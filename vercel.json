@@ -1,0 +1,14 @@
+{
+  "functions": {
+    "api/scrape_socialblade.py": {
+      "maxDuration": 60,
+      "includeFiles": "node_modules/playwright-core/**"
+    }
+  },
+  "build": {
+    "env": {
+      "PLAYWRIGHT_BROWSERS_PATH": "0"
+    }
+  },
+  "installCommand": "npm install && playwright install --with-deps chromium && pip install -r api/requirements.txt"
+}
