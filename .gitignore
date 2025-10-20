@@ -39,3 +39,17 @@ yarn-error.log*
 *.tsbuildinfo
 
 .vscode
+
+# Supabase
+.supabase/
+supabase/.branches
+supabase/.temp
+
+# Database
+*.db
+*.db-journal
+drizzle/
+
+# OS
+.DS_Store
+Thumbs.db
