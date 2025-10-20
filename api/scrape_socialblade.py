@@ -17,7 +17,8 @@ class ScrapeRequest(BaseModel):
 
 class DailyStat(BaseModel):
     views: int
-    newVideo: bool
+    videosPosted: int  # Número de vídeos postados naquele dia
+    hasNewVideo: bool  # Flag indicando se houve postagem
 
 class ScrapeResponse(BaseModel):
     channelId: str
@@ -129,21 +130,31 @@ async def scrape_channel(request: Request, body: ScrapeRequest):
 
                 # Extrai informação de vídeo novo da coluna 5 (índice 5)
                 video_cell = cells.nth(5)
+                videos_text = await video_cell.inner_text()
+                videos_text = videos_text.strip()
                 class_attr = await video_cell.get_attribute('class')
 
                 # Processa views
                 if views_text and views_text != '--':
-                    # Remove caracteres não numéricos
+                    # Remove caracteres não numéricos das views
                     views_num = int(''.join(filter(str.isdigit, views_text)))
 
+                    # Extrai o NÚMERO de vídeos postados (não apenas se é positivo)
+                    videos_count = 0
+                    if videos_text and videos_text != '--':
+                        videos_clean = ''.join(filter(str.isdigit, videos_text))
+                        if videos_clean:
+                            videos_count = int(videos_clean)
+
                     # Detecta se houve vídeo novo (classe 'positive')
-                    new_video = 'positive' in (class_attr or '')
+                    has_new_video = 'positive' in (class_attr or '')
 
                     # Filtra dias com views baixas (< 100)
                     if views_num > 100:
                         daily_stats.append(DailyStat(
                             views=views_num,
-                            newVideo=new_video
+                            videosPosted=videos_count,
+                            hasNewVideo=has_new_video
                         ))
 
             # Fecha o navegador
