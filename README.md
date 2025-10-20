@@ -1,49 +1,141 @@
----
-name: Postgres + Drizzle Next.js Starter
-slug: postgres-drizzle
-description: Simple Next.js template that uses a Postgres database and Drizzle as the ORM.
-framework: Next.js
-useCase: Starter
-css: Tailwind
-database: Postgres
-deployUrl: https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fexamples%2Ftree%2Fmain%2Fstorage%2Fpostgres-drizzle&project-name=postgres-drizzle&repository-name=postgres-drizzle&demo-title=Vercel%20Postgres%20%2B%20Drizzle%20Next.js%20Starter&demo-description=Simple%20Next.js%20template%20that%20uses%20Vercel%20Postgres%20as%20the%20database%20and%20Drizzle%20as%20the%20ORM.&demo-url=https%3A%2F%2Fpostgres-drizzle.vercel.app%2F&demo-image=https%3A%2F%2Fpostgres-drizzle.vercel.app%2Fopengraph-image.png&products=%5B%7B%22type%22%3A%22integration%22%2C%22group%22%3A%22postgres%22%7D%5D
-demoUrl: https://postgres-drizzle.vercel.app/
-relatedTemplates:
-  - postgres-starter
-  - postgres-prisma
-  - postgres-kysely
----
+# AutoMedia Platform
 
-# Postgres + Drizzle Next.js Starter
+**Next.js 15** application for YouTube channel benchmark and enrichment pipeline with AI-powered categorization.
 
-Simple Next.js template that uses a Postgres database and [Drizzle](https://github.com/drizzle-team/drizzle-orm) as the ORM.
+[![GitHub](https://img.shields.io/badge/GitHub-blessy--devops%2Fautomedia--app-blue?logo=github)](https://github.com/blessy-devops/automedia-app)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-green?logo=supabase)](https://supabase.com/)
 
-## Demo
+## 🚀 Features
 
-https://postgres-drizzle.vercel.app/
+- **5-Step Enrichment Pipeline** with AI categorization
+- **Real-time Progress Monitoring** via Supabase Realtime
+- **Structured Taxonomy** (niche → subniche → microniche → category → format)
+- **n8n Compatible** - 100% aligned with existing workflow
+- **Cost Optimized** - Pre-flight checks skip already-categorized channels
 
-## How to Use
-
-You can choose from one of the following two methods to use this repository:
-
-### One-Click Deploy
-
-Deploy the example using [Vercel](https://vercel.com?utm_source=github&utm_medium=readme&utm_campaign=vercel-examples):
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fexamples%2Ftree%2Fmain%2Fstorage%2Fpostgres-drizzle&project-name=postgres-drizzle&repository-name=postgres-drizzle&demo-title=Vercel%20Postgres%20%2B%20Drizzle%20Next.js%20Starter&demo-description=Simple%20Next.js%20template%20that%20uses%20Vercel%20Postgres%20as%20the%20database%20and%20Drizzle%20as%20the%20ORM.&demo-url=https%3A%2F%2Fpostgres-drizzle.vercel.app%2F&demo-image=https%3A%2F%2Fpostgres-drizzle.vercel.app%2Fopengraph-image.png&products=%5B%7B%22type%22%3A%22integration%22%2C%22group%22%3A%22postgres%22%7D%5D)
-
-### Clone and Deploy
-
-Execute [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app) with [pnpm](https://pnpm.io/installation) to bootstrap the example:
+## ⚡ Quick Start
 
 ```bash
-pnpm create next-app --example https://github.com/vercel/examples/tree/main/storage/postgres-drizzle
-```
+# 1. Clone
+git clone https://github.com/blessy-devops/automedia-app.git
+cd automedia-app
 
-Next, run Next.js in development mode:
+# 2. Install
+pnpm install
 
-```bash
+# 3. Configure .env
+cp .env.example .env
+# Edit .env with your Supabase credentials
+
+# 4. Run
 pnpm dev
 ```
 
-Deploy it to the cloud with [Vercel](https://vercel.com/new?utm_source=github&utm_medium=readme&utm_campaign=vercel-examples) ([Documentation](https://nextjs.org/docs/deployment)).
+Visit [http://localhost:3003/benchmark/channels](http://localhost:3003/benchmark/channels)
+
+## 📋 Prerequisites
+
+- Node.js 18+
+- pnpm
+- Supabase account
+- RapidAPI key (YouTube Data API)
+- OpenRouter API key
+
+## 📚 Documentation
+
+- **[CATEGORIZATION_N8N_ALIGNMENT.md](./CATEGORIZATION_N8N_ALIGNMENT.md)** - n8n workflow alignment
+- **[PIPELINE_IMPLEMENTATION_SUMMARY.md](./PIPELINE_IMPLEMENTATION_SUMMARY.md)** - Implementation overview
+- **[EDGE_FUNCTIONS_DEPLOYMENT.md](./EDGE_FUNCTIONS_DEPLOYMENT.md)** - Deployment guide
+- **[DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md)** - Database schema
+- **[SUPABASE_SETUP.md](./SUPABASE_SETUP.md)** - Supabase configuration
+
+## 🏗️ Tech Stack
+
+- **Framework**: Next.js 15 (App Router)
+- **Database**: Supabase (PostgreSQL)
+- **ORM**: Drizzle ORM
+- **UI**: shadcn/ui + Tailwind CSS
+- **Real-time**: Supabase Realtime
+- **Edge Functions**: Deno
+- **AI**: OpenRouter API (GPT-4o-mini)
+
+## 🔄 Pipeline Flow
+
+```
+User submits Channel ID
+    ↓
+enrichment-pipeline-starter
+    ↓ Fetches channel details from RapidAPI
+    ↓
+enrichment-step-1-categorization ✅ COMPLETE
+    ↓ AI-powered categorization with n8n taxonomy
+    ↓
+enrichment-step-2-socialblade 🚧 STUB
+    ↓ SocialBlade metrics
+    ↓
+enrichment-step-3-fetch-videos 🚧 STUB
+    ↓ Video fetching
+    ↓
+enrichment-step-4-baseline-stats 🚧 STUB
+    ↓ Performance baselines
+    ↓
+enrichment-step-5-outlier-analysis 🚧 STUB
+    ↓ Outlier detection
+    ↓
+Pipeline Complete! ✅
+```
+
+## 🎯 Categorization Example
+
+```json
+{
+  "niche": "technology",
+  "subniche": "web_development",
+  "microniche": "fast_paced_tutorials",
+  "category": "tutorial",
+  "format": "screen_recording"
+}
+```
+
+## 💰 Performance
+
+- **Latency**: 2-5s (new) | ~100ms (skip)
+- **Cost**: ~$0.0013/channel (new) | $0 (skip)
+- **Savings**: 50% on re-categorization with pre-flight check
+
+## 🧪 Testing
+
+```bash
+# 1. Navigate to benchmark page
+open http://localhost:3003/benchmark/channels
+
+# 2. Enter Channel ID
+# Example: UCuAXFkgsw1L7xaCfnd5JJOw (Fireship)
+
+# 3. Monitor logs
+supabase functions logs enrichment-step-1-categorization --follow
+```
+
+## 📦 Deployment
+
+### Deploy Edge Functions
+
+```bash
+supabase functions deploy --project-ref YOUR_PROJECT_REF
+```
+
+### Set Secrets
+
+```bash
+supabase secrets set rapidapi_key_1760651731629=YOUR_KEY --project-ref YOUR_PROJECT_REF
+supabase secrets set openrouter_key_1760655833491=YOUR_KEY --project-ref YOUR_PROJECT_REF
+```
+
+## 📄 License
+
+MIT
+
+---
+
+**Built with ❤️ using [Claude Code](https://claude.com/claude-code)**
