@@ -37,7 +37,7 @@ export async function startChannelBenchmark(channelId: string) {
     // Step 1: Create enrichment job using Supabase client
     const supabase = await createClient()
 
-    const { data: job, error: jobError } = await supabase
+    const { data: job, error: jobError } = await (supabase as any)
       .from('channel_enrichment_jobs')
       .insert({
         channel_ids: [sanitizedChannelId],
@@ -60,7 +60,7 @@ export async function startChannelBenchmark(channelId: string) {
     console.log(`[Benchmark] Created job #${job.id}`)
 
     // Step 2: Create enrichment task
-    const { data: task, error: taskError } = await supabase
+    const { data: task, error: taskError } = await (supabase as any)
       .from('channel_enrichment_tasks')
       .insert({
         enrichment_job_id: job.id,
