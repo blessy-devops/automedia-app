@@ -423,10 +423,27 @@ export type NewUser = InferInsertModel<typeof UsersTable>
 // ============================================================================
 
 /**
+ * Database schema for Drizzle ORM query API
+ */
+const schema = {
+  benchmarkChannelsTable,
+  benchmarkVideosTable,
+  benchmarkChannelsBaselineStatsTable,
+  channelEnrichmentJobsTable,
+  channelEnrichmentTasksTable,
+  structureCategorizationNichesTable,
+  structureCategorizationSubnichesTable,
+  structureCategorizationCategoriesTable,
+  structureCategorizationFormatsTable,
+  structureCategorizationMicronichesTable,
+  UsersTable,
+}
+
+/**
  * db - Conexão padrão usando shared pooler
  * Use para: Queries rápidas, CRUD padrão, operações síncronas
  */
-export const db = drizzle(sqlPooled)
+export const db = drizzle(sqlPooled, { schema })
 
 /**
  * dbDirect - Conexão direta ao banco
@@ -439,4 +456,4 @@ export const db = drizzle(sqlPooled)
  * const result = await dbDirect.select().from(channelEnrichmentTasksTable)
  * ```
  */
-export const dbDirect = drizzle(sqlDirect)
+export const dbDirect = drizzle(sqlDirect, { schema })

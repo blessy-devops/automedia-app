@@ -35,6 +35,16 @@ interface RapidAPIChannelResponse {
 }
 
 Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      },
+    })
+  }
+
   try {
     // Parse request body
     const { channelId, taskId }: RequestBody = await req.json()
@@ -70,7 +80,7 @@ Deno.serve(async (req) => {
     // Step 2: Fetch RapidAPI Key from Supabase Vault
     console.log('[Pipeline] Fetching RapidAPI key from Vault')
 
-    const { data: vaultData, error: vaultError } = await supabase.rpc('get_secret', {
+    const { data: vaultData, error: vaultError } = await supabase.rpc('read_secret', {
       secret_name: 'rapidapi_key_1760651731629',
     })
 

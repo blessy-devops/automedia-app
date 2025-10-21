@@ -88,7 +88,7 @@ export async function getVaultSecret(secretName: string): Promise<string | null>
   const supabase = createAdminClient()
 
   try {
-    const { data, error } = await supabase.rpc('get_secret', {
+    const { data, error } = await (supabase as any).rpc('get_secret', {
       secret_name: secretName,
     })
 
