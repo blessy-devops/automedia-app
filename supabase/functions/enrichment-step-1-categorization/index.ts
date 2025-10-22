@@ -130,17 +130,13 @@ Deno.serve(async (req) => {
       hasKeywords: !!channelData.channel_keywords,
     })
 
-    // Step 4: Fetch popular videos from RapidAPI
-    console.log('[Step 1: Categorization] Fetching popular videos from RapidAPI')
-    const { data: rapidApiKeyData } = await supabase.rpc('get_secret', {
-      secret_name: 'rapidapi_key_1760651731629',
-    })
+    // Step 4: Get RapidAPI key from Environment Variables
+    console.log('[Step 1: Categorization] Getting RapidAPI key from environment')
+    const rapidApiKey = Deno.env.get('RAPIDAPI_KEY')
 
-    if (!rapidApiKeyData) {
-      throw new Error('Failed to retrieve RapidAPI key from Vault')
+    if (!rapidApiKey) {
+      throw new Error('RAPIDAPI_KEY environment variable not found. Please add it to Edge Function secrets.')
     }
-
-    const rapidApiKey = rapidApiKeyData as string
 
     const videosResponse = await fetch(
       `https://yt-api.p.rapidapi.com/channel/videos?id=${channelId}&sort_by=popular&limit=30`,
@@ -248,15 +244,11 @@ Deno.serve(async (req) => {
 
     // Step 7: Fetch OpenRouter API key
     console.log('[Step 1: Categorization] Fetching OpenRouter API key from Vault')
-    const { data: openRouterKeyData } = await supabase.rpc('get_secret', {
-      secret_name: 'openrouter_key_1760655833491',
-    })
+    const openRouterKey = Deno.env.get('OPENROUTER_API_KEY')
 
-    if (!openRouterKeyData) {
-      throw new Error('Failed to retrieve OpenRouter key from Vault')
+    if (!openRouterKey) {
+      throw new Error('OPENROUTER_API_KEY environment variable not found. Please add it to Edge Function secrets.')
     }
-
-    const openRouterKey = openRouterKeyData as string
 
     // Step 8: Build LLM prompt (using n8n system prompt)
     console.log('[Step 1: Categorization] Building LLM prompt with taxonomy')
@@ -267,7 +259,7 @@ Deno.serve(async (req) => {
     </role>
 
     <critical_instruction>
-A Regra de Ouro: O perfil do CANAL (<channel_data>) incluindo nome, descrição, keywords e vídeos populares são suas fontes primárias. A padronização para os termos em <lista_de_opcoes_validas> é obrigatória.
+A Regra de Ouro: O perfil do CANAL (\`<channel_data>\`) incluindo nome, descrição, keywords e vídeos populares são suas fontes primárias. A padronização para os termos em \`<lista_de_opcoes_validas>\` é obrigatória.
     </critical_instruction>
 
     <taxonomia_e_definicoes>
@@ -276,7 +268,7 @@ A Regra de Ouro: O perfil do CANAL (<channel_data>) incluindo nome, descrição,
         <microniche>
             Uma etiqueta de agrupamento TEMÁTICO que define o foco específico do canal DENTRO do subniche. NÃO é a categoria, NEM o formato.
 
-            - **PROIBIÇÃO:** O microniche NUNCA pode ser um termo de category ou format.
+            - **PROIBIÇÃO:** O microniche NUNCA pode ser um termo de \`category\` ou \`format\`.
             - **OBJETIVO:** Definir o posicionamento único do canal dentro do seu subniche.
 
             - **ESTRUTURA RECOMENDADA quando aplicável:**
@@ -304,13 +296,13 @@ A Regra de Ouro: O perfil do CANAL (<channel_data>) incluindo nome, descrição,
     </taxonomia_e_definicoes>
 
     <regras_de_normalizacao_obrigatorias>
-        - SE a estrutura do conteúdo for uma história ("storytime", "folktale", "tale") -> o category DEVE ser "narrative".
-        - SE o subniche parecer ser "christianity" ou "bible mysteries" -> o subniche DEVE ser "biblical_stories".
-        - SE a estrutura for instrucional ("how-to", "guide") -> o category DEVE ser "tutorial".
+        - SE a estrutura do conteúdo for uma história ("storytime", "folktale", "tale") -> o \`category\` DEVE ser "narrative".
+        - SE o subniche parecer ser "christianity" ou "bible mysteries" -> o \`subniche\` DEVE ser "biblical_stories".
+        - SE a estrutura for instrucional ("how-to", "guide") -> o \`category\` DEVE ser "tutorial".
     </regras_de_normalizacao_obrigatorias>
 
     <workflow>
-        1. Analise os dados em <channel_data> incluindo nome, descrição, keywords e vídeos populares.
+        1. Analise os dados em \`<channel_data>\` incluindo nome, descrição, keywords e vídeos populares.
         2. **Decisão de Niche/Subniche:** Determine o tópico predominante do CANAL...
         3. **Decisão de Category/Format:** Determine a estrutura e formato predominantes do CANAL...
         4. **Decisão de Microniche:** Seguindo a estrutura recomendada quando aplicável...
@@ -333,6 +325,7 @@ A Regra de Ouro: O perfil do CANAL (<channel_data>) incluindo nome, descrição,
 
     const userPrompt = `# DADOS DO CANAL
 <channel_data>
+
     <channel_name>
       ${channelData.channel_name || 'Not provided'}
     </channel_name>
@@ -348,6 +341,7 @@ A Regra de Ouro: O perfil do CANAL (<channel_data>) incluindo nome, descrição,
     <channel_popular_videos>
       ${videoTitles.map((title, idx) => `${idx + 1}. ${title}`).join('\n      ')}
     </channel_popular_videos>
+
 </channel_data>
 
 # GABARITO DE RESPOSTAS
@@ -459,9 +453,19 @@ A Regra de Ouro: O perfil do CANAL (<channel_data>) incluindo nome, descrição,
 
     // Step 13: Invoke next step in pipeline (SocialBlade)
     console.log('[Step 1: Categorization] Invoking Step 2: SocialBlade')
-    await supabase.functions.invoke('enrichment-step-2-socialblade', {
+    console.log('[Step 1: Categorization] Payload:', { channelId, taskId })
+
+    const step2Response = await supabase.functions.invoke('enrichment-step-2-socialblade', {
       body: { channelId, taskId },
     })
+
+    if (step2Response.error) {
+      console.error('[Step 1: Categorization] Error invoking Step 2:', step2Response.error)
+      console.error('[Step 1: Categorization] Step 2 error details:', JSON.stringify(step2Response.error, null, 2))
+    } else {
+      console.log('[Step 1: Categorization] Step 2 invoked successfully')
+      console.log('[Step 1: Categorization] Step 2 response:', step2Response.data)
+    }
 
     console.log('[Step 1: Categorization] Successfully completed categorization')
 

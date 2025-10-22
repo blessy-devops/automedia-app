@@ -1,42 +1,9 @@
 // @ts-ignore: Deno-specific imports
 import { createClient } from 'npm:@supabase/supabase-js@2'
-// @ts-ignore: Deno-specific imports
-import { drizzle } from 'npm:drizzle-orm/postgres-js'
-// @ts-ignore: Deno-specific imports
-import postgres from 'npm:postgres'
-// @ts-ignore: Deno-specific imports
-import { eq } from 'npm:drizzle-orm'
-// @ts-ignore: Deno-specific imports
-import {
-  pgTable,
-  serial,
-  varchar,
-  bigint,
-  integer,
-  real,
-  timestamp,
-} from 'npm:drizzle-orm/pg-core'
+import { scrapeSocialBladeV2 } from '../_shared/socialblade-scraper-v2.ts'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const dbUrl = Deno.env.get('DATABASE_URL_DIRECT')!
-const scraperApiUrl = Deno.env.get('SCRAPER_API_URL')!
-const socialbladeApiSecret = Deno.env.get('SOCIALBLADE_API_SECRET')!
-
-// Drizzle schema definitions (inline for Edge Function)
-const benchmarkChannelsBaselineStatsTable = pgTable('benchmark_channels_baseline_stats', {
-  id: serial('id').primaryKey(),
-  channelId: varchar('channel_id', { length: 255 }).notNull(),
-  totalViews14d: bigint('total_views_14d', { mode: 'number' }),
-  videosCount14d: integer('videos_count_14d'),
-  avgViewsPerVideo14d: real('avg_views_per_video_14d'),
-  mediaDiariaViews14d: real('media_diaria_views_14d'),
-  taxaCrescimento: real('taxa_crescimento'),
-  avgViewsPerVideoHistorical: real('avg_views_per_video_historical'),
-  calculatedAt: timestamp('calculated_at', { withTimezone: true }).defaultNow().notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-})
 
 /**
  * Enrichment Step 2: SocialBlade Metrics
@@ -78,59 +45,31 @@ Deno.serve(async (req) => {
       .eq('id', taskId)
 
     // ========================================================================
-    // STEP 2: Call Vercel Function to scrape Social Blade
+    // STEP 2: Scrape Social Blade using V2 scraper
     // ========================================================================
-    console.log('[Step 2: SocialBlade] Calling Vercel scraper API...')
+    console.log('[Step 2: SocialBlade] Calling SocialBlade scraper V2...')
 
-    if (!scraperApiUrl || !socialbladeApiSecret) {
-      throw new Error('Missing SCRAPER_API_URL or SOCIALBLADE_API_SECRET environment variables')
-    }
-
-    const scraperResponse = await fetch(scraperApiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${socialbladeApiSecret}`,
-      },
-      body: JSON.stringify({ channelId }),
-    })
-
-    if (!scraperResponse.ok) {
-      const errorText = await scraperResponse.text()
-      throw new Error(`Scraper API failed with status ${scraperResponse.status}: ${errorText}`)
-    }
-
-    const scrapedData: {
-      channelId: string
-      dailyStats: Array<{
-        views: number
-        videosPosted: number
-        hasNewVideo: boolean
-      }>
-    } = await scraperResponse.json()
+    const scrapedData = await scrapeSocialBladeV2(channelId)
 
     console.log(`[Step 2: SocialBlade] Received ${scrapedData.dailyStats.length} days of data`)
 
     // ========================================================================
-    // STEP 3: Calculate metrics from scraped data
+    // STEP 3: Extract metrics from scraped data (already calculated by V2)
     // ========================================================================
-    const dailyStats = scrapedData.dailyStats
+    const { aggregated, dailyStats } = scrapedData
 
     if (dailyStats.length === 0) {
       throw new Error('No daily stats returned from scraper')
     }
 
-    // Calculate total views (14d)
-    const totalViews14d = dailyStats.reduce((sum, day) => sum + day.views, 0)
-
-    // Calculate total videos posted (14d)
-    const videosCount14d = dailyStats.reduce((sum, day) => sum + day.videosPosted, 0)
-
-    // Calculate average views per day (14d)
-    const mediaDiariaViews14d = dailyStats.length > 0 ? totalViews14d / dailyStats.length : 0
-
-    // Calculate average views per video (14d)
-    const avgViewsPerVideo14d = videosCount14d > 0 ? totalViews14d / videosCount14d : 0
+    // Use aggregated metrics from V2 scraper
+    const totalSubscribers14d = aggregated.totalSubscribers
+    const totalViews14d = aggregated.totalViews
+    const videosCount14d = aggregated.totalVideosPosted
+    const mediaDiariaViews14d = aggregated.averageViewsPerDay
+    const avgViewsPerVideo14d = aggregated.totalVideosPosted > 0
+      ? aggregated.totalViews / aggregated.totalVideosPosted
+      : 0
 
     // Calculate growth rate (taxa_crescimento)
     // Compare first half vs second half of the period
@@ -149,6 +88,7 @@ Deno.serve(async (req) => {
     }
 
     console.log('[Step 2: SocialBlade] Calculated metrics:', {
+      totalSubscribers14d,
       totalViews14d,
       videosCount14d,
       avgViewsPerVideo14d: avgViewsPerVideo14d.toFixed(2),
@@ -181,41 +121,30 @@ Deno.serve(async (req) => {
     console.log('[Step 2: SocialBlade] Historical average:', avgViewsPerVideoHistorical.toFixed(2))
 
     // ========================================================================
-    // STEP 5: UPSERT baseline stats using Drizzle
+    // STEP 5: UPSERT baseline stats using Supabase Client
     // ========================================================================
     console.log('[Step 2: SocialBlade] Upserting baseline stats...')
 
-    const sql = postgres(dbUrl, { prepare: false })
-    const db = drizzle(sql)
-
-    await db
-      .insert(benchmarkChannelsBaselineStatsTable)
-      .values({
-        channelId: channelId,
-        totalViews14d: BigInt(totalViews14d),
-        videosCount14d: videosCount14d,
-        avgViewsPerVideo14d: avgViewsPerVideo14d,
-        mediaDiariaViews14d: mediaDiariaViews14d,
-        taxaCrescimento: taxaCrescimento,
-        avgViewsPerVideoHistorical: avgViewsPerVideoHistorical,
-        calculatedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: benchmarkChannelsBaselineStatsTable.channelId,
-        set: {
-          totalViews14d: BigInt(totalViews14d),
-          videosCount14d: videosCount14d,
-          avgViewsPerVideo14d: avgViewsPerVideo14d,
-          mediaDiariaViews14d: mediaDiariaViews14d,
-          taxaCrescimento: taxaCrescimento,
-          avgViewsPerVideoHistorical: avgViewsPerVideoHistorical,
-          calculatedAt: new Date(),
-          updatedAt: new Date(),
-        },
+    const { error: upsertError } = await supabase
+      .from('benchmark_channels_baseline_stats')
+      .upsert({
+        channel_id: channelId,
+        total_views_14d: totalViews14d,
+        videos_count_14d: videosCount14d,
+        avg_views_per_video_14d: avgViewsPerVideo14d,
+        avg_views_per_video_historical: avgViewsPerVideoHistorical,
+        media_diaria_views_14d: mediaDiariaViews14d,
+        taxa_crescimento: taxaCrescimento,
+        calculated_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'channel_id'
       })
 
-    await sql.end()
+    if (upsertError) {
+      console.error('[Step 2: SocialBlade] Error upserting baseline stats:', upsertError)
+      throw new Error(`Failed to upsert baseline stats: ${upsertError.message}`)
+    }
 
     console.log('[Step 2: SocialBlade] Baseline stats upserted successfully')
 
@@ -228,6 +157,7 @@ Deno.serve(async (req) => {
         socialblade_status: 'completed',
         socialblade_completed_at: new Date().toISOString(),
         socialblade_result: {
+          totalSubscribers14d,
           totalViews14d,
           videosCount14d,
           avgViewsPerVideo14d,
@@ -242,9 +172,9 @@ Deno.serve(async (req) => {
     // ========================================================================
     // STEP 7: Invoke next step in the pipeline
     // ========================================================================
-    console.log('[Step 2: SocialBlade] Invoking Step 3: Recent Videos Fetch')
+    console.log('[Step 2: SocialBlade] Invoking Step 3: Recent Videos')
 
-    const nextStepResponse = await supabase.functions.invoke('enrichment-step-3-fetch-videos', {
+    const nextStepResponse = await supabase.functions.invoke('enrichment-step-3-recent-videos', {
       body: { channelId, taskId },
     })
 
@@ -262,6 +192,7 @@ Deno.serve(async (req) => {
         channelId,
         taskId,
         metrics: {
+          totalSubscribers14d,
           totalViews14d,
           videosCount14d,
           avgViewsPerVideo14d,

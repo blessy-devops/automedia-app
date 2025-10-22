@@ -1,39 +1,8 @@
 // @ts-ignore: Deno-specific imports
 import { createClient } from 'npm:@supabase/supabase-js@2'
-// @ts-ignore: Deno-specific imports
-import { drizzle } from 'npm:drizzle-orm/postgres-js'
-// @ts-ignore: Deno-specific imports
-import postgres from 'npm:postgres'
-// @ts-ignore: Deno-specific imports
-import { pgTable, serial, varchar, text, timestamp, integer, jsonb } from 'npm:drizzle-orm/pg-core'
-// @ts-ignore: Deno-specific imports
-import { eq } from 'npm:drizzle-orm'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const dbUrl = Deno.env.get('DATABASE_URL_DIRECT')!
-
-// Drizzle schema for benchmark_videos
-const benchmarkVideosTable = pgTable('benchmark_videos', {
-  id: serial('id').primaryKey(),
-  youtubeVideoId: varchar('youtube_video_id', { length: 255 }).notNull().unique(),
-  channelId: varchar('channel_id', { length: 255 }).notNull(),
-  title: text('title'),
-  description: text('description'),
-  videoTranscript: text('video_transcript'),
-  categorization: jsonb('categorization'),
-  updatedAt: timestamp('updated_at', { withTimezone: true }),
-})
-
-// Drizzle schema for benchmark_channels
-const benchmarkChannelsTable = pgTable('benchmark_channels', {
-  id: serial('id').primaryKey(),
-  channelId: varchar('channel_id', { length: 255 }).notNull().unique(),
-  channelName: text('channel_name'),
-  description: text('description'),
-  channelKeywords: jsonb('channel_keywords'),
-  categorization: jsonb('categorization'),
-})
 
 /**
  * Video Categorization Manager (Sub-workflow)
@@ -164,19 +133,15 @@ Deno.serve(async (req) => {
     })
 
     // ========================================================================
-    // STEP 5: Fetch OpenRouter API key
+    // STEP 5: Get OpenRouter API key from Environment Variables
     // ========================================================================
-    console.log('[Video Categorization Manager] Fetching OpenRouter API key...')
+    console.log('[Video Categorization Manager] Getting OpenRouter API key from environment...')
 
-    const { data: openRouterKeyData, error: keyError } = await supabase.rpc('read_secret', {
-      secret_name: 'openrouter_key_1760655833491',
-    })
+    const openRouterKey = Deno.env.get('OPENROUTER_API_KEY')
 
-    if (keyError || !openRouterKeyData) {
-      throw new Error(`Failed to fetch OpenRouter key: ${keyError?.message || 'No data'}`)
+    if (!openRouterKey) {
+      throw new Error('OPENROUTER_API_KEY environment variable not found. Please add it to Edge Function secrets.')
     }
-
-    const openRouterKey = openRouterKeyData as string
 
     // ========================================================================
     // STEP 6: Build LLM prompt (n8n agente_categorizador_v7.4_contextual)
@@ -385,22 +350,22 @@ Deno.serve(async (req) => {
     console.log('[Video Categorization Manager] Parsed categorization:', categorizationObject)
 
     // ========================================================================
-    // STEP 9: Update benchmark_videos with categorization
+    // STEP 9: Update benchmark_videos with categorization using Supabase Client
     // ========================================================================
     console.log('[Video Categorization Manager] Updating benchmark_videos...')
 
-    const sql = postgres(dbUrl, { prepare: false })
-    const db = drizzle(sql)
-
-    await db
-      .update(benchmarkVideosTable)
-      .set({
-        categorization: categorizationObject as any,
-        updatedAt: new Date(),
+    const { error: updateError } = await supabase
+      .from('benchmark_videos')
+      .update({
+        categorization: categorizationObject,
+        updated_at: new Date().toISOString(),
       })
-      .where(eq(benchmarkVideosTable.youtubeVideoId, youtube_video_id))
+      .eq('youtube_video_id', youtube_video_id)
 
-    await sql.end()
+    if (updateError) {
+      console.error('[Video Categorization Manager] Error updating categorization:', updateError)
+      throw new Error(`Failed to update categorization: ${updateError.message}`)
+    }
 
     console.log('[Video Categorization Manager] Successfully categorized video')
 

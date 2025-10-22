@@ -1,17 +1,8 @@
 // @ts-ignore: Deno-specific imports
 import { createClient } from 'npm:@supabase/supabase-js@2'
-// @ts-ignore: Deno-specific imports
-import { drizzle } from 'npm:drizzle-orm/postgres-js'
-// @ts-ignore: Deno-specific imports
-import postgres from 'npm:postgres'
-// @ts-ignore: Deno-specific imports
-import { pgTable, serial, varchar, text, timestamp } from 'npm:drizzle-orm/pg-core'
-// @ts-ignore: Deno-specific imports
-import { eq } from 'npm:drizzle-orm'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const dbUrl = Deno.env.get('DATABASE_URL_DIRECT')!
 
 // CORS headers
 const corsHeaders = {
@@ -19,14 +10,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Content-Type': 'application/json',
 }
-
-// Drizzle schema for benchmark_videos
-const benchmarkVideosTable = pgTable('benchmark_videos', {
-  id: serial('id').primaryKey(),
-  youtubeVideoId: varchar('youtube_video_id', { length: 255 }).notNull().unique(),
-  videoTranscript: text('video_transcript'),
-  updatedAt: timestamp('updated_at', { withTimezone: true }),
-})
 
 /**
  * Helper function to clean SRT transcript text
@@ -100,22 +83,19 @@ Deno.serve(async (req) => {
     // ========================================================================
     console.log('[Video Transcript] Checking if transcript already exists in DB...')
 
-    const sql = postgres(dbUrl, { prepare: false })
-    const db = drizzle(sql)
+    const { data: existingVideo, error: selectError } = await supabase
+      .from('benchmark_videos')
+      .select('video_transcript')
+      .eq('youtube_video_id', youtube_video_id)
+      .single()
 
-    const [existingVideo] = await db
-      .select({ transcript: benchmarkVideosTable.videoTranscript })
-      .from(benchmarkVideosTable)
-      .where(eq(benchmarkVideosTable.youtubeVideoId, youtube_video_id))
-
-    if (existingVideo && existingVideo.transcript) {
+    if (existingVideo && existingVideo.video_transcript) {
       console.log(`[Video Transcript] Transcript already exists for ${youtube_video_id}. Returning from DB.`)
-      await sql.end()
 
       return new Response(
         JSON.stringify({
           success: true,
-          transcript: existingVideo.transcript,
+          transcript: existingVideo.video_transcript,
           source: 'database',
         }),
         { status: 200, headers: corsHeaders }
@@ -123,20 +103,15 @@ Deno.serve(async (req) => {
     }
 
     // ========================================================================
-    // STEP 2: Fetch RapidAPI key from Vault
+    // STEP 2: Get RapidAPI key from Environment Variables
     // ========================================================================
-    console.log('[Video Transcript] Fetching RapidAPI key from Vault...')
+    console.log('[Video Transcript] Getting RapidAPI key from environment...')
 
-    const { data: rapidApiKeyData, error: keyError } = await supabase.rpc('read_secret', {
-      secret_name: 'rapidapi_key_1760651731629',
-    })
+    const rapidApiKey = Deno.env.get('RAPIDAPI_KEY')
 
-    if (keyError || !rapidApiKeyData) {
-      await sql.end()
-      throw new Error(`Failed to fetch RapidAPI key: ${keyError?.message || 'No data'}`)
+    if (!rapidApiKey) {
+      throw new Error('RAPIDAPI_KEY environment variable not found. Please add it to Edge Function secrets.')
     }
-
-    const rapidApiKey = rapidApiKeyData as string
 
     // ========================================================================
     // STEP 3: Call RapidAPI - List available subtitles
@@ -155,7 +130,6 @@ Deno.serve(async (req) => {
     )
 
     if (!subtitlesResponse.ok) {
-      await sql.end()
       const errorText = await subtitlesResponse.text()
       throw new Error(`RapidAPI subtitles request failed: ${subtitlesResponse.status} - ${errorText}`)
     }
@@ -181,7 +155,6 @@ Deno.serve(async (req) => {
     // No subtitles available
     if (!selectedSubtitle || !selectedSubtitle.url) {
       console.log('[Video Transcript] No suitable subtitles found (pt/en)')
-      await sql.end()
 
       return new Response(
         JSON.stringify({
@@ -212,7 +185,6 @@ Deno.serve(async (req) => {
     })
 
     if (!srtResponse.ok) {
-      await sql.end()
       const errorText = await srtResponse.text()
       throw new Error(`RapidAPI SRT download failed: ${srtResponse.status} - ${errorText}`)
     }
@@ -229,19 +201,22 @@ Deno.serve(async (req) => {
     console.log(`[Video Transcript] Cleaned transcript (${cleanedTranscript.length} chars)`)
 
     // ========================================================================
-    // STEP 7: Save to database
+    // STEP 7: Save to database using Supabase Client
     // ========================================================================
     console.log('[Video Transcript] Saving transcript to database...')
 
-    await db
-      .update(benchmarkVideosTable)
-      .set({
-        videoTranscript: cleanedTranscript,
-        updatedAt: new Date(),
+    const { error: updateError } = await supabase
+      .from('benchmark_videos')
+      .update({
+        video_transcript: cleanedTranscript,
+        updated_at: new Date().toISOString(),
       })
-      .where(eq(benchmarkVideosTable.youtubeVideoId, youtube_video_id))
+      .eq('youtube_video_id', youtube_video_id)
 
-    await sql.end()
+    if (updateError) {
+      console.error('[Video Transcript] Error updating transcript:', updateError)
+      throw new Error(`Failed to update transcript: ${updateError.message}`)
+    }
 
     console.log('[Video Transcript] Transcript saved successfully')
 

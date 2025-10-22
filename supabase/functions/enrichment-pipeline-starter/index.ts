@@ -30,8 +30,11 @@ interface RapidAPIChannelResponse {
   keywords?: string[]
   country?: string
   customUrl?: string
-  thumbnail?: string
-  banner?: string
+  channelHandle?: string
+  thumbnail?: string  // Old API format (deprecated)
+  avatar?: Array<{ url: string; width: number; height: number }>  // New API format
+  banner?: string | Array<{ url: string; width: number; height: number }>  // Support both formats
+  isVerified?: boolean
 }
 
 Deno.serve(async (req) => {
@@ -77,18 +80,14 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to update task status: ${updateError.message}`)
     }
 
-    // Step 2: Fetch RapidAPI Key from Supabase Vault
-    console.log('[Pipeline] Fetching RapidAPI key from Vault')
+    // Step 2: Get RapidAPI Key from Environment Variables
+    console.log('[Pipeline] Getting RapidAPI key from environment')
 
-    const { data: vaultData, error: vaultError } = await supabase.rpc('read_secret', {
-      secret_name: 'rapidapi_key_1760651731629',
-    })
+    const rapidApiKey = Deno.env.get('RAPIDAPI_KEY')
 
-    if (vaultError || !vaultData) {
-      throw new Error(`Failed to fetch API key from Vault: ${vaultError?.message || 'No data'}`)
+    if (!rapidApiKey) {
+      throw new Error('RAPIDAPI_KEY environment variable not found. Please add it to Edge Function secrets.')
     }
-
-    const rapidApiKey = vaultData as string
 
     // Step 3: Call RapidAPI to get channel details
     console.log(`[Pipeline] Fetching channel data from RapidAPI for: ${channelId}`)
@@ -112,6 +111,45 @@ Deno.serve(async (req) => {
 
     console.log('[Pipeline] Successfully fetched channel data from RapidAPI')
 
+    // Helper: Select best avatar URL from array (prefer 176x176 for high quality)
+    // Supports both old format (string) and new format (array)
+    const getAvatarUrl = (
+      avatarArray?: Array<{ url: string; width: number; height: number }>,
+      thumbnailString?: string
+    ): string | null => {
+      // Try new format first (avatar array)
+      if (avatarArray && Array.isArray(avatarArray) && avatarArray.length > 0) {
+        // Prefer 176x176 for high quality
+        const highRes = avatarArray.find(a => a.width >= 176)
+        if (highRes) return highRes.url
+
+        // Fallback to largest available
+        const largest = avatarArray.reduce((prev, current) =>
+          current.width > prev.width ? current : prev
+        )
+        return largest.url
+      }
+
+      // Fallback to old format (thumbnail string)
+      return thumbnailString || null
+    }
+
+    // Helper: Convert banner to JSON string
+    // Supports both old format (string) and new format (array)
+    const getBannerUrl = (banner?: string | Array<{ url: string; width: number; height: number }>): string | null => {
+      if (!banner) return null
+
+      // If it's already a string, return as is (old format)
+      if (typeof banner === 'string') return banner
+
+      // If it's an array, convert to JSON (new format)
+      if (Array.isArray(banner) && banner.length > 0) {
+        return JSON.stringify(banner)
+      }
+
+      return null
+    }
+
     // Step 4: Standardize and map API data to database schema
     const standardizedData = {
       channel_id: apiData.channelId || channelId,
@@ -126,10 +164,10 @@ Deno.serve(async (req) => {
       channel_keywords: apiData.keywords || null,
       metric_date: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
       country: apiData.country || null,
-      custom_url: apiData.customUrl || null,
-      thumbnail_url: apiData.thumbnail || null,
-      banner_url: apiData.banner || null,
-      is_verified: false, // TODO: Get from API if available
+      custom_url: apiData.customUrl || apiData.channelHandle || null,
+      thumbnail_url: getAvatarUrl(apiData.avatar, apiData.thumbnail),
+      banner_url: getBannerUrl(apiData.banner),
+      is_verified: apiData.isVerified || false,
       updated_at: new Date().toISOString(),
     }
 
@@ -156,29 +194,32 @@ Deno.serve(async (req) => {
     console.log('[Pipeline] Successfully saved channel data to database')
 
     // Step 6: Invoke next Edge Function in the pipeline (categorization)
+    // Using fire-and-forget pattern to avoid timeout issues
     console.log('[Pipeline] Invoking next step: enrichment-step-1-categorization')
+    console.log('[Pipeline] Invocation payload:', { channelId, taskId })
 
-    try {
-      const { error: invokeError } = await supabase.functions.invoke(
-        'enrichment-step-1-categorization',
-        {
-          body: {
-            channelId,
-            taskId,
-          },
-        }
-      )
-
-      if (invokeError) {
-        console.error('[Pipeline] Error invoking next step:', invokeError)
-        // Don't fail - the task is saved and can be retried
-      } else {
-        console.log('[Pipeline] Successfully invoked categorization step')
+    // Fire and forget - don't wait for response to avoid timeout
+    supabase.functions.invoke(
+      'enrichment-step-1-categorization',
+      {
+        body: {
+          channelId,
+          taskId,
+        },
       }
-    } catch (invokeError) {
-      console.error('[Pipeline] Exception invoking next step:', invokeError)
-      // Continue - task can be retried
-    }
+    ).then(({ data, error: invokeError }) => {
+      if (invokeError) {
+        console.error('[Pipeline] Error invoking Step 1:', invokeError)
+        console.error('[Pipeline] Error details:', JSON.stringify(invokeError, null, 2))
+      } else {
+        console.log('[Pipeline] Successfully invoked Step 1')
+        console.log('[Pipeline] Step 1 response:', data)
+      }
+    }).catch((invokeError) => {
+      console.error('[Pipeline] Exception invoking Step 1:', invokeError)
+    })
+
+    console.log('[Pipeline] Step 1 invocation sent (fire-and-forget)')
 
     // Return success response
     return new Response(

@@ -102,10 +102,45 @@ BEGIN
 END;
 $$;
 
+-- Function: read_secret
+-- Reads a secret value from the Supabase Vault
+--
+-- Parameters:
+--   secret_name: The name/identifier of the secret to retrieve
+--
+-- Returns: The secret value as text
+CREATE OR REPLACE FUNCTION public.read_secret(secret_name text)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  secret_value text;
+BEGIN
+  -- Validate input
+  IF secret_name IS NULL OR secret_name = '' THEN
+    RAISE EXCEPTION 'Secret name cannot be empty';
+  END IF;
+
+  -- Read the secret from the vault
+  -- This uses the vault.decrypted_secrets view
+  SELECT decrypted_secret INTO secret_value
+  FROM vault.decrypted_secrets
+  WHERE name = secret_name
+  LIMIT 1;
+
+  -- Return the secret value (will be NULL if not found)
+  RETURN secret_value;
+END;
+$$;
+
 -- Grant execute permissions to authenticated users only
 -- In production, you should restrict this to admin role only
 GRANT EXECUTE ON FUNCTION public.list_secrets() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.update_vault_secret(text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.read_secret(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.read_secret(text) TO service_role;
 
 -- Add helpful comments
 COMMENT ON FUNCTION public.list_secrets() IS
@@ -113,3 +148,6 @@ COMMENT ON FUNCTION public.list_secrets() IS
 
 COMMENT ON FUNCTION public.update_vault_secret(text, text) IS
   'Updates or creates a secret in the Supabase Vault. Security: authenticated users only. In production, restrict to admin role.';
+
+COMMENT ON FUNCTION public.read_secret(text) IS
+  'Reads a secret value from the Supabase Vault. Returns NULL if secret not found. Security: service_role and authenticated users only.';
