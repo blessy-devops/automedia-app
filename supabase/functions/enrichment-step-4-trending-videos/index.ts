@@ -214,7 +214,7 @@ Deno.serve(async (req) => {
         title: video.title || '',
         description: video.description ? video.description.substring(0, 100) + '...' : null,
         thumbnail_url: getBestThumbnail(video.thumbnail),
-        upload_date: safeDate(video.publishedTimeText || video.publishDate).toISOString(),
+        upload_date: safeDate(video.publishedAt || video.publishDate || video.uploadDate).toISOString(),
         views: parseViewCount(video.viewCount || video.viewCountText),
         likes: null, // Not available in this endpoint
         comments: null, // Not available in this endpoint
