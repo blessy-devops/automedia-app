@@ -121,81 +121,84 @@ export function ChannelBenchmarkForm() {
     form.reset()
   }
 
-  // If there's an active task, show the progress monitor
-  if (activeTask) {
-    return (
-      <div className="space-y-6">
-        <BenchmarkProgressMonitor
-          taskId={activeTask.taskId}
-          channelId={activeTask.channelId}
-          onComplete={handleMonitoringComplete}
-        />
-        <div className="flex justify-center">
-          <Button variant="outline" onClick={handleStartNew}>
-            <RotateCcw className="mr-2 h-4 w-4" />
-            Start Another Benchmark
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
-  // Otherwise, show the form
+  // Show form and monitor side by side
   return (
-    <Card className="max-w-2xl">
-      <CardHeader>
-        <CardTitle>Start Channel Benchmark</CardTitle>
-        <CardDescription>
-          Enter a YouTube Channel ID to begin a comprehensive benchmark analysis.
-          The system will analyze the channel&apos;s performance, videos, and statistics.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="channelId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>YouTube Channel ID</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="UC1234567890ABCDEFGHIJ"
-                      disabled={isSubmitting}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    The unique identifier for the YouTube channel. You can find this in
-                    the channel&apos;s URL or use a Channel ID lookup tool.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Left Column: Form */}
+      <Card className="h-fit">
+        <CardHeader>
+          <CardTitle>Start Channel Benchmark</CardTitle>
+          <CardDescription>
+            Enter a YouTube Channel ID to begin a comprehensive benchmark analysis.
+            The system will analyze the channel&apos;s performance, videos, and statistics.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="channelId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>YouTube Channel ID</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="UC1234567890ABCDEFGHIJ"
+                        disabled={isSubmitting || !!activeTask}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      The unique identifier for the YouTube channel. You can find this in
+                      the channel&apos;s URL or use a Channel ID lookup tool.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <Button type="submit" disabled={isSubmitting} className="w-full">
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Starting Benchmark...
-                </>
-              ) : (
-                'Start Channel Benchmark'
-              )}
-            </Button>
-          </form>
-        </Form>
+              <Button type="submit" disabled={isSubmitting || !!activeTask} className="w-full">
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Starting Benchmark...
+                  </>
+                ) : (
+                  'Start Channel Benchmark'
+                )}
+              </Button>
 
-        {/* Error Feedback */}
-        {result && !result.success && (
-          <div className="mt-6 rounded-lg border border-red-500 bg-red-50 text-red-900 p-4">
-            <h3 className="font-semibold mb-2">Error</h3>
-            <p className="text-sm">{result.error}</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              {/* Start New Button */}
+              {activeTask && (
+                <Button variant="outline" onClick={handleStartNew} className="w-full">
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Start Another Benchmark
+                </Button>
+              )}
+            </form>
+          </Form>
+
+          {/* Error Feedback */}
+          {result && !result.success && (
+            <div className="mt-6 rounded-lg border border-red-500 bg-red-50 text-red-900 p-4">
+              <h3 className="font-semibold mb-2">Error</h3>
+              <p className="text-sm">{result.error}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Right Column: Progress Monitor (shown when task is active) */}
+      {activeTask && (
+        <div className="h-fit">
+          <BenchmarkProgressMonitor
+            taskId={activeTask.taskId}
+            channelId={activeTask.channelId}
+            onComplete={handleMonitoringComplete}
+          />
+        </div>
+      )}
+    </div>
   )
 }

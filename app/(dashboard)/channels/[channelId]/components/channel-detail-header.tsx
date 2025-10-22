@@ -19,9 +19,36 @@ interface ChannelDetailHeaderProps {
 }
 
 /**
+ * Parse banner URL JSON and select best resolution
+ */
+function getBannerUrl(bannerUrlJson: string | null): string | null {
+  if (!bannerUrlJson) return null
+
+  try {
+    const banners = JSON.parse(bannerUrlJson) as Array<{ url: string; width: number; height: number }>
+
+    if (!Array.isArray(banners) || banners.length === 0) return null
+
+    // Select banner with width >= 2000px for best quality
+    const highRes = banners.find(b => b.width >= 2000)
+    if (highRes) return highRes.url
+
+    // Fallback to largest available
+    const largest = banners.reduce((prev, current) =>
+      current.width > prev.width ? current : prev
+    )
+    return largest.url
+  } catch (error) {
+    console.error('Failed to parse banner URL JSON:', error)
+    return null
+  }
+}
+
+/**
  * Channel Detail Header Component
  *
  * Displays comprehensive channel information in organized cards:
+ * - Channel banner (if available)
  * - Main statistics (subscribers, views, videos)
  * - AI categorization results
  * - Recent performance metrics (14d baseline)
@@ -39,8 +66,25 @@ export function ChannelDetailHeader({
     format?: string
   } | null
 
+  const bannerUrl = getBannerUrl(channel.bannerUrl)
+
   return (
     <div className="space-y-6">
+      {/* Channel Banner */}
+      {bannerUrl && (
+        <div className="relative w-full overflow-hidden rounded-xl bg-muted">
+          <div className="aspect-[6/1] relative">
+            <Image
+              src={bannerUrl}
+              alt={`${channel.channelName || 'Channel'} banner`}
+              fill
+              className="object-cover"
+              priority
+            />
+          </div>
+        </div>
+      )}
+
       {/* Channel Header */}
       <div className="flex items-start gap-6">
         {channel.thumbnailUrl && (
@@ -199,41 +243,6 @@ export function ChannelDetailHeader({
                 <p className="text-xl font-bold">
                   {baselineStats.avgViewsPerVideo14d
                     ? formatLargeNumber(Math.round(baselineStats.avgViewsPerVideo14d))
-                    : "—"}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* 30-Day Performance Card */}
-        {baselineStats && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                30-Day Performance
-              </CardTitle>
-              <CardDescription>Last month metrics</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Views</p>
-                <p className="text-xl font-bold">
-                  {formatLargeNumber(baselineStats.totalViews30d)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Videos Published</p>
-                <p className="text-xl font-bold">
-                  {baselineStats.videosCount30d || 0}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Avg Views/Video</p>
-                <p className="text-xl font-bold">
-                  {baselineStats.avgViewsPerVideo30d
-                    ? formatLargeNumber(Math.round(baselineStats.avgViewsPerVideo30d))
                     : "—"}
                 </p>
               </div>

@@ -7,6 +7,8 @@ import { LayoutDashboard, BarChart3, Settings, LogOut, Youtube, Video } from "lu
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { Toaster } from "sonner";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 /**
  * Dashboard Layout
@@ -60,7 +62,7 @@ export default function DashboardLayout({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="flex flex-col md:flex-row bg-background w-full flex-1 min-h-screen overflow-hidden">
+    <div className="flex h-screen bg-background w-full overflow-hidden">
       <Sidebar open={open} setOpen={setOpen}>
         <SidebarBody className="justify-between gap-10">
           <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
@@ -71,7 +73,8 @@ export default function DashboardLayout({
               ))}
             </div>
           </div>
-          <div>
+          <div className="flex flex-col gap-2">
+            <ThemeToggle />
             <SidebarLink
               link={{
                 label: "Logout",
@@ -85,6 +88,7 @@ export default function DashboardLayout({
         </SidebarBody>
       </Sidebar>
       <main className="flex-1 overflow-auto">{children}</main>
+      <Toaster richColors position="top-right" />
     </div>
   );
 }

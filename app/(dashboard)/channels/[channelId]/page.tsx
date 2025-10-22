@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
 import { db } from '@/lib/drizzle'
 import {
   benchmarkChannelsTable,
@@ -7,8 +8,16 @@ import {
 } from '@/lib/drizzle'
 import { eq, desc, sql } from 'drizzle-orm'
 import { ChannelDetailHeader } from './components/channel-detail-header'
-import { VideosDataTable } from '../../videos/components/videos-data-table'
-import { columns as videoColumns } from '../../videos/components/columns'
+import { SimpleVideosTable } from '../../videos/components/simple-videos-table'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+import { ChevronRight, Home } from "lucide-react"
 
 /**
  * Channel Details Page
@@ -22,14 +31,9 @@ import { columns as videoColumns } from '../../videos/components/columns'
 export default async function ChannelDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ channelId: string }>
 }) {
-  const { id } = await params
-  const channelId = parseInt(id, 10)
-
-  if (isNaN(channelId)) {
-    notFound()
-  }
+  const { channelId } = await params
 
   // Fetch all channel data in parallel for optimal performance
   const [channelData, baselineStats, videos] = await Promise.all([
@@ -37,7 +41,7 @@ export default async function ChannelDetailPage({
     db
       .select()
       .from(benchmarkChannelsTable)
-      .where(eq(benchmarkChannelsTable.id, channelId))
+      .where(eq(benchmarkChannelsTable.channelId, channelId))
       .limit(1)
       .then((rows) => rows[0]),
 
@@ -45,12 +49,7 @@ export default async function ChannelDetailPage({
     db
       .select()
       .from(benchmarkChannelsBaselineStatsTable)
-      .where(
-        eq(
-          benchmarkChannelsBaselineStatsTable.channelId,
-          sql`(SELECT channel_id FROM benchmark_channels WHERE id = ${channelId})`
-        )
-      )
+      .where(eq(benchmarkChannelsBaselineStatsTable.channelId, channelId))
       .orderBy(desc(benchmarkChannelsBaselineStatsTable.calculatedAt))
       .limit(1)
       .then((rows) => rows[0]),
@@ -61,6 +60,7 @@ export default async function ChannelDetailPage({
         id: benchmarkVideosTable.id,
         youtubeVideoId: benchmarkVideosTable.youtubeVideoId,
         channelId: benchmarkVideosTable.channelId,
+        channelName: benchmarkChannelsTable.channelName,
         title: benchmarkVideosTable.title,
         views: benchmarkVideosTable.views,
         likes: benchmarkVideosTable.likes,
@@ -76,12 +76,11 @@ export default async function ChannelDetailPage({
         videoAgeDays: sql<number>`EXTRACT(DAY FROM NOW() - ${benchmarkVideosTable.uploadDate})`.as('video_age_days'),
       })
       .from(benchmarkVideosTable)
-      .where(
-        eq(
-          benchmarkVideosTable.channelId,
-          sql`(SELECT channel_id FROM benchmark_channels WHERE id = ${channelId})`
-        )
+      .leftJoin(
+        benchmarkChannelsTable,
+        eq(benchmarkVideosTable.channelId, benchmarkChannelsTable.channelId)
       )
+      .where(eq(benchmarkVideosTable.channelId, channelId))
       .orderBy(desc(benchmarkVideosTable.uploadDate))
   ])
 
@@ -92,6 +91,36 @@ export default async function ChannelDetailPage({
 
   return (
     <div className="container mx-auto py-10 px-4">
+      {/* Breadcrumbs */}
+      <Breadcrumb className="mb-6">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/" className="flex items-center gap-1.5">
+                <Home className="h-4 w-4" />
+                Home
+              </Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator>
+            <ChevronRight className="h-4 w-4" />
+          </BreadcrumbSeparator>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/channels">Channels</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator>
+            <ChevronRight className="h-4 w-4" />
+          </BreadcrumbSeparator>
+          <BreadcrumbItem>
+            <BreadcrumbPage className="max-w-[200px] truncate">
+              {channelData.channelName || channelId}
+            </BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+
       {/* Channel Header with all metadata and statistics */}
       <ChannelDetailHeader
         channel={channelData}
@@ -109,10 +138,7 @@ export default async function ChannelDetailPage({
           </p>
         </div>
 
-        <VideosDataTable
-          columns={videoColumns}
-          data={videos}
-        />
+        <SimpleVideosTable data={videos} />
       </div>
     </div>
   )

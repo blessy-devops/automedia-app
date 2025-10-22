@@ -14,7 +14,6 @@ import {
   index,
   real,
   boolean,
-  pgMaterializedView,
 } from 'drizzle-orm/pg-core'
 import { InferSelectModel, InferInsertModel } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/postgres-js'
@@ -83,7 +82,7 @@ export const benchmarkChannelsTable = pgTable(
       category?: string
       format?: string
     }>(),
-    country: varchar('country', { length: 50 }),
+    country: varchar('country', { length: 10 }),
     customUrl: varchar('custom_url', { length: 255 }),
     thumbnailUrl: text('thumbnail_url'),
     bannerUrl: text('banner_url'),
@@ -128,9 +127,6 @@ export const benchmarkVideosTable = pgTable(
       content_type?: string
       format?: string
     }>(),
-    // Métricas calculadas
-    videoAgeDays: integer('video_age_days'),
-    viewsPerDay: integer('views_per_day'),
     // Outlier scores para performance do vídeo
     performanceVsAvgHistorical: real('performance_vs_avg_historical'),
     performanceVsMedianHistorical: real('performance_vs_median_historical'),
@@ -140,7 +136,6 @@ export const benchmarkVideosTable = pgTable(
     // Metadados adicionais
     isOutlier: boolean('is_outlier').default(false),
     outlierThreshold: real('outlier_threshold'),
-    videoTranscript: text('video_transcript'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -171,8 +166,6 @@ export const benchmarkChannelsBaselineStatsTable = pgTable(
     totalViews14d: bigint('total_views_14d', { mode: 'number' }),
     videosCount14d: integer('videos_count_14d'),
     avgViewsPerVideo14d: real('avg_views_per_video_14d'),
-    mediaDiariaViews14d: real('media_diaria_views_14d'),
-    taxaCrescimento: real('taxa_crescimento'),
     medianViewsPerVideo14d: real('median_views_per_video_14d'),
     stdDevViews14d: real('std_dev_views_14d'),
     // Estatísticas 30 dias
@@ -284,31 +277,7 @@ export const channelEnrichmentTasksTable = pgTable(
     socialbladeStartedAt: timestamp('socialblade_started_at', { withTimezone: true }),
     socialbladeCompletedAt: timestamp('socialblade_completed_at', { withTimezone: true }),
 
-    // Sub-workflow 3: Fetch Recent Videos (YouTube Data API - sort by newest)
-    recentVideosStatus: enrichmentSubWorkflowStatusEnum('recent_videos_status').default('pending').notNull(),
-    recentVideosJobId: varchar('recent_videos_job_id', { length: 255 }),
-    recentVideosResult: jsonb('recent_videos_result').$type<{
-      total_videos_fetched?: number
-      video_ids?: string[]
-      fetch_date?: string
-    }>(),
-    recentVideosError: text('recent_videos_error'),
-    recentVideosStartedAt: timestamp('recent_videos_started_at', { withTimezone: true }),
-    recentVideosCompletedAt: timestamp('recent_videos_completed_at', { withTimezone: true }),
-
-    // Sub-workflow 4: Fetch Trending Videos (YouTube Data API - sort by popular)
-    trendingVideosStatus: enrichmentSubWorkflowStatusEnum('trending_videos_status').default('pending').notNull(),
-    trendingVideosJobId: varchar('trending_videos_job_id', { length: 255 }),
-    trendingVideosResult: jsonb('trending_videos_result').$type<{
-      total_videos_fetched?: number
-      video_ids?: string[]
-      fetch_date?: string
-    }>(),
-    trendingVideosError: text('trending_videos_error'),
-    trendingVideosStartedAt: timestamp('trending_videos_started_at', { withTimezone: true }),
-    trendingVideosCompletedAt: timestamp('trending_videos_completed_at', { withTimezone: true }),
-
-    // DEPRECATED: Legacy field kept for backward compatibility - use recentVideosStatus/trendingVideosStatus
+    // Sub-workflow 3: Fetch Videos (YouTube Data API)
     fetchVideosStatus: enrichmentSubWorkflowStatusEnum('fetch_videos_status').default('pending').notNull(),
     fetchVideosResult: jsonb('fetch_videos_result').$type<{
       total_videos_fetched?: number
@@ -319,7 +288,7 @@ export const channelEnrichmentTasksTable = pgTable(
     fetchVideosStartedAt: timestamp('fetch_videos_started_at', { withTimezone: true }),
     fetchVideosCompletedAt: timestamp('fetch_videos_completed_at', { withTimezone: true }),
 
-    // Sub-workflow 5: Cálculo de Baseline Stats
+    // Sub-workflow 4: Cálculo de Baseline Stats
     baselineStatsStatus: enrichmentSubWorkflowStatusEnum('baseline_stats_status').default('pending').notNull(),
     baselineStatsResult: jsonb('baseline_stats_result').$type<{
       stats_calculated?: boolean
@@ -356,9 +325,7 @@ export const channelEnrichmentTasksTable = pgTable(
       overallStatusIdx: index('enrichment_tasks_overall_status_idx').on(table.overallStatus),
       categorizationStatusIdx: index('enrichment_tasks_categorization_status_idx').on(table.categorizationStatus),
       socialbladeStatusIdx: index('enrichment_tasks_socialblade_status_idx').on(table.socialbladeStatus),
-      recentVideosStatusIdx: index('enrichment_tasks_recent_videos_status_idx').on(table.recentVideosStatus),
-      trendingVideosStatusIdx: index('enrichment_tasks_trending_videos_status_idx').on(table.trendingVideosStatus),
-      fetchVideosStatusIdx: index('enrichment_tasks_fetch_videos_status_idx').on(table.fetchVideosStatus), // DEPRECATED
+      fetchVideosStatusIdx: index('enrichment_tasks_fetch_videos_status_idx').on(table.fetchVideosStatus),
       baselineStatsStatusIdx: index('enrichment_tasks_baseline_stats_status_idx').on(table.baselineStatsStatus),
       outlierAnalysisStatusIdx: index('enrichment_tasks_outlier_analysis_status_idx').on(table.outlierAnalysisStatus),
     }
@@ -456,54 +423,10 @@ export type NewUser = InferInsertModel<typeof UsersTable>
 // ============================================================================
 
 /**
- * Database schema for Drizzle ORM query API
- */
-// ============================================================
-// MATERIALIZED VIEWS FOR METRICS
-// ============================================================
-
-export const videoMetricsSummaryView = pgMaterializedView('video_metrics_summary', {
-  totalVideos: integer('total_videos'),
-  totalViews: bigint('total_views', { mode: 'number' }),
-  averageViews: bigint('average_views', { mode: 'number' }),
-  outliers5xCount: integer('outliers_5x_count'),
-  lastUpdated: timestamp('last_updated', { withTimezone: true }),
-})
-
-export const channelMetricsSummaryView = pgMaterializedView('channel_metrics_summary', {
-  totalChannels: integer('total_channels'),
-  totalSubscribers: bigint('total_subscribers', { mode: 'number' }),
-  averageSubscribers: bigint('average_subscribers', { mode: 'number' }),
-  totalVideosAcrossChannels: bigint('total_videos_across_channels', { mode: 'number' }),
-  averageVideosPerChannel: bigint('average_videos_per_channel', { mode: 'number' }),
-  lastUpdated: timestamp('last_updated', { withTimezone: true }),
-})
-
-// Types for materialized views (not used in production code yet due to Drizzle limitations)
-// export type VideoMetricsSummary = typeof videoMetricsSummaryView.$inferSelect
-// export type ChannelMetricsSummary = typeof channelMetricsSummaryView.$inferSelect
-
-const schema = {
-  benchmarkChannelsTable,
-  benchmarkVideosTable,
-  benchmarkChannelsBaselineStatsTable,
-  channelEnrichmentJobsTable,
-  channelEnrichmentTasksTable,
-  structureCategorizationNichesTable,
-  structureCategorizationSubnichesTable,
-  structureCategorizationCategoriesTable,
-  structureCategorizationFormatsTable,
-  structureCategorizationMicronichesTable,
-  UsersTable,
-  videoMetricsSummaryView,
-  channelMetricsSummaryView,
-}
-
-/**
  * db - Conexão padrão usando shared pooler
  * Use para: Queries rápidas, CRUD padrão, operações síncronas
  */
-export const db = drizzle(sqlPooled, { schema })
+export const db = drizzle(sqlPooled)
 
 /**
  * dbDirect - Conexão direta ao banco
@@ -516,4 +439,4 @@ export const db = drizzle(sqlPooled, { schema })
  * const result = await dbDirect.select().from(channelEnrichmentTasksTable)
  * ```
  */
-export const dbDirect = drizzle(sqlDirect, { schema })
+export const dbDirect = drizzle(sqlDirect)

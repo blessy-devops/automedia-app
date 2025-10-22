@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
 import { db } from '@/lib/drizzle'
 import {
   benchmarkVideosTable,
@@ -10,6 +11,15 @@ import { PerformanceMetricsCard } from './components/performance-metrics-card'
 import { VideoStatsCard } from './components/video-stats-card'
 import { CategorizationCard } from './components/categorization-card'
 import { ChannelCard } from './components/channel-card'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+import { ChevronRight, Home } from "lucide-react"
 
 /**
  * Video Details Page
@@ -24,14 +34,9 @@ import { ChannelCard } from './components/channel-card'
 export default async function VideoDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ youtubeVideoId: string }>
 }) {
-  const { id } = await params
-  const videoId = parseInt(id, 10)
-
-  if (isNaN(videoId)) {
-    notFound()
-  }
+  const { youtubeVideoId } = await params
 
   // Fetch video data with channel information via LEFT JOIN
   const result = await db
@@ -50,6 +55,7 @@ export default async function VideoDetailPage({
       thumbnailUrl: benchmarkVideosTable.thumbnailUrl,
       tags: benchmarkVideosTable.tags,
       categorization: benchmarkVideosTable.categorization,
+      videoTranscript: benchmarkVideosTable.videoTranscript,
       // Performance scores
       performanceVsAvgHistorical: benchmarkVideosTable.performanceVsAvgHistorical,
       performanceVsMedianHistorical: benchmarkVideosTable.performanceVsMedianHistorical,
@@ -61,6 +67,7 @@ export default async function VideoDetailPage({
       // Channel fields
       channelName: benchmarkChannelsTable.channelName,
       channelDatabaseId: benchmarkChannelsTable.id,
+      channelYoutubeId: benchmarkVideosTable.channelId,
       // Calculated fields
       videoAgeDays: sql<number>`EXTRACT(DAY FROM NOW() - ${benchmarkVideosTable.uploadDate})`.as('video_age_days'),
     })
@@ -69,7 +76,7 @@ export default async function VideoDetailPage({
       benchmarkChannelsTable,
       eq(benchmarkVideosTable.channelId, benchmarkChannelsTable.channelId)
     )
-    .where(eq(benchmarkVideosTable.id, videoId))
+    .where(eq(benchmarkVideosTable.youtubeVideoId, youtubeVideoId))
     .limit(1)
 
   const video = result[0]
@@ -80,6 +87,36 @@ export default async function VideoDetailPage({
 
   return (
     <div className="container mx-auto py-10 px-4">
+      {/* Breadcrumbs */}
+      <Breadcrumb className="mb-6">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/" className="flex items-center gap-1.5">
+                <Home className="h-4 w-4" />
+                Home
+              </Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator>
+            <ChevronRight className="h-4 w-4" />
+          </BreadcrumbSeparator>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/videos">Videos</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator>
+            <ChevronRight className="h-4 w-4" />
+          </BreadcrumbSeparator>
+          <BreadcrumbItem>
+            <BreadcrumbPage className="max-w-[200px] truncate">
+              {video.title || video.youtubeVideoId}
+            </BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content Column (Left - 2/3 width) */}
         <div className="lg:col-span-2 space-y-6">
@@ -93,7 +130,7 @@ export default async function VideoDetailPage({
           <CategorizationCard video={video} />
           <ChannelCard
             channelName={video.channelName}
-            channelDatabaseId={video.channelDatabaseId}
+            channelId={video.channelYoutubeId}
           />
         </div>
       </div>

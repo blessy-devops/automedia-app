@@ -1,6 +1,8 @@
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { Toaster } from 'sonner'
+import { ThemeProvider } from '@/components/theme-provider'
+import { QueryProvider } from '@/components/providers/query-provider'
 
 export const metadata = {
   metadataBase: new URL('https://postgres-drizzle.vercel.app'),
@@ -21,10 +23,19 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="light">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.variable}>
-        {children}
-        <Toaster richColors position="top-right" />
+        <QueryProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="light"
+            enableSystem={false}
+            disableTransitionOnChange
+          >
+            {children}
+            <Toaster richColors position="top-right" />
+          </ThemeProvider>
+        </QueryProvider>
       </body>
     </html>
   )

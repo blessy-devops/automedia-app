@@ -13,7 +13,7 @@ import Link from "next/link"
 
 interface ChannelCardProps {
   channelName: string | null
-  channelDatabaseId: number | null
+  channelId: string | null
 }
 
 /**
@@ -21,7 +21,7 @@ interface ChannelCardProps {
  *
  * Displays channel information with link to channel details
  */
-export function ChannelCard({ channelName, channelDatabaseId }: ChannelCardProps) {
+export function ChannelCard({ channelName, channelId }: ChannelCardProps) {
   return (
     <Card>
       <CardHeader>
@@ -39,8 +39,8 @@ export function ChannelCard({ channelName, channelDatabaseId }: ChannelCardProps
           </p>
         </div>
 
-        {channelDatabaseId && (
-          <Link href={`/channels/${channelDatabaseId}`} className="block">
+        {channelId && (
+          <Link href={`/channels/${channelId}`} className="block">
             <Button variant="outline" size="sm" className="w-full">
               <ExternalLink className="h-4 w-4 mr-2" />
               View Channel Details

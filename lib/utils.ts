@@ -38,3 +38,19 @@ export function formatLargeNumber(num: number | null | undefined): string {
 
   return num.toString()
 }
+
+/**
+ * Format date to readable string
+ * Example: 2024-01-15 -> "Jan 15, 2024"
+ */
+export function formatDate(date: Date | string | null | undefined): string {
+  if (!date) return '-'
+
+  const d = typeof date === 'string' ? new Date(date) : date
+
+  return d.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
