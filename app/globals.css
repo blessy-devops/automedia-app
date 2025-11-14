@@ -1,0 +1,152 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --card: #f9fafb;
+  --ring: #3b82f6;
+  --input: #e5e7eb;
+  --muted: #f1f5f9;
+  --accent: #f1f5f9;
+  --border: #e2e8f0;
+  --radius: 0.5rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.425rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.75rem;
+  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --popover: #ffffff;
+  --primary: #3b82f6;
+  --spacing: 0.25rem;
+  --font-mono: "Courier New", monospace;
+  --font-sans: "Netflix Sans Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --secondary: #f3f4f6;
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --background: #ffffff;
+  --font-serif: "Georgia", serif;
+  --foreground: #0f172a;
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --destructive: #ef4444;
+  --card-foreground: #0f172a;
+  --muted-foreground: #64748b;
+  --accent-foreground: #0f172a;
+  --popover-foreground: #0f172a;
+  --primary-foreground: #ffffff;
+  --secondary-foreground: #4b5563;
+  --destructive-foreground: #ffffff;
+  --color-1: 0 100% 63%;
+  --color-2: 270 100% 63%;
+  --color-3: 210 100% 63%;
+  --color-4: 195 100% 63%;
+  --color-5: 90 100% 63%;
+  --fg: #0f172a;
+  --bg: #ffffff;
+  --secondary-fg: #4b5563;
+}
+
+.dark {
+  --card: #0f172a;
+  --ring: #3b82f6;
+  --input: #1e293b;
+  --muted: #1e293b;
+  --accent: #1e293b;
+  --border: #334155;
+  --radius: 0.5rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.425rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.75rem;
+  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --popover: #0f172a;
+  --primary: #3b82f6;
+  --spacing: 0.25rem;
+  --font-mono: "Courier New", monospace;
+  --font-sans: "Netflix Sans Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --secondary: #1e293b;
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --background: #020617;
+  --font-serif: "Georgia", serif;
+  --foreground: #f8fafc;
+  --shadow-2xl: 0px 0.25rem 0.5rem 0px rgba(0, 0, 0, 0.8);
+  --destructive: #ef4444;
+  --card-foreground: #f8fafc;
+  --muted-foreground: #94a3b8;
+  --accent-foreground: #f8fafc;
+  --popover-foreground: #f8fafc;
+  --primary-foreground: #0f172a;
+  --secondary-foreground: #94a3b8;
+  --destructive-foreground: #ffffff;
+  --fg: #f8fafc;
+  --bg: #020617;
+  --secondary-fg: #94a3b8;
+}
+
+@theme inline {
+  --color-card: var(--card);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-border: var(--border);
+  --color-radius: var(--radius);
+  --color-shadow: var(--shadow);
+  --color-popover: var(--popover);
+  --color-primary: var(--primary);
+  --color-spacing: var(--spacing);
+  --color-font-mono: var(--font-mono);
+  --color-font-sans: var(--font-sans);
+  --color-secondary: var(--secondary);
+  --color-shadow-lg: var(--shadow-lg);
+  --color-shadow-md: var(--shadow-md);
+  --color-shadow-sm: var(--shadow-sm);
+  --color-shadow-xl: var(--shadow-xl);
+  --color-background: var(--background);
+  --color-font-serif: var(--font-serif);
+  --color-foreground: var(--foreground);
+  --color-shadow-2xl: var(--shadow-2xl);
+  --color-destructive: var(--destructive);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-destructive-foreground: var(--destructive-foreground);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+  }
+}
+
+@layer utilities {
+  .inset-ring {
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .inset-ring-border {
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .inset-ring-fg {
+    box-shadow: inset 0 0 0 1px var(--fg);
+  }
+  .inset-ring-ring\/70 {
+    box-shadow: inset 0 0 0 1px hsl(from var(--ring) h s l / 0.7);
+  }
+  .inset-ring-1 {
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .outline-hidden {
+    outline: none;
+  }
+}
