@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { formatLargeNumber } from '@/lib/utils'
-import { SimpleMetricCard } from './components/simple-metric-card'
+import { MetricCard } from '@/components/metric-card'
 import { ChannelsClient } from './components/channels-client'
 
 /**
@@ -12,28 +12,54 @@ import { ChannelsClient } from './components/channels-client'
 export default async function ChannelsPage() {
   const supabase = await createClient()
 
-  // Fetch channels data
-  let query = supabase
-    .from('benchmark_channels')
-    .select('*')
-    .order('subscriber_count', { ascending: false })
-    .limit(100)
-
-  const { data: channelsData, error } = await query
+  // Fetch channels data and metrics in parallel
+  const [
+    { data: channelsData, error },
+    { data: metricsData }
+  ] = await Promise.all([
+    // Query 1: Get top 100 channels (ordered by benchmark date - most recent first)
+    supabase
+      .from('benchmark_channels')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100),
+    // Query 2: Get ALL channels for metrics (parallel)
+    supabase
+      .from('benchmark_channels')
+      .select('channel_id, subscriber_count, video_upload_count, total_views', { count: 'exact' })
+  ])
 
   if (error) {
     console.error('Error fetching channels:', error)
   }
 
-  // Get baseline stats separately
+  const totalChannels = metricsData?.length || 0
+  const totalSubscribers = metricsData?.reduce((sum: number, ch: any) => sum + (ch.subscriber_count || 0), 0) || 0
+
+  // Get baseline stats for displayed channels AND all channels in parallel
   const channelIds = (channelsData || []).map((c: any) => c.channel_id)
-  const { data: baselineStatsData } = await supabase
-    .from('benchmark_channels_baseline_stats')
-    .select('channel_id, avg_views_per_video_historical, median_views_per_video_historical')
-    .in('channel_id', channelIds)
+
+  const [
+    { data: baselineStatsData },
+    { data: allBaselineStats }
+  ] = await Promise.all([
+    // Query 3: Baseline stats for displayed channels
+    supabase
+      .from('benchmark_channels_baseline_stats')
+      .select('channel_id, avg_views_per_video_historical, median_views_per_video_historical')
+      .in('channel_id', channelIds),
+    // Query 4: All baseline stats for metrics
+    supabase
+      .from('benchmark_channels_baseline_stats')
+      .select('channel_id, avg_views_per_video_historical')
+  ])
 
   const baselineStatsMap = new Map(
     (baselineStatsData || []).map((stat: any) => [stat.channel_id, stat])
+  )
+
+  const allBaselineStatsMap = new Map(
+    (allBaselineStats || []).map((stat: any) => [stat.channel_id, stat])
   )
 
   // Transform data to camelCase format
@@ -57,23 +83,6 @@ export default async function ChannelsPage() {
       engagementRate: null, // TODO: Calculate engagement rate if data available
     }
   })
-
-  // Calculate metrics from ALL channels in database
-  const { data: metricsData } = await supabase
-    .from('benchmark_channels')
-    .select('channel_id, subscriber_count, video_upload_count, total_views', { count: 'exact' })
-
-  const totalChannels = metricsData?.length || 0
-  const totalSubscribers = metricsData?.reduce((sum: number, ch: any) => sum + (ch.subscriber_count || 0), 0) || 0
-
-  // Get all baseline stats for metrics calculation
-  const { data: allBaselineStats } = await supabase
-    .from('benchmark_channels_baseline_stats')
-    .select('channel_id, avg_views_per_video_historical')
-
-  const allBaselineStatsMap = new Map(
-    (allBaselineStats || []).map((stat: any) => [stat.channel_id, stat])
-  )
 
   // Calculate overall average views per video
   const channelsWithAvg = (metricsData || [])
@@ -102,7 +111,7 @@ export default async function ChannelsPage() {
         <div className="p-8 space-y-6">
           {/* Metrics Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <SimpleMetricCard
+            <MetricCard
               label="Total Channels"
               value={totalChannels.toLocaleString()}
               trend={{
@@ -111,7 +120,7 @@ export default async function ChannelsPage() {
               }}
             />
 
-            <SimpleMetricCard
+            <MetricCard
               label="Total Subscribers"
               value={formatLargeNumber(totalSubscribers)}
               trend={{
@@ -120,13 +129,13 @@ export default async function ChannelsPage() {
               }}
             />
 
-            <SimpleMetricCard
+            <MetricCard
               label="Avg. Views"
               value={formatLargeNumber(overallAvgViews)}
               subtitle="per video"
             />
 
-            <SimpleMetricCard
+            <MetricCard
               label="Engagement Rate"
               value="4.8%"
               trend={{

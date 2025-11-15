@@ -79,7 +79,7 @@ export function VideoStatsCard({ video }: VideoStatsCardProps) {
           <Eye className="h-4 w-4 text-muted-foreground flex-shrink-0" />
           <div className="flex-1">
             <p className="text-xs text-muted-foreground">Views</p>
-            <p className="text-lg font-semibold">
+            <p className="text-2xl font-semibold">
               {formatLargeNumber(video.views)}
             </p>
           </div>
@@ -90,7 +90,7 @@ export function VideoStatsCard({ video }: VideoStatsCardProps) {
           <ThumbsUp className="h-4 w-4 text-muted-foreground flex-shrink-0" />
           <div className="flex-1">
             <p className="text-xs text-muted-foreground">Likes</p>
-            <p className="text-lg font-semibold">
+            <p className="text-2xl font-semibold">
               {formatLargeNumber(video.likes)}
             </p>
           </div>
@@ -101,7 +101,7 @@ export function VideoStatsCard({ video }: VideoStatsCardProps) {
           <MessageSquare className="h-4 w-4 text-muted-foreground flex-shrink-0" />
           <div className="flex-1">
             <p className="text-xs text-muted-foreground">Comments</p>
-            <p className="text-lg font-semibold">
+            <p className="text-2xl font-semibold">
               {video.comments !== null ? video.comments.toLocaleString() : "—"}
             </p>
           </div>

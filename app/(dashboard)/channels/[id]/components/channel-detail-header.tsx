@@ -26,6 +26,7 @@ interface BenchmarkChannelBaselineStats {
   totalViews14d: number
   videosCount14d: number | null
   avgViewsPerVideo14d: number | null
+  medianViewsPerVideoHistorical: number | null
 }
 
 interface ChannelDetailHeaderProps {
@@ -269,6 +270,14 @@ export function ChannelDetailHeader({
                   <p className="text-2xl font-bold">
                     {baselineStats.avgViewsPerVideo14d
                       ? formatLargeNumber(Math.round(baselineStats.avgViewsPerVideo14d))
+                      : "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Median Views/Video</p>
+                  <p className="text-2xl font-bold">
+                    {baselineStats.medianViewsPerVideoHistorical
+                      ? formatLargeNumber(Math.round(baselineStats.medianViewsPerVideoHistorical))
                       : "—"}
                   </p>
                 </div>

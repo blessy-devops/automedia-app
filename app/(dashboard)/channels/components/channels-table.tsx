@@ -3,8 +3,12 @@
 import { useState, useMemo } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { ArrowUpDown, BarChart3, Edit } from "lucide-react"
-import { formatLargeNumber } from "@/lib/utils"
+import { ArrowUpDown, BarChart3, Edit, Trash2, X } from "lucide-react"
+import { formatLargeNumber, formatDate } from "@/lib/utils"
+import { DeleteChannelDialog } from "./delete-channel-dialog"
+import { BulkDeleteChannelsDialog } from "./bulk-delete-channels-dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Button } from "@/components/ui/button"
 
 export type Channel = {
   id: number
@@ -24,19 +28,26 @@ export type Channel = {
   thumbnailUrl: string | null
   avgViewsPerVideoHistorical: number | null
   engagementRate?: number | null
+  createdAt?: Date | null
 }
 
 interface ChannelsTableProps {
   channels: Channel[]
 }
 
-type SortField = "subscribers" | "videos" | "views"
+type SortField = "subscribers" | "videos" | "views" | "benchDate"
 type SortDirection = "asc" | "desc"
 
 export function ChannelsTable({ channels }: ChannelsTableProps) {
   const router = useRouter()
-  const [sortBy, setSortBy] = useState<SortField>("subscribers")
+  const [sortBy, setSortBy] = useState<SortField>("benchDate")
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean
+    channel: { id: number; channelName: string | null; channelId: string } | null
+  }>({ open: false, channel: null })
+  const [bulkDeleteDialog, setBulkDeleteDialog] = useState(false)
 
   const handleSort = (field: SortField) => {
     if (sortBy === field) {
@@ -51,6 +62,19 @@ export function ChannelsTable({ channels }: ChannelsTableProps) {
     const sorted = [...channels]
 
     sorted.sort((a, b) => {
+      if (sortBy === "benchDate") {
+        // Sort by created date
+        const aTime = a.createdAt?.getTime() || 0
+        const bTime = b.createdAt?.getTime() || 0
+
+        if (sortDirection === "asc") {
+          return aTime > bTime ? 1 : -1
+        } else {
+          return aTime < bTime ? 1 : -1
+        }
+      }
+
+      // Numeric sorting for other fields
       let aVal: number
       let bVal: number
 
@@ -89,16 +113,89 @@ export function ChannelsTable({ channels }: ChannelsTableProps) {
     console.log("Edit channel:", channelId)
   }
 
+  // Selection handlers
+  const handleToggleSelect = (channelId: number) => {
+    const newSelected = new Set(selectedIds)
+    if (newSelected.has(channelId)) {
+      newSelected.delete(channelId)
+    } else {
+      newSelected.add(channelId)
+    }
+    setSelectedIds(newSelected)
+  }
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === sortedChannels.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(sortedChannels.map((c) => c.id)))
+    }
+  }
+
+  const handleClearSelection = () => {
+    setSelectedIds(new Set())
+  }
+
+  const isAllSelected = sortedChannels.length > 0 && selectedIds.size === sortedChannels.length
+  const isSomeSelected = selectedIds.size > 0 && selectedIds.size < sortedChannels.length
+
   return (
-    <div className="bg-card border border-border rounded-lg overflow-hidden">
-      <table className="w-full">
+    <div className="space-y-4">
+      {/* Bulk Actions Toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="bg-primary/10 border border-primary/20 rounded-lg px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <p className="text-sm font-medium">
+              {selectedIds.size} channel{selectedIds.size > 1 ? 's' : ''} selected
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearSelection}
+              className="h-7 text-xs"
+            >
+              <X className="w-3 h-3 mr-1" />
+              Clear
+            </Button>
+          </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setBulkDeleteDialog(true)}
+            className="h-7 text-xs"
+          >
+            <Trash2 className="w-3 h-3 mr-1" />
+            Delete Selected
+          </Button>
+        </div>
+      )}
+
+      <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <table className="w-full">
         <thead className="bg-muted border-b border-border">
           <tr>
+            <th className="p-3 w-12">
+              <Checkbox
+                checked={isAllSelected}
+                indeterminate={isSomeSelected}
+                onCheckedChange={handleSelectAll}
+                aria-label="Select all channels"
+              />
+            </th>
             <th className="text-left p-3 text-sm text-muted-foreground font-normal">
               Channel
             </th>
             <th className="text-left p-3 text-sm text-muted-foreground font-normal">
               Category
+            </th>
+            <th className="text-left p-3 text-sm text-muted-foreground font-normal">
+              <button
+                onClick={() => handleSort("benchDate")}
+                className="hover:text-foreground flex items-center gap-1 transition-colors"
+              >
+                Bench Date
+                <ArrowUpDown className="w-3 h-3" />
+              </button>
             </th>
             <th className="text-right p-3 text-sm text-muted-foreground font-normal">
               <button
@@ -127,9 +224,6 @@ export function ChannelsTable({ channels }: ChannelsTableProps) {
                 <ArrowUpDown className="w-3 h-3" />
               </button>
             </th>
-            <th className="text-right p-3 text-sm text-muted-foreground font-normal">
-              Engagement
-            </th>
             <th className="text-center p-3 text-sm text-muted-foreground font-normal">
               Actions
             </th>
@@ -140,11 +234,19 @@ export function ChannelsTable({ channels }: ChannelsTableProps) {
             sortedChannels.map((channel) => (
               <tr
                 key={channel.id}
-                onClick={() => handleRowClick(channel.id)}
-                className="border-b border-border hover:bg-accent/50 cursor-pointer transition-colors"
+                className="border-b border-border hover:bg-accent/50 transition-colors"
               >
+                {/* Checkbox */}
+                <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    checked={selectedIds.has(channel.id)}
+                    onCheckedChange={() => handleToggleSelect(channel.id)}
+                    aria-label={`Select ${channel.channelName || 'channel'}`}
+                  />
+                </td>
+
                 {/* Channel Info: avatar + name + @handle */}
-                <td className="p-3">
+                <td className="p-3 cursor-pointer" onClick={() => handleRowClick(channel.id)}>
                   <div className="flex items-center gap-3">
                     {channel.thumbnailUrl ? (
                       <Image
@@ -171,7 +273,7 @@ export function ChannelsTable({ channels }: ChannelsTableProps) {
                 </td>
 
                 {/* Category Badge */}
-                <td className="p-3">
+                <td className="p-3 cursor-pointer" onClick={() => handleRowClick(channel.id)}>
                   {channel.categorization?.category ||
                   channel.categorization?.niche ? (
                     <span className="px-2 py-1 bg-muted text-muted-foreground text-xs rounded">
@@ -183,27 +285,27 @@ export function ChannelsTable({ channels }: ChannelsTableProps) {
                   )}
                 </td>
 
+                {/* Bench Date */}
+                <td className="p-3 text-left text-sm text-muted-foreground cursor-pointer" onClick={() => handleRowClick(channel.id)}>
+                  {channel.createdAt ? formatDate(channel.createdAt) : "—"}
+                </td>
+
                 {/* Subscribers */}
-                <td className="p-3 text-right text-sm text-foreground">
+                <td className="p-3 text-right text-sm text-foreground cursor-pointer" onClick={() => handleRowClick(channel.id)}>
                   {formatLargeNumber(channel.subscriberCount)}
                 </td>
 
                 {/* Videos */}
-                <td className="p-3 text-right text-sm text-foreground">
+                <td className="p-3 text-right text-sm text-foreground cursor-pointer" onClick={() => handleRowClick(channel.id)}>
                   {channel.videoUploadCount?.toLocaleString() || "—"}
                 </td>
 
                 {/* Avg Views */}
-                <td className="p-3 text-right text-sm text-foreground">
+                <td className="p-3 text-right text-sm text-foreground cursor-pointer" onClick={() => handleRowClick(channel.id)}>
                   {formatLargeNumber(channel.avgViewsPerVideoHistorical)}
                 </td>
 
-                {/* Engagement Rate */}
-                <td className="p-3 text-right text-sm text-foreground">
-                  {channel.engagementRate ? `${channel.engagementRate}%` : "—"}
-                </td>
-
-                {/* Actions: 2 icon buttons */}
+                {/* Actions: 3 icon buttons */}
                 <td className="p-3" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center justify-center gap-2">
                     <button
@@ -220,19 +322,56 @@ export function ChannelsTable({ channels }: ChannelsTableProps) {
                     >
                       <Edit className="w-4 h-4" />
                     </button>
+                    <button
+                      onClick={() =>
+                        setDeleteDialog({
+                          open: true,
+                          channel: {
+                            id: channel.id,
+                            channelName: channel.channelName,
+                            channelId: channel.channelId,
+                          },
+                        })
+                      }
+                      className="text-destructive hover:text-destructive/80 transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan={7} className="p-8 text-center text-muted-foreground">
+              <td colSpan={8} className="p-8 text-center text-muted-foreground">
                 No channels found
               </td>
             </tr>
           )}
         </tbody>
       </table>
+
+      <DeleteChannelDialog
+        channel={deleteDialog.channel}
+        open={deleteDialog.open}
+        onOpenChange={(open) => setDeleteDialog({ open, channel: null })}
+        onSuccess={() => {
+          // Refresh the page to show updated data
+          window.location.reload()
+        }}
+      />
+
+      <BulkDeleteChannelsDialog
+        channelIds={Array.from(selectedIds)}
+        open={bulkDeleteDialog}
+        onOpenChange={setBulkDeleteDialog}
+        onSuccess={() => {
+          setSelectedIds(new Set())
+          window.location.reload()
+        }}
+      />
+      </div>
     </div>
   )
 }

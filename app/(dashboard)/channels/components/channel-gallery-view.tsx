@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { formatLargeNumber } from "@/lib/utils"
-import { StatCard } from "@/components/stat-card"
+import { MetricCard } from "@/components/metric-card"
 import { Channel } from "./columns"
 import { BadgeCheck, Users, Eye, Video, TrendingUp } from "lucide-react"
 
@@ -76,13 +76,15 @@ export function ChannelGalleryView({ channels }: ChannelGalleryViewProps) {
             <CardContent className="pt-4 space-y-4">
               {/* Main Stats Grid */}
               <div className="grid grid-cols-2 gap-4">
-                <StatCard
+                <MetricCard
+                  layout="inline"
                   icon={Users}
                   label="Subscribers"
                   value={formatLargeNumber(channel.subscriberCount)}
                   variant="primary"
                 />
-                <StatCard
+                <MetricCard
+                  layout="inline"
                   icon={Eye}
                   label="Total Views"
                   value={formatLargeNumber(channel.totalViews)}
@@ -100,7 +102,8 @@ export function ChannelGalleryView({ channels }: ChannelGalleryViewProps) {
                channel.avgViewsPerVideoHistorical !== undefined && (
                 <>
                   <Separator />
-                  <StatCard
+                  <MetricCard
+                    layout="inline"
                     icon={TrendingUp}
                     label="Avg Views/Video"
                     value={formatLargeNumber(channel.avgViewsPerVideoHistorical)}

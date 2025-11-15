@@ -39,6 +39,9 @@ export function formatLargeNumber(num: number | null | undefined): string {
   return num.toString()
 }
 
+// Alias for formatLargeNumber
+export const formatNumber = formatLargeNumber
+
 /**
  * Format date to readable string
  * Example: 2024-01-15 -> "Jan 15, 2024"

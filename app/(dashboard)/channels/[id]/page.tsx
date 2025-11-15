@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ChannelDetailHeader } from './components/channel-detail-header'
-import { SimpleVideosTable } from '../../videos/components/simple-videos-table'
+import { SimpleVideosTableNew } from '../../videos/components/simple-videos-table-new'
+import { parseVideoFilters, applyVideoFiltersToQuery } from '@/lib/video-filters'
 
 /**
  * Channel Details Page
@@ -11,11 +12,14 @@ import { SimpleVideosTable } from '../../videos/components/simple-videos-table'
  * - AI categorization results
  * - Baseline performance metrics
  * - Complete list of channel's videos with performance analysis
+ * - Filterable video list (Upload Date, Min Views, Min Outlier Score)
  */
 export default async function ChannelDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const supabase = await createClient()
   const { id } = await params
@@ -41,6 +45,19 @@ export default async function ChannelDetailPage({
 
   const youtubeChannelId = channelResult.channel_id
 
+  // Parse URL filters
+  const searchParamsData = await searchParams
+  const filters = parseVideoFilters(searchParamsData)
+
+  // Build videos query with filters
+  let videosQuery = supabase
+    .from('benchmark_videos')
+    .select('*')
+    .eq('channel_id', youtubeChannelId)
+
+  // Apply filters (minViews, minOutlierScore, dateRange, sortBy)
+  videosQuery = applyVideoFiltersToQuery(videosQuery, filters)
+
   // 2. Fetch baseline statistics and videos in parallel using the channel_id
   const [baselineStatsResult, videosResult] = await Promise.all([
     // Fetch baseline statistics (14d, 30d, 90d) - get the most recent one
@@ -52,12 +69,8 @@ export default async function ChannelDetailPage({
       .limit(1)
       .maybeSingle(),
 
-    // Fetch all videos from this channel
-    supabase
-      .from('benchmark_videos')
-      .select('*')
-      .eq('channel_id', youtubeChannelId)
-      .order('upload_date', { ascending: false })
+    // Fetch videos with filters applied
+    videosQuery
   ])
 
   // Transform channel data to camelCase
@@ -150,7 +163,7 @@ export default async function ChannelDetailPage({
           </p>
         </div>
 
-        <SimpleVideosTable data={videos} />
+        <SimpleVideosTableNew data={videos} />
       </div>
     </div>
   )
