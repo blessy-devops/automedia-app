@@ -1,0 +1,1445 @@
+{
+  "name": "[automedia] wf1: add_to_production → aprovação manual ou automática",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        -176
+      ],
+      "id": "0640d5d1-0400-4d66-9757-b9b62c5d3eb3",
+      "name": "When clicking ‘Execute workflow’",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Inputs').item.json.modo }}",
+                    "rightValue": "=manual",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "2c696595-74eb-4eb5-b2e0-ed40a7c92d31"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "manual"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "7dd917c9-dfa9-4fb0-936e-f37ce883b754",
+                    "leftValue": "={{ $('Inputs').item.json.modo }}",
+                    "rightValue": "auto",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "auto"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        608,
+        32
+      ],
+      "id": "fae77f34-1823-419c-88b6-c354e2b23d74",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "85b62741-d30e-45e6-9058-1ebbe0227d12",
+              "name": "modo",
+              "value": "manual",
+              "type": "string"
+            },
+            {
+              "id": "2012d0cf-2312-4125-880d-ab354dc77c20",
+              "name": "status",
+              "value": "={{ $('Get benchmark_video: add_to_production').item.json.production_status }}",
+              "type": "string"
+            },
+            {
+              "id": "30fb5e2a-d19a-4884-a501-f7a17d00a422",
+              "name": "id",
+              "value": "={{ $('Get benchmark_video: add_to_production').item.json.id }}",
+              "type": "number"
+            },
+            {
+              "id": "891ab5f2-e1f4-4b23-92fd-d7c0371d596b",
+              "name": "benchmark_title",
+              "value": "={{ $('Get benchmark_video: add_to_production').item.json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "c50e93f8-1b6c-428f-ab64-84722d492053",
+              "name": "categorization",
+              "value": "={{ $json.categorization }}",
+              "type": "string"
+            },
+            {
+              "id": "89ee2418-a760-491f-a8cc-428a0856aa5f",
+              "name": "youtube_video_id",
+              "value": "={{ $json.youtube_video_id }}",
+              "type": "string"
+            },
+            {
+              "id": "5992b211-b633-4a1d-b1b3-5583f184d5a3",
+              "name": "youtube_url",
+              "value": "={{ $json.youtube_url }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        320,
+        32
+      ],
+      "id": "87b62803-42d2-468a-911f-e8f0b054d6a6",
+      "name": "Inputs"
+    },
+    {
+      "parameters": {
+        "formTitle": "APERTA O BOTÃO ABAIXO",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        -464,
+        288
+      ],
+      "id": "d57d0934-8c36-4cad-96d9-ed75c35a1b4d",
+      "name": "On form submission",
+      "webhookId": "9e4f6e72-fddf-4b4e-baf0-7f01074c5681"
+    },
+    {
+      "parameters": {
+        "tableId": "production_videos",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "unique_profile_id",
+              "fieldValue": "={{ $json.unique_profile_id }}"
+            },
+            {
+              "fieldId": "benchmark_id",
+              "fieldValue": "={{ $('GET video de benchmark (referência)').first().json.id }}"
+            },
+            {
+              "fieldId": "benchmark_title",
+              "fieldValue": "={{ $('GET video de benchmark (referência)').first().json.title }}"
+            },
+            {
+              "fieldId": "benchmark_video_transcript",
+              "fieldValue": "={{ $('GET video de benchmark (referência)').first().json.video_transcript }}"
+            },
+            {
+              "fieldId": "placeholder",
+              "fieldValue": "={{ $json.placeholder }}"
+            },
+            {
+              "fieldId": "language",
+              "fieldValue": "={{ $json.language }}"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            },
+            {
+              "fieldId": "description",
+              "fieldValue": "={{ $('GET video de benchmark (referência)').first().json.description }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "create_title"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2096,
+        480
+      ],
+      "id": "4e2bc814-ec15-4e27-a93d-5c4d95ca9f3c",
+      "name": "Cria Linhas para cada Canal Selecionado",
+      "notesInFlow": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "I0sUz9QL2A9e4Bp4",
+          "name": "supabase: automedia"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "production_videos"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "30fb5e2a-d19a-4884-a501-f7a17d00a422",
+              "name": "id",
+              "value": "={{ $json.id }}",
+              "type": "number"
+            },
+            {
+              "id": "71d64241-f841-476e-9aef-a280824eaad3",
+              "name": "categorization",
+              "value": "={{ $json.categorization }}",
+              "type": "string"
+            },
+            {
+              "id": "6273a7a6-7fb6-40e6-8f01-05d28c2793c7",
+              "name": "title",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "410764b2-08be-4075-b1aa-7d6ce95eee7d",
+              "name": "channel_id",
+              "value": "={{ $json.channel_id }}",
+              "type": "string"
+            },
+            {
+              "id": "5df3d39f-b4c4-4c4f-8528-088456b10d30",
+              "name": "description",
+              "value": "={{ $json.description }}",
+              "type": "string"
+            },
+            {
+              "id": "9a6d8a54-5579-44ca-bad4-8e332366408f",
+              "name": "video_transcript",
+              "value": "={{ $json.video_transcript }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        288
+      ],
+      "id": "86f1ec78-4f00-4249-aaeb-4bf668ada282",
+      "name": "Inputs1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega os canais\nconst channels = $('Busca Canais com Match').all();\n\n// Monta as opções no formato correto: um array de objetos com a chave \"option\"\nconst options = channels.map(item => ({ \"option\": item.json.placeholder }));\n\n// Retorna no formato EXATO que o nó Form espera\nreturn [{\n  json: {\n    formDefinition: [\n      {\n        \"fieldLabel\": \"Quais canais você quer aprovar?\",\n        \"fieldType\": \"dropdown\",\n        \"multiselect\": true,\n        \"requiredField\": true,\n        \"fieldOptions\": {\n          \"values\": options\n        }\n      }\n    ]\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        288
+      ],
+      "id": "b5c9fcbf-b813-4b7a-9435-222eabcfb83a",
+      "name": "Monta Form1"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "structure_accounts",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "niche",
+              "condition": "eq",
+              "keyValue": "={{ JSON.parse($json.categorization).niche }}"
+            },
+            {
+              "keyName": "subniche",
+              "condition": "eq",
+              "keyValue": "={{ JSON.parse($json.categorization).subniche }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        448,
+        288
+      ],
+      "id": "35a112f8-f0b3-4024-b3b7-b823bd3645c7",
+      "name": "Busca Canais com Match",
+      "notesInFlow": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "I0sUz9QL2A9e4Bp4",
+          "name": "supabase: automedia"
+        }
+      },
+      "notes": "structure_accounts"
+    },
+    {
+      "parameters": {
+        "defineForm": "json",
+        "jsonOutput": "={{ $json.formDefinition }}",
+        "options": {
+          "buttonLabel": "APROVAR"
+        }
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 1,
+      "position": [
+        880,
+        288
+      ],
+      "id": "a652fd17-9961-46ee-9d20-f8a1ae69ec87",
+      "name": "Form de Seleção dos Canais (Multipla Escolha)",
+      "webhookId": "dc711131-9331-48c0-9638-64a80d5a6b44",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9006289e-dd23-4847-8002-273da8215acf",
+              "name": "placeholder",
+              "value": "={{ $json['[\\'Quais canais você quer aprovar?\\']'] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1584,
+        480
+      ],
+      "id": "337825b1-b270-47a3-9e6a-db33bb9ad9b8",
+      "name": "Parse Output"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "['Quais canais você quer aprovar?']",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        288
+      ],
+      "id": "4aba9b8c-f06c-4ecc-85a1-1a797b8a9156",
+      "name": "Splita Canais Selecionados"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "structure_accounts",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "placeholder",
+              "keyValue": "={{ $json.placeholder }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        480
+      ],
+      "id": "751efe8c-17e4-41d0-8a53-72c4396145a4",
+      "name": "Get Info Canal",
+      "notesInFlow": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "I0sUz9QL2A9e4Bp4",
+          "name": "supabase: automedia"
+        }
+      },
+      "notes": "structure_accounts"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "automedialat@gmail.com",
+        "subject": "=[bench_video_id: {{ $('Inputs').item.json.id }}] Selecionar canais p/ \"{{ $json.benchmark_title }}\"",
+        "message": "=PARA QUAIS CANAIS VOCÊ QUER PRODUZIR ESTE VIDEO ABAIXO?\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n\n• Tema a Modelar: {{ $('Get benchmark_video: add_to_production').item.json.title }}\n• YouTube ID: {{ $('Inputs').item.json.youtube_video_id }}\n• URL do Vídeo: {{ $json.youtube_url }}\n• Nicho: {{ JSON.parse($json.categorization).niche }}\n• Subnicho: {{ JSON.parse($json.categorization).subniche }}\n• Micronicho: {{ JSON.parse($json.categorization).microniche }}\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n\n■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■\n\nhttp://localhost:5678/form/9e4f6e72-fddf-4b4e-baf0-7f01074c5681\n\n■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■\n\n",
+        "responseType": "freeText",
+        "options": {
+          "messageButtonLabel": " ",
+          "limitWaitTime": {
+            "values": {
+              "resumeAmount": 5,
+              "resumeUnit": "minutes"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1152,
+        -160
+      ],
+      "id": "e9b7760b-1b56-4b96-a896-7b929752a3d1",
+      "name": "Aguarda Validação no Gmail1",
+      "webhookId": "8f68db59-512f-4206-94b6-cfffd7b568f2",
+      "notesInFlow": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sGv5Oa6g6E43CTs4",
+          "name": "automedialat@gmail.com"
+        }
+      },
+      "notes": "http://localhost:5678/form/d41cdc89-36d7-4d88-b8f2-42efc56c396f"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "benchmark_videos",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{$json.id}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        16,
+        288
+      ],
+      "id": "ad687d84-26c6-40fd-aeb4-143c71b076c7",
+      "name": "GET video de benchmark (referência)",
+      "alwaysOutputData": true,
+      "notesInFlow": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "I0sUz9QL2A9e4Bp4",
+          "name": "supabase: automedia"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "benchmark_videos"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "benchmark_videos",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $json.benchmark_video_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -192,
+        32
+      ],
+      "id": "c6a8b4fe-c171-4bcb-bd18-d268b15d3d6a",
+      "name": "Get benchmark_video: add_to_production",
+      "notesInFlow": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "I0sUz9QL2A9e4Bp4",
+          "name": "supabase: automedia"
+        }
+      },
+      "notes": "benchmark_videos"
+    },
+    {
+      "parameters": {
+        "content": "## AUTOMÁTICO\nQuando tiver o match automático, colocar aqui",
+        "height": 112
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        816,
+        48
+      ],
+      "id": "4acd1d77-a76d-41c0-93a7-959ac6245fa6",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1584,
+        304
+      ],
+      "id": "26466137-68af-41af-b625-82a4a8e00912",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1376,
+        464
+      ],
+      "id": "3d774e5f-1f52-4911-a3fc-c6d33857b838",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "benchmark_videos",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('GET video de benchmark (referência)').first().json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "used"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2336,
+        704
+      ],
+      "id": "07e86f10-dae2-422c-b23e-e892078a9786",
+      "name": "UPDATE: Status → used",
+      "notesInFlow": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "I0sUz9QL2A9e4Bp4",
+          "name": "supabase: automedia"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "benchmark_videos"
+    },
+    {
+      "parameters": {
+        "content": "// Para extrair o niche\n{{ JSON.parse($json.categorization).niche }}\n\n// Para extrair o subniche\n{{ JSON.parse($json.categorization).subniche }}\n\n// Para extrair o microniche\n{{ JSON.parse($json.categorization).microniche }}\n\n// Para extrair a category\n{{ JSON.parse($json.categorization).category }}\n\n// Para extrair o format\n{{ JSON.parse($json.categorization).format }}",
+        "height": 288,
+        "width": 528,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        560
+      ],
+      "id": "77be3707-2a03-4314-a173-bcc0cc6d6a98",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "dataToSave": {
+          "values": [
+            {
+              "key": "title",
+              "value": "={{ $json.title }}"
+            },
+            {
+              "key": "youtube_video_id",
+              "value": "={{ $json.youtube_video_id }}"
+            },
+            {
+              "key": "benchmark_video_id",
+              "value": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executionData",
+      "typeVersion": 1.1,
+      "position": [
+        320,
+        -512
+      ],
+      "id": "6e539912-16e7-42f0-aca2-f29e7ecad2a9",
+      "name": "Execution Data"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "benchmark_video_id",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -464,
+        32
+      ],
+      "id": "bc3f6752-7d57-4ed9-99ee-db9d2a7d89fb",
+      "name": "wf0 ➡️ wf1"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "DqzxJWuEa29AGDOS",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/DqzxJWuEa29AGDOS",
+          "cachedResultName": "[automedia] wf2: reescreve títulos"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "video_id": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "video_id"
+          ],
+          "schema": [
+            {
+              "id": "video_id",
+              "displayName": "video_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3712,
+        416
+      ],
+      "id": "089ce0e3-197e-4ad0-bd22-a46fc41962f1",
+      "name": "[automedia] wf2: reescreve títulos",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Vj6MDUpvN2DOoB0m",
+          "mode": "list",
+          "cachedResultName": "[automedia] [módulo] wf: benchmark baixa transcrição video"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "youtube_video_id": "={{ $json.youtube_video_id }}",
+            "api_key": "4cfde719d0mshc3d6d6ce63a4f01p1205bcjsn8cc0e9779a20"
+          },
+          "matchingColumns": [
+            "youtube_video_id",
+            "api_key"
+          ],
+          "schema": [
+            {
+              "id": "youtube_video_id",
+              "displayName": "youtube_video_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "api_key",
+              "displayName": "api_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        608,
+        -144
+      ],
+      "name": "Baixa Transcrição do Vídeo",
+      "id": "be4bb8de-7ec8-465a-8e22-1de6622f39e1",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c840c0b0-9f32-4d74-9e2d-159c77614c66",
+              "leftValue": "={{ $json.video_transcript.length < 100 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        -160
+      ],
+      "id": "59761402-43ad-4af6-94ff-f8268c344893",
+      "name": "tem transcrição?",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "benchmark_videos",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "pending_distribution"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        320,
+        -336
+      ],
+      "id": "bb6d7b34-5bbe-47f9-91ed-7d759d807cc0",
+      "name": "status → pending_distribution",
+      "credentials": {
+        "supabaseApi": {
+          "id": "I0sUz9QL2A9e4Bp4",
+          "name": "supabase: automedia"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "benchmark_videos",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "pending_distribution"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        288
+      ],
+      "id": "4f85baef-7471-4ba2-94f6-dbd61a80dac5",
+      "name": "GET benchmark_video: pending_distribution",
+      "notesInFlow": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "I0sUz9QL2A9e4Bp4",
+          "name": "supabase: automedia"
+        }
+      },
+      "notes": "benchmark_videos"
+    },
+    {
+      "parameters": {
+        "content": "## Ativa Próximo Fluxo\nAqui, já vai direto pro início da produção (escolha de título)",
+        "height": 304,
+        "width": 256,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3632,
+        304
+      ],
+      "id": "44b45963-0767-4093-ad0a-93ee45e435f6",
+      "name": "Sticky Note4",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "content": "## 🚨 POSSÍVEL PROBLEMA DE FILA\nO que pode acontecer aqui?\n- Só passa videos pra cá (vindo do WF0) quando não tem NENHUM produzindo. Até aqui, ok.\n- Só que, a gente pode não ter NENHUM video produzindo, mas podemos ter VÁRIOS em `add_to_production` em `benchmark_videos`. Quando filtrar lá no WF0, vai mandar pra cá.\n- O problema é que aqui pode ter vários acumulados em `pending_distribution` e entrar na produção ao mesmo tempo",
+        "height": 256,
+        "width": 496,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        960,
+        -512
+      ],
+      "id": "a2113879-2607-4137-b29c-456ec39ccb6d",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## Ativa Próximo Fluxo\nAqui, já vai direto pra escolha de título no novo fluxo de produção",
+        "height": 320,
+        "width": 256,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3632,
+        -48
+      ],
+      "id": "957ff52e-cbe7-418c-b9e8-a324752f92b0",
+      "name": "Sticky Note6",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Pt6U97gPa9R1iim8",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/Pt6U97gPa9R1iim8",
+          "cachedResultName": "✅ 1. Criação de Título"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "video_id": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "video_id"
+          ],
+          "schema": [
+            {
+              "id": "video_id",
+              "displayName": "video_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3712,
+        80
+      ],
+      "id": "5ab4e6da-9f74-4397-9a2a-8db3df80e982",
+      "name": "✅ 1. Criação de Título",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "content": "## ⚠️ MUDANÇA AQUI\n_Com a ideia de ter tanto o fluxo de produção de histórias quanto o fluxo de clone de scripts, eu resolvi criar a coluna_ `production_workflow_id ` _na brand_bible._\n\n_A ideia é direcionar qual é o fluxo de produção de cada marca._\n\n_Também criei a tabela_ `structure_production_workflow` _para alimentar com diferentes perfis de produção._",
+        "height": 448,
+        "width": 400,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2272,
+        80
+      ],
+      "id": "e8cff6a6-61d4-466a-b50c-e110cc22e77b",
+      "name": "Sticky Note7",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "structure_brand_bible",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "placeholder",
+              "keyValue": "={{ $json.placeholder }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1744,
+        480
+      ],
+      "id": "ae77bef8-695f-4b2c-84d3-d35a35b5a362",
+      "name": "Busca Brand Bible",
+      "notesInFlow": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "I0sUz9QL2A9e4Bp4",
+          "name": "supabase: automedia"
+        }
+      },
+      "notes": "tb: structure_brand_bible"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Busca Brand Bible').item.json.production_workflow_id }}",
+                    "rightValue": "ff5c9fd6-0427-46e1-9572-6c997cbbf086",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "dce39698-0bee-4ee5-b33c-33c4b8054e71"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "fluxo capítulos"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "b5b1e934-e86a-4c6b-9649-fc19adc04d4f",
+                    "leftValue": "={{ $('Busca Brand Bible').item.json.production_workflow_id }}",
+                    "rightValue": "4d91196a-29ae-4d71-a6b8-d580f55cfa84",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEquals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "fluxo clone roteiro"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        3216,
+        288
+      ],
+      "id": "7e349d40-7593-41f4-b919-29cd385b5b8e",
+      "name": "escolhe qual fluxo de produção",
+      "notesInFlow": true,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "AZ14QvBluwJPpfie",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/AZ14QvBluwJPpfie",
+          "cachedResultName": "Triagem Fluxos de Produção"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "original_workflow_id": "={{ $workflow.id }}",
+            "original_workflow_name": "={{ $workflow.name }}",
+            "video_id": "={{ $json.id}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "original_workflow_id",
+              "displayName": "original_workflow_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "original_workflow_name",
+              "displayName": "original_workflow_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "video_id",
+              "displayName": "video_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2400,
+        368
+      ],
+      "id": "4ab7e2d9-1986-4d89-a32e-9ba9789ebde2",
+      "name": "Triagem Fluxos de Produção"
+    }
+  ],
+  "pinData": {
+    "wf0 ➡️ wf1": [
+      {
+        "json": {
+          "benchmark_video_id": 22254
+        }
+      }
+    ],
+    "On form submission": [
+      {
+        "json": {
+          "submittedAt": "2025-10-25T08:18:19.645-03:00",
+          "formMode": "production"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        []
+      ]
+    },
+    "Inputs": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Aguarda Validação no Gmail1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "GET benchmark_video: pending_distribution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inputs1": {
+      "main": [
+        [
+          {
+            "node": "Busca Canais com Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Monta Form1": {
+      "main": [
+        [
+          {
+            "node": "Form de Seleção dos Canais (Multipla Escolha)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Busca Canais com Match": {
+      "main": [
+        [
+          {
+            "node": "Monta Form1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form de Seleção dos Canais (Multipla Escolha)": {
+      "main": [
+        [
+          {
+            "node": "Splita Canais Selecionados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Output": {
+      "main": [
+        [
+          {
+            "node": "Busca Brand Bible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Splita Canais Selecionados": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cria Linhas para cada Canal Selecionado": {
+      "main": [
+        [
+          {
+            "node": "UPDATE: Status → used",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Triagem Fluxos de Produção",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Info Canal": {
+      "main": [
+        [
+          {
+            "node": "Cria Linhas para cada Canal Selecionado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET video de benchmark (referência)": {
+      "main": [
+        [
+          {
+            "node": "Inputs1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get benchmark_video: add_to_production": {
+      "main": [
+        [
+          {
+            "node": "Execution Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Inputs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "tem transcrição?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "status → pending_distribution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parse Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UPDATE: Status → used": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "wf0 ➡️ wf1": {
+      "main": [
+        [
+          {
+            "node": "Get benchmark_video: add_to_production",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixa Transcrição do Vídeo": {
+      "main": [
+        []
+      ]
+    },
+    "tem transcrição?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Baixa Transcrição do Vídeo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET benchmark_video: pending_distribution": {
+      "main": [
+        [
+          {
+            "node": "GET video de benchmark (referência)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[automedia] wf2: reescreve títulos": {
+      "main": [
+        []
+      ]
+    },
+    "Busca Brand Bible": {
+      "main": [
+        [
+          {
+            "node": "Get Info Canal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "escolhe qual fluxo de produção": {
+      "main": [
+        [
+          {
+            "node": "✅ 1. Criação de Título",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[automedia] wf2: reescreve títulos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "b04531cc-2e56-4384-abbc-fad41dde954e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "33738330930e3881dd5571eca013f36ddf8aab20e4ea5c1f2ebaf4a2b4668ac6"
+  },
+  "id": "9CyNViVvKiCNIpI8",
+  "tags": [
+    {
+      "createdAt": "2025-07-26T21:12:41.529Z",
+      "updatedAt": "2025-07-26T21:12:41.529Z",
+      "id": "rw9clsk6DPBqn9eg",
+      "name": "automedia"
+    }
+  ]
+}

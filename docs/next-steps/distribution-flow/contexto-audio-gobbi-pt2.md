@@ -1,0 +1,3 @@
+E aí qual que é o problema que a gente tá enfrentando nesse fluxo aí? Que vale a pena nós olharmos. Que eu acho que não vai ter problema quando a gente transmutar, né? A lógica tá passando mais de vídeo de uma vez pra seleção.
+
+Ele está fazendo Enfim, ele está fazendo Many to many, uma relação Many to many errada Não sei o que está acontecendo não, mas Posso te mandar uns prints Do que está dando errado E você infere aí de alguma forma Do porquê que isso está acontecendo Que eu não faço ideia, estamos juntos

@@ -3,7 +3,7 @@ Bom, primeira coisa, uma visão geral, é que nós temos os prefixos muito bem d
 
 ______
 ### benchmark_channels
-Essa tabela é a tabela onde a gente guarda os canais de referência Canais que a gente acredita que sejam bons, que valham a pena modelar 
+Essa tabela é a tabela o nde a gente guarda os canais de referência Canais que a gente acredita que sejam bons, que valham a pena modelar 
 ______
 ### benchmark_channels_baseline_stats
 Essa tabela tem relação com os benchmark channels e ela é que guarda as principais métricas para a gente calcular, que são utilizadas como base para a gente poder calcular o outlier score dos vídeos destes mesmos canais. É aqui que nós temos as médias, tudo que a gente pega e calcula usando o scraping do social blade, coisas do tipo, para dizer como é a média desse canal e como os vídeos que estão sendo postados nesse canal se comportam em relação à média, à mediana e coisas do tipo.
