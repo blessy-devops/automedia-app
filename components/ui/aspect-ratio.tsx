@@ -1,22 +1,11 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import * as AspectRatioPrimitive from "@radix-ui/react-aspect-ratio"
+import * as AspectRatioPrimitive from "@radix-ui/react-aspect-ratio";
 
-const AspectRatio = React.forwardRef<
-  React.ElementRef<typeof AspectRatioPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof AspectRatioPrimitive.Root> & {
-    ratio?: number
-    children?: React.ReactNode
-  }
->(({ ratio, children, ...props }, ref) => (
-  <AspectRatioPrimitive.Root
-    ref={ref}
-    {...({ ratio, ...props } as any)}
-  >
-    {children}
-  </AspectRatioPrimitive.Root>
-))
-AspectRatio.displayName = "AspectRatio"
+function AspectRatio({
+  ...props
+}: React.ComponentProps<typeof AspectRatioPrimitive.Root>) {
+  return <AspectRatioPrimitive.Root data-slot="aspect-ratio" {...props} />;
+}
 
-export { AspectRatio }
+export { AspectRatio };
