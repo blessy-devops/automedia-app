@@ -545,3 +545,206 @@ export async function processVideoQueue() {
     return { success: false, error: 'Failed to process queue' }
   }
 }
+
+// ============================================================================
+// VIDEO DELETE OPERATIONS
+// ============================================================================
+
+interface ActionResult<T = unknown> {
+  success: boolean
+  data?: T
+  error?: string
+}
+
+/**
+ * Delete a single video from the database
+ * Also removes the video from any folders it's in (video_folder_items)
+ *
+ * @param id - Video database ID (benchmark_videos.id)
+ */
+export async function deleteVideo(id: number): Promise<ActionResult<{ videoTitle: string | null }>> {
+  try {
+    const supabase = await createClient()
+
+    // Get the video first to retrieve title for confirmation
+    const { data: video, error: fetchError } = await supabase
+      .from('benchmark_videos')
+      .select('id, title')
+      .eq('id', id)
+      .single()
+
+    if (fetchError || !video) {
+      return {
+        success: false,
+        error: 'Video not found',
+      }
+    }
+
+    // 1. Delete from video_folder_items (cascade)
+    const { error: folderItemsError } = await supabase
+      .from('video_folder_items')
+      .delete()
+      .eq('video_id', id)
+
+    if (folderItemsError) {
+      console.error('[deleteVideo] Error deleting folder items:', folderItemsError)
+      // Not critical, continue with video deletion
+    }
+
+    // 2. Delete the video itself
+    const { error: deleteError } = await supabase
+      .from('benchmark_videos')
+      .delete()
+      .eq('id', id)
+
+    if (deleteError) {
+      console.error('[deleteVideo] Error deleting video:', deleteError)
+      return {
+        success: false,
+        error: 'Failed to delete video',
+      }
+    }
+
+    // Revalidate the videos page
+    revalidatePath('/videos')
+
+    return {
+      success: true,
+      data: {
+        videoTitle: video.title,
+      },
+    }
+  } catch (error) {
+    console.error('[deleteVideo] Error:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete video',
+    }
+  }
+}
+
+/**
+ * Delete multiple videos in bulk
+ *
+ * @param ids - Array of video database IDs
+ */
+export async function bulkDeleteVideos(
+  ids: number[]
+): Promise<ActionResult<{ deleted: number; failed: number; errors: string[] }>> {
+  try {
+    if (!ids || ids.length === 0) {
+      return {
+        success: false,
+        error: 'No videos selected for deletion',
+      }
+    }
+
+    let deleted = 0
+    let failed = 0
+    const errors: string[] = []
+
+    // Delete videos one by one
+    for (const id of ids) {
+      const result = await deleteVideo(id)
+      if (result.success) {
+        deleted++
+      } else {
+        failed++
+        errors.push(`Video ID ${id}: ${result.error}`)
+      }
+    }
+
+    // Revalidate once at the end
+    revalidatePath('/videos')
+
+    return {
+      success: true,
+      data: {
+        deleted,
+        failed,
+        errors,
+      },
+    }
+  } catch (error) {
+    console.error('[bulkDeleteVideos] Error:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to bulk delete videos',
+    }
+  }
+}
+
+// ============================================================================
+// PRODUCTION WEBHOOK OPERATIONS
+// ============================================================================
+
+/**
+ * Send videos to production via Edge Function
+ *
+ * Calls the send-to-gobbi Edge Function which handles:
+ * - Fetching compatible video fields
+ * - Batching
+ * - Webhook URL lookup
+ * - Error handling
+ * - Logging
+ *
+ * @param videoIds - Array of video database IDs to send
+ * @param webhookId - ID of the webhook to use (currently unused - Edge Function looks up by name)
+ */
+export async function sendVideosToProduction(
+  videoIds: number[],
+  webhookId: number
+): Promise<ActionResult<{ sent: number; webhook_name: string }>> {
+  try {
+    if (!videoIds || videoIds.length === 0) {
+      return {
+        success: false,
+        error: 'No videos selected',
+      }
+    }
+
+    const supabase = await createClient()
+
+    // Call the send-to-gobbi Edge Function
+    const { data, error } = await supabase.functions.invoke('send-to-gobbi', {
+      body: {
+        video_ids: videoIds,
+        options: {
+          include_transcript: false, // Don't send huge transcript by default
+          batch_size: 50, // Send in batches of 50
+        },
+      },
+    })
+
+    if (error) {
+      console.error('[sendVideosToProduction] Edge Function error:', error)
+      return {
+        success: false,
+        error: error.message || 'Failed to call Edge Function',
+      }
+    }
+
+    // Check Edge Function response
+    if (!data.success) {
+      console.error('[sendVideosToProduction] Edge Function returned error:', data)
+      return {
+        success: false,
+        error: data.message || data.error || 'Edge Function failed',
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        sent: data.videos_sent || videoIds.length,
+        webhook_name: 'receive-benchmark-videos',
+      },
+    }
+  } catch (error) {
+    console.error('[sendVideosToProduction] Error:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to send videos to production',
+    }
+  }
+}

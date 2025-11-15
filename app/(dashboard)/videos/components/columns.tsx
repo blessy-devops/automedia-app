@@ -7,6 +7,7 @@ export type Video = {
   youtubeVideoId: string
   channelId: string
   channelName: string | null
+  channelDbId: number | null
   title: string | null
   views: number | null
   likes: number | null

@@ -7,12 +7,8 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { formatLargeNumber, formatDate } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Separator } from "@/components/ui/separator"
-import { Label } from "@/components/ui/label"
 import {
   Search,
-  SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
   X,
@@ -20,12 +16,18 @@ import {
   Settings,
   List,
   Grid3x3,
-  ArrowUpDown
+  ArrowUpDown,
+  Trash2
 } from "lucide-react"
 import { PerformanceBadge } from "./performance-badge"
 import { AddToFolderButton } from "./add-to-folder-button"
 import { RemoveFromFolderButton } from "./remove-from-folder-button"
+import { SendToProductionButton } from "./send-to-production-button"
 import { ManageFoldersModal } from "./manage-folders-modal"
+import { VideoFiltersPopover } from "./video-filters-popover"
+import { DeleteVideoDialog } from "./delete-video-dialog"
+import { BulkDeleteVideosDialog } from "./bulk-delete-videos-dialog"
+import { Button } from "@/components/ui/button"
 import type { Video } from "./columns"
 
 // Lazy load GalleryView
@@ -55,14 +57,15 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
   // View state (table or gallery)
   const [view, setView] = useState<"table" | "gallery">("table")
 
-  // Filters state
-  const [filtersOpen, setFiltersOpen] = useState(false)
-  const [minViewsFilter, setMinViewsFilter] = useState("")
-  const [minOutlierFilter, setMinOutlierFilter] = useState("")
-  const [dateRangeFilter, setDateRangeFilter] = useState("")
-
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+
+  // Delete dialog states
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean
+    video: { id: number; title: string | null; youtubeVideoId: string } | null
+  }>({ open: false, video: null })
+  const [bulkDeleteDialog, setBulkDeleteDialog] = useState(false)
 
   // Update URL params helper
   const updateSearchParams = (key: string, value: string) => {
@@ -72,27 +75,8 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
     } else {
       params.delete(key)
     }
-    router.push(`${pathname}?${params.toString()}`)
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
   }
-
-  // Clear all filters
-  const clearFilters = () => {
-    setMinViewsFilter("")
-    setMinOutlierFilter("")
-    setDateRangeFilter("")
-    const params = new URLSearchParams(searchParams.toString())
-    params.delete("minViews")
-    params.delete("minOutlierScore")
-    params.delete("dateRange")
-    router.push(`${pathname}?${params.toString()}`)
-  }
-
-  // Count active filters
-  const activeFiltersCount = [
-    searchParams.get("minViews"),
-    searchParams.get("minOutlierScore"),
-    searchParams.get("dateRange") && searchParams.get("dateRange") !== "all" ? searchParams.get("dateRange") : null
-  ].filter(Boolean).length
 
   // Filter by search
   const filtered = useMemo(() => {
@@ -272,110 +256,8 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
             />
           </div>
 
-          {/* Filters Popover */}
-          <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
-            <PopoverTrigger asChild>
-              <button className="border border-border bg-card rounded-md px-3 py-2.5 text-sm text-foreground hover:bg-accent flex items-center gap-2 transition-colors shadow-sm">
-                <SlidersHorizontal className="w-4 h-4" />
-                Filters
-                {activeFiltersCount > 0 && (
-                  <>
-                    <Separator orientation="vertical" className="h-4" />
-                    <Badge variant="secondary" className="rounded-sm px-1.5 py-0.5 text-xs font-normal">
-                      {activeFiltersCount}
-                    </Badge>
-                  </>
-                )}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-80">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <h4 className="font-medium text-sm">Filters</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Filter videos by date, views and performance
-                  </p>
-                </div>
-                <Separator />
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="date-range">Upload Date</Label>
-                    <Select
-                      value={dateRangeFilter || searchParams.get("dateRange") || "all"}
-                      onValueChange={setDateRangeFilter}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All time" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All time</SelectItem>
-                        <SelectItem value="7d">Last 7 days</SelectItem>
-                        <SelectItem value="30d">Last 30 days</SelectItem>
-                        <SelectItem value="90d">Last 90 days</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="min-views">Minimum Views</Label>
-                    <input
-                      id="min-views"
-                      type="number"
-                      placeholder="e.g., 10000"
-                      value={minViewsFilter}
-                      onChange={(e) => setMinViewsFilter(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          updateSearchParams("minViews", minViewsFilter)
-                          setFiltersOpen(false)
-                        }
-                      }}
-                      className="w-full bg-card border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-foreground"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="min-outlier">Minimum Outlier Score</Label>
-                    <input
-                      id="min-outlier"
-                      type="number"
-                      step="0.1"
-                      placeholder="e.g., 5.0"
-                      value={minOutlierFilter}
-                      onChange={(e) => setMinOutlierFilter(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          updateSearchParams("minOutlierScore", minOutlierFilter)
-                          setFiltersOpen(false)
-                        }
-                      }}
-                      className="w-full bg-card border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-foreground"
-                    />
-                  </div>
-                </div>
-                <Separator />
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      updateSearchParams("minViews", minViewsFilter)
-                      updateSearchParams("minOutlierScore", minOutlierFilter)
-                      updateSearchParams("dateRange", dateRangeFilter)
-                      setFiltersOpen(false)
-                    }}
-                    className="flex-1 bg-primary text-primary-foreground rounded-md px-3 py-2 text-sm hover:bg-primary/90 transition-colors"
-                  >
-                    Apply Filters
-                  </button>
-                  {activeFiltersCount > 0 && (
-                    <button
-                      onClick={clearFilters}
-                      className="border border-border bg-card rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+          {/* Filters Popover - Reusable Component */}
+          <VideoFiltersPopover />
 
           {/* Upload Date Select Dropdown */}
           <Select
@@ -427,6 +309,10 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <SendToProductionButton
+              videoIds={Array.from(selectedIds)}
+              onSuccess={handleBulkActionSuccess}
+            />
             <AddToFolderButton
               videoIds={Array.from(selectedIds)}
               folders={folders}
@@ -439,6 +325,15 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
                 onSuccess={handleBulkActionSuccess}
               />
             )}
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setBulkDeleteDialog(true)}
+              className="h-8"
+            >
+              <Trash2 className="w-4 h-4 mr-1.5" />
+              Delete Selected
+            </Button>
             <button
               onClick={handleClearSelection}
               className="text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 px-3 py-1.5 text-sm transition-colors"
@@ -513,6 +408,9 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
                     <ArrowUpDown className={`w-3 h-3 ${sortField === 'performanceVsMedianHistorical' ? 'opacity-100' : 'opacity-40'}`} />
                   </button>
                 </th>
+                <th className="px-4 py-3 text-center text-xs text-muted-foreground uppercase tracking-wide">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -551,8 +449,17 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
                         {video.title || "Untitled"}
                       </Link>
                     </td>
-                    <td className="px-4 py-4 text-sm text-muted-foreground">
-                      {video.channelName || "-"}
+                    <td className="px-4 py-4 text-sm">
+                      {video.channelDbId ? (
+                        <Link
+                          href={`/channels/${video.channelDbId}`}
+                          className="text-primary hover:text-primary/80 hover:underline transition-colors"
+                        >
+                          @{video.channelName || "-"}
+                        </Link>
+                      ) : (
+                        <span className="text-muted-foreground">@{video.channelName || "-"}</span>
+                      )}
                     </td>
                     <td className="px-4 py-4 text-sm text-foreground text-right">
                       {formatLargeNumber(video.views)}
@@ -568,11 +475,31 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
                         </Badge>
                       )}
                     </td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center justify-center">
+                        <button
+                          onClick={() =>
+                            setDeleteDialog({
+                              open: true,
+                              video: {
+                                id: video.id,
+                                title: video.title,
+                                youtubeVideoId: video.youtubeVideoId,
+                              },
+                            })
+                          }
+                          className="text-destructive hover:text-destructive/80 transition-colors p-1"
+                          title="Delete video"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="h-24 text-center text-muted-foreground">
+                  <td colSpan={8} className="h-24 text-center text-muted-foreground">
                     No videos found.
                   </td>
                 </tr>
@@ -638,6 +565,26 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
           onClose={() => setShowManageFolders(false)}
         />
       )}
+
+      {/* Delete Dialogs */}
+      <DeleteVideoDialog
+        video={deleteDialog.video}
+        open={deleteDialog.open}
+        onOpenChange={(open) => setDeleteDialog({ open, video: null })}
+        onSuccess={() => {
+          window.location.reload()
+        }}
+      />
+
+      <BulkDeleteVideosDialog
+        videoIds={Array.from(selectedIds)}
+        open={bulkDeleteDialog}
+        onOpenChange={setBulkDeleteDialog}
+        onSuccess={() => {
+          setSelectedIds(new Set())
+          window.location.reload()
+        }}
+      />
     </div>
   )
 }
