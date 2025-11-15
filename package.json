@@ -70,6 +70,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "tailwindcss-animate": "^1.0.7",
     "tsx": "^4.20.6"
   }
 }

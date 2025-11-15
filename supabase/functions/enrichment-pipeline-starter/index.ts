@@ -180,18 +180,25 @@ Deno.serve(async (req) => {
     // Step 5: UPSERT data into benchmark_channels table
     console.log(`[Pipeline] Upserting data into benchmark_channels for: ${channelId}`)
 
-    const { error: upsertError } = await supabase
+    const { data: upsertedChannel, error: upsertError } = await supabase
       .from('benchmark_channels')
       .upsert(standardizedData, {
         onConflict: 'channel_id',
         ignoreDuplicates: false,
       })
+      .select('id, channel_id, channel_name, thumbnail_url')
+      .single()
 
-    if (upsertError) {
-      throw new Error(`Failed to upsert channel data: ${upsertError.message}`)
+    if (upsertError || !upsertedChannel) {
+      throw new Error(`Failed to upsert channel data: ${upsertError?.message || 'No data returned'}`)
     }
 
     console.log('[Pipeline] Successfully saved channel data to database')
+    console.log('[Pipeline] Upserted channel:', {
+      id: upsertedChannel.id,
+      channel_id: upsertedChannel.channel_id,
+      channel_name: upsertedChannel.channel_name,
+    })
 
     // Step 6: Invoke next Edge Function in the pipeline (categorization)
     // Using fire-and-forget pattern to avoid timeout issues
@@ -227,8 +234,10 @@ Deno.serve(async (req) => {
         success: true,
         message: `Pipeline started successfully for channel ${channelId}`,
         channelData: {
-          channel_id: standardizedData.channel_id,
-          channel_name: standardizedData.channel_name,
+          id: upsertedChannel.id,
+          channel_id: upsertedChannel.channel_id,
+          channel_name: upsertedChannel.channel_name,
+          thumbnail_url: upsertedChannel.thumbnail_url,
           subscriber_count: standardizedData.subscriber_count,
         },
       }),

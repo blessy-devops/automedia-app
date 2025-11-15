@@ -15,16 +15,19 @@ const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
  * 2. For each channel:
  *    a. Fetch latest YouTube channel metrics (via YouTube API)
  *    b. Update benchmark_channels (subscribers, views, video_count)
- *    c. Run enrichment-step-2-socialblade (baseline stats)
- *    d. Run enrichment-step-3-recent-videos (UPSERT videos)
- *    e. Run enrichment-step-5-outlier-calc (recalculate ratios)
- *    f. Update channel_radar timestamps
+ *    c. Create enrichment task (with categorization & trending pre-completed)
+ *    d. Trigger enrichment pipeline: Step 2 → 3 → 4 → 5
+ *       - Step 2: SocialBlade baseline stats
+ *       - Step 3: Recent videos (UPSERT)
+ *       - Step 4: Trending videos (sorted by views)
+ *       - Step 5: Outlier calculation (marks task as completed)
+ *    e. Update channel_radar with next_update_at
  * 3. Log execution to channel_radar_cron_log
  *
- * OPTIMIZATIONS:
- * - Skips Step 1 (categorization) - already done during onboarding
- * - Skips Step 4 (trending videos) - not essential for radar
- * - Uses UPSERT for videos to avoid duplicates
+ * FLOW:
+ * - Radar only invokes Step 2, which automatically chains to Step 3 → 4 → 5
+ * - Step 5 marks the task as completed at the end
+ * - Task has categorization_status='completed' (skip Step 1, already done)
  * - Continues on error (one channel failure doesn't stop batch)
  */
 
@@ -170,76 +173,62 @@ Deno.serve(async (req) => {
         console.log(`[Radar Updater] ✓ Channel metrics updated`)
 
         // ====================================================================
-        // 3c. Run enrichment-step-2-socialblade (baseline stats)
+        // 3c. Create enrichment task for tracking
         // ====================================================================
-        console.log(`[Radar Updater] Running SocialBlade scraping...`)
+        console.log(`[Radar Updater] Creating enrichment task for radar update...`)
 
-        const { error: socialBladeError } = await supabase.functions.invoke(
+        const { data: task, error: taskError } = await supabase
+          .from('channel_enrichment_tasks')
+          .insert({
+            enrichment_job_id: null, // Radar updates don't need a job
+            channel_id: channel.channel_id,
+            overall_status: 'processing',
+            retry_count: 0,
+            // Skip categorization and trending for radar updates
+            categorization_status: 'completed',
+            trending_videos_status: 'completed',
+            // Set remaining steps to pending
+            socialblade_status: 'pending',
+            recent_videos_status: 'pending',
+            outlier_analysis_status: 'pending',
+          })
+          .select()
+          .single()
+
+        if (taskError || !task) {
+          throw new Error(`Failed to create enrichment task: ${taskError?.message}`)
+        }
+
+        const taskId = task.id
+        console.log(`[Radar Updater] ✓ Created task #${taskId}`)
+
+        // ====================================================================
+        // 3d. Trigger enrichment pipeline (Step 2 → 3 → 4 → 5)
+        // ====================================================================
+        // Only invoke Step 2, which will automatically chain:
+        // Step 2 → Step 3 → Step 4 → Step 5 (Step 5 marks task as completed)
+        console.log(`[Radar Updater] Triggering enrichment pipeline...`)
+
+        const { error: pipelineError } = await supabase.functions.invoke(
           'enrichment-step-2-socialblade',
           {
             body: {
               channelId: channel.channel_id,
-              taskId: null, // No task tracking for radar updates
+              taskId: taskId,
               radarUpdate: true,
             },
           }
         )
 
-        if (socialBladeError) {
-          console.warn(`[Radar Updater] ⚠ SocialBlade failed: ${socialBladeError.message}`)
-          // Continue anyway - not critical
-        } else {
-          console.log(`[Radar Updater] ✓ SocialBlade completed`)
+        if (pipelineError) {
+          console.error(`[Radar Updater] ✗ Pipeline failed: ${pipelineError.message}`)
+          throw new Error(`Pipeline invocation failed: ${pipelineError.message}`)
         }
 
-        // ====================================================================
-        // 3d. Run enrichment-step-3-recent-videos (UPSERT)
-        // ====================================================================
-        console.log(`[Radar Updater] Fetching recent videos...`)
-
-        const { error: recentVideosError } = await supabase.functions.invoke(
-          'enrichment-step-3-recent-videos',
-          {
-            body: {
-              channelId: channel.channel_id,
-              taskId: null,
-              radarUpdate: true,
-            },
-          }
-        )
-
-        if (recentVideosError) {
-          console.warn(`[Radar Updater] ⚠ Recent videos failed: ${recentVideosError.message}`)
-          // Continue anyway
-        } else {
-          console.log(`[Radar Updater] ✓ Recent videos updated`)
-        }
+        console.log(`[Radar Updater] ✓ Pipeline triggered (Step 2 → 3 → 4 → 5 running in background)`)
 
         // ====================================================================
-        // 3e. Run enrichment-step-5-outlier-calc (recalculate ratios)
-        // ====================================================================
-        console.log(`[Radar Updater] Recalculating outlier ratios...`)
-
-        const { error: outlierError } = await supabase.functions.invoke(
-          'enrichment-step-5-outlier-calc',
-          {
-            body: {
-              channelId: channel.channel_id,
-              taskId: null,
-              radarUpdate: true,
-            },
-          }
-        )
-
-        if (outlierError) {
-          console.warn(`[Radar Updater] ⚠ Outlier calc failed: ${outlierError.message}`)
-          // Continue anyway
-        } else {
-          console.log(`[Radar Updater] ✓ Outlier ratios recalculated`)
-        }
-
-        // ====================================================================
-        // 3f. Update channel_radar with next_update_at
+        // 3e. Update channel_radar with next_update_at
         // ====================================================================
         const nextUpdate = calculateNextUpdate(channel.update_frequency)
 

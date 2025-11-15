@@ -80,13 +80,15 @@ export async function startChannelBenchmark(channelId: string) {
     console.log(`[Benchmark] Created task #${task.id} for channel ${sanitizedChannelId}`)
 
     // Step 3: Invoke Edge Function to start the pipeline
+    let channelData = null
+
     try {
       const adminClient = createAdminClient()
 
       console.log(`[Benchmark] Invoking enrichment-pipeline-starter for task #${task.id}`)
 
-      // Invoke Edge Function without waiting (fire and forget)
-      const { error: invokeError } = await adminClient.functions.invoke(
+      // Invoke Edge Function and wait for response to get channel metadata
+      const { data: edgeResponse, error: invokeError } = await adminClient.functions.invoke(
         'enrichment-pipeline-starter',
         {
           body: {
@@ -102,6 +104,19 @@ export async function startChannelBenchmark(channelId: string) {
         // The task is created and can be retried manually
       } else {
         console.log(`[Benchmark] Edge Function invoked successfully for task #${task.id}`)
+        console.log('[Benchmark] Edge Function response:', edgeResponse)
+
+        // Extract channel data from edge function response
+        if (edgeResponse && edgeResponse.channelData) {
+          channelData = {
+            id: edgeResponse.channelData.id,
+            channel_id: edgeResponse.channelData.channel_id,
+            channel_name: edgeResponse.channelData.channel_name,
+            thumbnail_url: edgeResponse.channelData.thumbnail_url,
+            subscriber_count: edgeResponse.channelData.subscriber_count,
+          }
+          console.log('[Benchmark] Channel data extracted:', channelData)
+        }
       }
     } catch (invokeError) {
       console.error('[Benchmark] Exception invoking Edge Function:', invokeError)
@@ -112,6 +127,7 @@ export async function startChannelBenchmark(channelId: string) {
       success: true,
       jobId: job.id,
       taskId: task.id,
+      channelData,
       message: `Benchmark pipeline started for channel ${sanitizedChannelId}`,
     }
   } catch (error) {

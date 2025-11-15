@@ -266,6 +266,25 @@ Deno.serve(async (req) => {
     console.log(`[Step 5: Outlier Calc] Batch update complete: ${successCount} success, ${errorCount} errors`)
 
     // ========================================================================
+    // STEP 7: Save channel-level median to baseline_stats
+    // ========================================================================
+    console.log('[Step 5: Outlier Calc] Saving channel median to baseline_stats...')
+
+    const { error: medianError } = await supabase
+      .from('benchmark_channels_baseline_stats')
+      .update({
+        median_views_per_video_historical: medianHistoricalViews,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('channel_id', channelId)
+
+    if (medianError) {
+      console.error('[Step 5: Outlier Calc] Error saving median:', medianError)
+    } else {
+      console.log(`[Step 5: Outlier Calc] ✓ Saved median: ${medianHistoricalViews?.toFixed(0) || 'null'}`)
+    }
+
+    // ========================================================================
     // STEP 8: Finalize pipeline (mark everything complete)
     // ========================================================================
     console.log('[Step 5: Outlier Calc] Finalizing pipeline...')
@@ -304,28 +323,6 @@ Deno.serve(async (req) => {
     console.log('[Step 5: Outlier Calc] ✅ Pipeline completed successfully!')
     console.log(`[Step 5: Outlier Calc] Duration: ${durationSeconds}s, Videos processed: ${successCount}/${successCount + errorCount}`)
 
-    // ========================================================================
-    // STEP 9: Notify queue callback if this was triggered from queue
-    // ========================================================================
-    console.log('[Step 5: Outlier Calc] Checking if task is from queue...')
-    supabase.functions
-      .invoke('video-queue-callback', {
-        body: {
-          taskId,
-          status: 'completed',
-        },
-      })
-      .then(({ error: callbackError }) => {
-        if (callbackError) {
-          console.error('[Step 5: Outlier Calc] Error invoking queue callback:', callbackError)
-        } else {
-          console.log('[Step 5: Outlier Calc] Queue callback invoked successfully')
-        }
-      })
-      .catch((error) => {
-        console.error('[Step 5: Outlier Calc] Exception invoking queue callback:', error)
-      })
-
     return new Response(
       JSON.stringify({
         success: true,
@@ -359,19 +356,6 @@ Deno.serve(async (req) => {
             overall_status: 'failed',
           })
           .eq('id', taskId)
-
-        // Notify queue callback about failure
-        supabase.functions
-          .invoke('video-queue-callback', {
-            body: {
-              taskId,
-              status: 'failed',
-              error: error instanceof Error ? error.message : 'Unknown error',
-            },
-          })
-          .catch((callbackError) => {
-            console.error('[Step 5: Outlier Calc] Failed to invoke error callback:', callbackError)
-          })
       } catch (updateError) {
         console.error('[Step 5: Outlier Calc] Failed to update error status:', updateError)
       }

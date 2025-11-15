@@ -438,6 +438,82 @@ export interface Database {
           }
         ]
       }
+      production_webhooks: {
+        Row: {
+          id: number
+          name: string
+          webhook_url: string
+          description: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          name: string
+          webhook_url: string
+          description?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          name?: string
+          webhook_url?: string
+          description?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      webhook_logs: {
+        Row: {
+          id: number
+          webhook_id: number | null
+          video_count: number
+          video_ids: number[]
+          status: 'success' | 'failed' | 'partial' | null
+          response_code: number | null
+          response_body: string | null
+          error_message: string | null
+          sent_at: string
+          sent_by: string | null
+        }
+        Insert: {
+          id?: number
+          webhook_id?: number | null
+          video_count: number
+          video_ids: number[]
+          status?: 'success' | 'failed' | 'partial' | null
+          response_code?: number | null
+          response_body?: string | null
+          error_message?: string | null
+          sent_at?: string
+          sent_by?: string | null
+        }
+        Update: {
+          id?: number
+          webhook_id?: number | null
+          video_count?: number
+          video_ids?: number[]
+          status?: 'success' | 'failed' | 'partial' | null
+          response_code?: number | null
+          response_body?: string | null
+          error_message?: string | null
+          sent_at?: string
+          sent_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'webhook_logs_webhook_id_fkey'
+            columns: ['webhook_id']
+            referencedRelation: 'production_webhooks'
+            referencedColumns: ['id']
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never

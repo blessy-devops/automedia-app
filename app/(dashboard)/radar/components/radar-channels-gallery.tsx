@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { formatLargeNumber } from '@/lib/utils'
-import { StatCard } from '@/components/stat-card'
+import { MetricCard } from '@/components/metric-card'
 import { RadarChannel } from './radar-channels-table'
 import { Users, Clock, Calendar } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
@@ -92,7 +92,8 @@ export function RadarChannelsGallery({
 
           <CardContent className="pt-4 space-y-4">
             {/* Subscribers Stat */}
-            <StatCard
+            <MetricCard
+              layout="inline"
               icon={Users}
               label="Subscribers"
               value={formatLargeNumber(channel.subscriber_count)}
