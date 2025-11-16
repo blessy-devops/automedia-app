@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { gobbiClient, ensureServerSide } from '@/lib/gobbi-client'
 import { revalidatePath } from 'next/cache'
 
 // ============================================================================
@@ -68,11 +68,11 @@ export async function getVideosAwaitingDistribution(): Promise<{
   videos: VideoWithChannels[]
   error: string | null
 }> {
-  const supabase = await createClient()
+  ensureServerSide()
 
   try {
     // Fetch benchmark videos in pending_distribution status
-    const { data: videos, error } = await supabase
+    const { data: videos, error } = await gobbiClient
       .from('benchmark_videos')
       .select(`
         *,
@@ -103,7 +103,7 @@ export async function getVideosAwaitingDistribution(): Promise<{
             : video.categorization
 
         // Fetch eligible channels matching niche AND subniche
-        const { data: channels } = await supabase
+        const { data: channels } = await gobbiClient
           .from('structure_accounts')
           .select(`
             *,
@@ -144,11 +144,11 @@ export async function getEligibleChannels(benchmarkVideoId: number): Promise<{
   channels: StructureAccount[]
   error: string | null
 }> {
-  const supabase = await createClient()
+  ensureServerSide()
 
   try {
     // Get video categorization
-    const { data: video, error: videoError } = await supabase
+    const { data: video, error: videoError } = await gobbiClient
       .from('benchmark_videos')
       .select('categorization')
       .eq('id', benchmarkVideoId)
@@ -166,7 +166,7 @@ export async function getEligibleChannels(benchmarkVideoId: number): Promise<{
         : video.categorization
 
     // Fetch eligible channels matching niche AND subniche
-    const { data: channels, error: channelsError } = await supabase
+    const { data: channels, error: channelsError } = await gobbiClient
       .from('structure_accounts')
       .select(`
         *,
@@ -204,13 +204,13 @@ export async function distributeVideoToChannels({
   benchmarkVideoId,
   selectedChannelIds,
 }: DistributionInput): Promise<DistributionResult> {
-  const supabase = await createClient()
+  ensureServerSide()
 
   try {
     // ========================================================================
     // Step 1: Validate video exists and is in pending_distribution
     // ========================================================================
-    const { data: video, error: videoError } = await supabase
+    const { data: video, error: videoError } = await gobbiClient
       .from('benchmark_videos')
       .select('*')
       .eq('id', benchmarkVideoId)
@@ -236,7 +236,7 @@ export async function distributeVideoToChannels({
         ? JSON.parse(video.categorization)
         : video.categorization
 
-    const { data: channels, error: channelsError } = await supabase
+    const { data: channels, error: channelsError } = await gobbiClient
       .from('structure_accounts')
       .select('*')
       .eq('niche', categorization.niche)
@@ -273,7 +273,7 @@ export async function distributeVideoToChannels({
       updated_at: new Date().toISOString(),
     }))
 
-    const { data: createdJobs, error: insertError } = await supabase
+    const { data: createdJobs, error: insertError } = await gobbiClient
       .from('production_videos')
       .insert(productionJobs)
       .select()
@@ -286,7 +286,7 @@ export async function distributeVideoToChannels({
     // ========================================================================
     // Step 4: Update benchmark video status to 'used'
     // ========================================================================
-    const { error: updateError } = await supabase
+    const { error: updateError } = await gobbiClient
       .from('benchmark_videos')
       .update({
         status: 'used',
