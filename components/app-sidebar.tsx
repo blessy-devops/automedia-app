@@ -61,6 +61,12 @@ const SettingsIcon = () => (
   </svg>
 )
 
+const DistributionIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeWidth="2" d="M8 7h12M8 12h12M8 17h12M3 7h.01M3 12h.01M3 17h.01" />
+  </svg>
+)
+
 const menuItems = [
   {
     title: "Dashboard",
@@ -86,6 +92,11 @@ const menuItems = [
     title: "Production",
     href: "/production-videos",
     icon: ProductionIcon,
+  },
+  {
+    title: "Distribution",
+    href: "/production/distribution",
+    icon: DistributionIcon,
   },
   {
     title: "New Benchmark",
