@@ -71,62 +71,29 @@ export async function getVideosAwaitingDistribution(): Promise<{
   ensureServerSide()
 
   try {
-    // Fetch benchmark videos in pending_distribution status
-    const { data: videos, error } = await gobbiClient
-      .from('benchmark_videos')
-      .select(`
-        *,
-        benchmark_channels!inner(
-          channel_title,
-          channel_handle
-        )
-      `)
-      .eq('status', 'pending_distribution')
-      .order('created_at', { ascending: true })
+    // Call RPC function in Gobbi's database
+    const { data, error } = await gobbiClient.rpc('get_videos_awaiting_distribution')
 
     if (error) {
-      console.error('[getVideosAwaitingDistribution] Error fetching videos:', error)
+      console.error('[getVideosAwaitingDistribution] RPC error:', error)
       return { videos: [], error: error.message }
     }
 
-    if (!videos || videos.length === 0) {
+    if (!data) {
       return { videos: [], error: null }
     }
 
-    // For each video, fetch eligible channels
-    const videosWithChannels = await Promise.all(
-      videos.map(async (video) => {
-        // Parse categorization if it's a string
-        const categorization =
-          typeof video.categorization === 'string'
-            ? JSON.parse(video.categorization)
-            : video.categorization
+    // RPC returns { videos: [...], error: null }
+    const result = data as { videos: VideoWithChannels[]; error: string | null }
 
-        // Fetch eligible channels matching niche AND subniche
-        const { data: channels } = await gobbiClient
-          .from('structure_accounts')
-          .select(`
-            *,
-            structure_brand_bible(
-              brand_identity,
-              production_workflow_id,
-              visual_style,
-              narrative_tone
-            )
-          `)
-          .eq('niche', categorization.niche)
-          .eq('subniche', categorization.subniche) // AND condition
-          .order('placeholder', { ascending: true })
+    if (result.error) {
+      console.error('[getVideosAwaitingDistribution] RPC returned error:', result.error)
+      return { videos: [], error: result.error }
+    }
 
-        return {
-          ...video,
-          categorization,
-          eligibleChannels: channels || [],
-        }
-      })
-    )
+    console.log(`[getVideosAwaitingDistribution] Fetched ${result.videos.length} videos awaiting distribution`)
 
-    return { videos: videosWithChannels as VideoWithChannels[], error: null }
+    return { videos: result.videos, error: null }
   } catch (error) {
     console.error('[getVideosAwaitingDistribution] Unexpected error:', error)
     return {
@@ -320,6 +287,62 @@ export async function distributeVideoToChannels({
     }
   } catch (error) {
     console.error('[distributeVideoToChannels] Unexpected error:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }
+  }
+}
+
+// ============================================================================
+// Server Action 4: Remove Video from Distribution Queue
+// ============================================================================
+
+export async function removeVideoFromQueue(
+  benchmarkVideoId: number
+): Promise<{ success: boolean; error?: string }> {
+  ensureServerSide()
+
+  try {
+    // Validate video exists and is in pending_distribution
+    const { data: video, error: videoError } = await gobbiClient
+      .from('benchmark_videos')
+      .select('id, status')
+      .eq('id', benchmarkVideoId)
+      .eq('status', 'pending_distribution')
+      .single()
+
+    if (videoError || !video) {
+      console.error('[removeVideoFromQueue] Video not found or invalid status:', benchmarkVideoId)
+      return {
+        success: false,
+        error: 'Video not found or not in pending_distribution status',
+      }
+    }
+
+    // Update status back to 'available' (so it can be re-added later if needed)
+    const { error: updateError } = await gobbiClient
+      .from('benchmark_videos')
+      .update({
+        status: 'available',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', benchmarkVideoId)
+
+    if (updateError) {
+      console.error('[removeVideoFromQueue] Error updating video status:', updateError)
+      return { success: false, error: updateError.message }
+    }
+
+    // Revalidate pages
+    revalidatePath('/production/distribution')
+    revalidatePath('/benchmark/videos')
+
+    console.log(`[removeVideoFromQueue] Successfully removed video ${benchmarkVideoId} from queue`)
+
+    return { success: true }
+  } catch (error) {
+    console.error('[removeVideoFromQueue] Unexpected error:', error)
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

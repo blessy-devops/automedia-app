@@ -13,19 +13,35 @@ export default async function ProductionDistributionPage() {
 
   if (error) {
     return (
-      <div className="container max-w-7xl py-8">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error loading videos</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+      <div className="min-h-screen bg-background">
+        <div className="bg-card border-b border-border px-8 py-5">
+          <h1 className="text-foreground">Videos Awaiting Distribution</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Select destination channels for benchmark videos
+          </p>
+        </div>
+        <div className="p-8">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error loading videos</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="container max-w-7xl py-8">
-      <DistributionList initialVideos={videos} />
+    <div className="min-h-screen bg-background">
+      <div className="bg-card border-b border-border px-8 py-5">
+        <h1 className="text-foreground">Videos Awaiting Distribution</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Select destination channels for {videos.length} video{videos.length !== 1 ? 's' : ''}
+        </p>
+      </div>
+      <div className="p-8">
+        <DistributionList initialVideos={videos} />
+      </div>
     </div>
   )
 }

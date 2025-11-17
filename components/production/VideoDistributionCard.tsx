@@ -109,6 +109,16 @@ export function VideoDistributionCard({ video, onDistributeSuccess }: VideoDistr
               <CardTitle className="text-lg line-clamp-2">{video.title}</CardTitle>
             </div>
 
+            {/* IDs visíveis */}
+            <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
+              <span className="bg-muted px-2 py-1 rounded">
+                ID: {video.id}
+              </span>
+              <span className="bg-muted px-2 py-1 rounded">
+                YT: {video.youtube_video_id}
+              </span>
+            </div>
+
             {video.benchmark_channels && (
               <CardDescription className="flex items-center gap-2">
                 <span>Source: {video.benchmark_channels.channel_title}</span>
