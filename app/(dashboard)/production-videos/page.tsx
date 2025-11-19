@@ -7,6 +7,7 @@ import { Search, SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight, Cloc
 import { getProductionVideos } from '@/app/actions/production-videos'
 import type { ProductionVideo, ProductionStats } from '@/types/production-video'
 import { StatsCardsSkeleton, VideoTableSkeleton } from '@/components/ProductionVideosSkeletons'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 /**
  * ProductionVideos Component - Lista todos os vídeos em produção
@@ -36,11 +37,11 @@ export default function ProductionVideosPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const itemsPerPage = 10
+  const [itemsPerPage, setItemsPerPage] = useState(50)
 
   useEffect(() => {
     loadVideos()
-  }, [statusFilter, searchQuery, currentPage])
+  }, [statusFilter, searchQuery, currentPage, itemsPerPage])
 
   async function loadVideos() {
     try {
@@ -306,6 +307,26 @@ export default function ProductionVideosPage() {
                 </select>
                 <ChevronDown className="w-4 h-4 absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
               </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Mostrar:</span>
+              <div className="relative">
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value))
+                    setCurrentPage(1)
+                  }}
+                  className="border border-border bg-card rounded-md pl-3 pr-8 py-2.5 text-sm text-foreground hover:bg-accent transition-colors shadow-sm appearance-none cursor-pointer"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <ChevronDown className="w-4 h-4 absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              </div>
+              <span className="text-sm text-muted-foreground">vídeos por página</span>
             </div>
           </div>
 

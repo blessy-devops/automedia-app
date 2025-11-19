@@ -51,7 +51,7 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
   const [sortField, setSortField] = useState<SortField>("uploadDate")
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc")
   const [page, setPage] = useState(1)
-  const pageSize = 10
+  const [pageSize, setPageSize] = useState(50)
   const [showManageFolders, setShowManageFolders] = useState(false)
 
   // View state (table or gallery)
@@ -510,8 +510,28 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
 
         {/* Pagination */}
         <div className="border-t border-border px-6 py-5 flex items-center justify-between bg-muted/50">
-          <div className="text-sm text-muted-foreground">
-            Showing {startIndex + 1} to {endIndex} of {sorted.length} videos
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-muted-foreground">
+              Showing {startIndex + 1} to {endIndex} of {sorted.length} videos
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>|</span>
+              <span>Show:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value))
+                  setPage(1)
+                }}
+                className="border border-border bg-card rounded px-2 py-1 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span>per page</span>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
