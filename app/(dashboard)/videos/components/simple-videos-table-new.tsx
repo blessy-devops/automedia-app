@@ -23,6 +23,7 @@ import { PerformanceBadge } from "./performance-badge"
 import { AddToFolderButton } from "./add-to-folder-button"
 import { RemoveFromFolderButton } from "./remove-from-folder-button"
 import { SendToProductionButton } from "./send-to-production-button"
+import { CopyTitlesButton } from "./copy-titles-button"
 import { ManageFoldersModal } from "./manage-folders-modal"
 import { VideoFiltersPopover } from "./video-filters-popover"
 import { DeleteVideoDialog } from "./delete-video-dialog"
@@ -317,6 +318,10 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
               videoIds={Array.from(selectedIds)}
               folders={folders}
               onSuccess={handleBulkActionSuccess}
+            />
+            <CopyTitlesButton
+              videoIds={Array.from(selectedIds)}
+              videos={sorted}
             />
             {currentFolderId && (
               <RemoveFromFolderButton
