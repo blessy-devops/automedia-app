@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -22,10 +22,21 @@ import {
   ExternalLink,
   Trash2,
 } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import { ImageWithFallback } from '@/components/ui/image-with-fallback'
-import { distributeVideoToChannels, removeVideoFromQueue } from './actions'
+import {
+  distributeVideoToChannels,
+  removeVideoFromQueue,
+  undoDistribution,
+  restoreVideoToQueue
+} from './actions'
 import { useRouter } from 'next/navigation'
+import {
+  VideoHistoryCard,
+  type DistributionRecord,
+  type RemovedRecord
+} from '@/components/shared/VideoHistoryCard'
 
 // ============================================================================
 // Type Definitions
@@ -85,9 +96,20 @@ export function DistributionList({ initialVideos }: DistributionListProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [isDistributing, setIsDistributing] = useState(false)
   const [showAllChannels, setShowAllChannels] = useState(false)
+  const [videos, setVideos] = useState(initialVideos)
+
+  // History & Undo State
+  const [activeTab, setActiveTab] = useState<'pending' | 'distributed' | 'removed'>('pending')
+  const [distributedHistory, setDistributedHistory] = useState<DistributionRecord[]>([])
+  const [removedHistory, setRemovedHistory] = useState<RemovedRecord[]>([])
+
+  // Sync local state when server data changes (after router.refresh())
+  useEffect(() => {
+    setVideos(initialVideos)
+  }, [initialVideos])
 
   // Filter videos by search term
-  const filteredVideos = initialVideos.filter(
+  const filteredVideos = videos.filter(
     (video) =>
       video.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       video.benchmark_channels?.channel_title
@@ -165,16 +187,44 @@ export function DistributionList({ initialVideos }: DistributionListProps) {
 
     setIsDistributing(true)
 
-    const result = await removeVideoFromQueue(selectedVideo.id)
+    // Capture data for history before state changes
+    const videoId = selectedVideo.id
+    const videoForHistory = selectedVideo
+    const hasEligibleChannels = selectedVideo.eligibleChannels.length > 0
+
+    // Optimistic update: remove video from list immediately
+    setVideos((prev) => prev.filter((v) => v.id !== videoId))
+    setIsDrawerOpen(false)
+    setSelectedVideo(null)
+
+    const result = await removeVideoFromQueue(videoId)
 
     if (result.success) {
+      // Create removed record for history
+      const removedRecord: RemovedRecord = {
+        id: `removed-${Date.now()}-${videoId}`,
+        video: {
+          id: videoForHistory.id,
+          title: videoForHistory.title,
+          youtube_video_id: videoForHistory.youtube_video_id,
+        },
+        timestamp: new Date(),
+        reason: hasEligibleChannels ? 'manual' : 'no_match',
+      }
+
+      // Add to removed history
+      setRemovedHistory(prev => [removedRecord, ...prev])
+
       toast.success('Video removed from distribution queue', {
-        description: `"${selectedVideo.title}" has been removed`,
+        description: `"${videoForHistory.title}" has been removed`,
+        duration: 5000,
       })
-      setIsDrawerOpen(false)
-      setSelectedVideo(null)
+
+      // Refresh to sync with server state
       router.refresh()
     } else {
+      // Revert optimistic update on error
+      setVideos(initialVideos)
       toast.error('Failed to remove video', {
         description: result.error || 'An error occurred',
       })
@@ -188,21 +238,132 @@ export function DistributionList({ initialVideos }: DistributionListProps) {
 
     setIsDistributing(true)
 
+    // Capture data for history before state changes
+    const videoId = selectedVideo.id
+    const videoTitle = selectedVideo.title
+    const channelCount = selectedChannels.length
+    const distributedChannels = eligibleChannels.filter(ch =>
+      selectedChannels.includes(ch.unique_profile_id)
+    )
+
+    // Optimistic update: remove video from list immediately
+    setVideos((prev) => prev.filter((v) => v.id !== videoId))
+    setIsDrawerOpen(false)
+    const videoForHistory = selectedVideo
+    setSelectedVideo(null)
+    setSelectedChannels([])
+
     const result = await distributeVideoToChannels({
-      benchmarkVideoId: selectedVideo.id,
+      benchmarkVideoId: videoId,
       selectedChannelIds: selectedChannels,
     })
 
     if (result.success) {
+      // Create distribution record for history
+      const distributionRecord: DistributionRecord = {
+        id: `dist-${Date.now()}-${videoId}`,
+        video: {
+          id: videoForHistory.id,
+          title: videoForHistory.title,
+          youtube_video_id: videoForHistory.youtube_video_id,
+        },
+        channels: distributedChannels.map(ch => ({
+          unique_profile_id: ch.unique_profile_id,
+          placeholder: ch.placeholder,
+        })),
+        timestamp: new Date(),
+        jobCount: result.jobsCreated || channelCount,
+        productionJobIds: result.productionJobIds || [],
+      }
+
+      // Add to distributed history
+      setDistributedHistory(prev => [distributionRecord, ...prev])
+
+      // Toast with Undo action
       toast.success(`${result.jobsCreated} production job(s) created successfully`, {
-        description: `Video "${selectedVideo.title}" distributed`,
+        description: `Video "${videoTitle}" distributed`,
+        duration: 5000,
+        action: {
+          label: 'Undo',
+          onClick: () => handleUndoDistribution(distributionRecord.id),
+        },
       })
-      setIsDrawerOpen(false)
-      setSelectedVideo(null)
-      setSelectedChannels([])
+
+      // Refresh to sync with server state
       router.refresh()
     } else {
+      // Revert optimistic update on error
+      setVideos(initialVideos)
       toast.error('Failed to distribute video', {
+        description: result.error || 'An error occurred',
+      })
+    }
+
+    setIsDistributing(false)
+  }
+
+  const handleUndoDistribution = async (recordId: string) => {
+    const record = distributedHistory.find(r => r.id === recordId)
+    if (!record) return
+
+    setIsDistributing(true)
+
+    const result = await undoDistribution(
+      record.video.id,
+      record.productionJobIds || []
+    )
+
+    if (result.success) {
+      // Remove from distributed history
+      setDistributedHistory(prev => prev.filter(r => r.id !== recordId))
+
+      // Add back to pending list (optimistic)
+      const fullVideo = initialVideos.find(v => v.id === record.video.id)
+      if (fullVideo) {
+        setVideos(prev => [fullVideo, ...prev])
+      }
+
+      toast.success('Distribution undone', {
+        description: `"${record.video.title}" restored to pending queue`,
+      })
+
+      // Refresh to sync with server state
+      router.refresh()
+    } else {
+      toast.error('Failed to undo distribution', {
+        description: result.error || 'An error occurred',
+      })
+    }
+
+    setIsDistributing(false)
+  }
+
+  const handleRestoreRemoved = async (recordId: string) => {
+    const record = removedHistory.find(r => r.id === recordId)
+    if (!record) return
+
+    setIsDistributing(true)
+
+    const result = await restoreVideoToQueue(record.video.id)
+
+    if (result.success) {
+      // Remove from removed history
+      setRemovedHistory(prev => prev.filter(r => r.id !== recordId))
+
+      // Add back to pending list (optimistic)
+      const fullVideo = initialVideos.find(v => v.id === record.video.id)
+      if (fullVideo) {
+        setVideos(prev => [fullVideo, ...prev])
+      }
+
+      toast.success('Video restored', {
+        description: `"${record.video.title}" restored to pending queue`,
+      })
+
+      // Refresh to sync with server state
+      router.refresh()
+    } else {
+      toast.error('Failed to restore video', {
         description: result.error || 'An error occurred',
       })
     }
@@ -240,8 +401,38 @@ export function DistributionList({ initialVideos }: DistributionListProps) {
         </Button>
       </div>
 
-      {/* Table */}
-      {filteredVideos.length > 0 ? (
+      {/* Tabs: Pending / Distributed / Removed */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="mb-6">
+        <TabsList>
+          <TabsTrigger value="pending" className="relative">
+            Pending
+            {videos.length > 0 && (
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {videos.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="distributed" className="relative">
+            Distributed
+            {distributedHistory.length > 0 && (
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {distributedHistory.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="removed" className="relative">
+            Removed
+            {removedHistory.length > 0 && (
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {removedHistory.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        {/* TAB 1: Pending */}
+        <TabsContent value="pending" className="mt-6">
+          {filteredVideos.length > 0 ? (
         <div className="bg-card rounded-lg border border-border overflow-hidden">
           <table className="w-full">
             <thead className="bg-muted/50 border-b border-border">
@@ -381,11 +572,57 @@ export function DistributionList({ initialVideos }: DistributionListProps) {
             </tbody>
           </table>
         </div>
-      ) : (
-        <div className="text-center py-12 text-muted-foreground">
-          {searchTerm ? 'No videos found matching your search' : 'No videos awaiting distribution'}
-        </div>
-      )}
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              {searchTerm ? 'No videos found matching your search' : 'No videos awaiting distribution'}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* TAB 2: Distributed History */}
+        <TabsContent value="distributed" className="mt-6">
+          {distributedHistory.length > 0 ? (
+            <div className="space-y-3">
+              {distributedHistory.map((record) => (
+                <VideoHistoryCard
+                  key={record.id}
+                  record={record}
+                  type="distributed"
+                  onUndo={handleUndoDistribution}
+                  disabled={isDistributing}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
+              <p>No distribution history yet</p>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* TAB 3: Removed History */}
+        <TabsContent value="removed" className="mt-6">
+          {removedHistory.length > 0 ? (
+            <div className="space-y-3">
+              {removedHistory.map((record) => (
+                <VideoHistoryCard
+                  key={record.id}
+                  record={record}
+                  type="removed"
+                  onRestore={handleRestoreRemoved}
+                  disabled={isDistributing}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <Trash2 className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
+              <p>No removed videos</p>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Drawer (Sheet) for Channel Selection */}
       <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
@@ -523,7 +760,7 @@ export function DistributionList({ initialVideos }: DistributionListProps) {
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <AlertCircle className="w-12 h-12 mb-3 text-amber-600" />
                     <p className="text-muted-foreground mb-4">
-                      No eligible channels found for this video's niche/subniche
+                      No eligible channels found for this video&apos;s niche/subniche
                     </p>
                     <div className="flex gap-2">
                       <Button

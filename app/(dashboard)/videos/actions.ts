@@ -313,14 +313,21 @@ export async function getFolderTree() {
   try {
     const supabase = await createClient()
 
+    // Debug: Check authenticated user
+    const { data: { user } } = await supabase.auth.getUser()
+    console.log('[getFolderTree] Authenticated user ID:', user?.id || 'NONE')
+
     // Fetch all folders (RLS filters by user automatically)
     const { data: folders, error } = await supabase
       .from('video_folders')
       .select('*')
       .order('name')
 
+    console.log('[getFolderTree] Fetched folders:', folders?.length || 0)
+
     if (error) {
-      console.error('Error fetching folders:', error)
+      console.error('[getFolderTree] Error:', error)
+      console.error('[getFolderTree] Error details:', JSON.stringify(error, null, 2))
       return { success: false, error: 'Failed to fetch folders', folders: [] }
     }
 

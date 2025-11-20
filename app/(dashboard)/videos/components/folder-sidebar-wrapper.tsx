@@ -54,7 +54,11 @@ export function FolderSidebarWrapper({ folders }: FolderSidebarWrapperProps) {
   }
 
   const handleDialogSuccess = () => {
-    router.refresh()
+    // Force cache bust by adding timestamp to URL
+    // This ensures folders appear immediately after creation/edit/delete
+    const params = new URLSearchParams(window.location.search)
+    params.set('_refresh', Date.now().toString())
+    router.push(`${window.location.pathname}?${params.toString()}`)
   }
 
   return (

@@ -1,5 +1,5 @@
-// supabase/functions/production-queue-control/index.ts
-// Production Queue Control - Substitui WF0 do N8N
+// supabase/functions/production-pipeline-starter/index.ts
+// Production Pipeline Starter - Controle de Fila de Produção
 // Trigger: Supabase Cron (a cada 2 minutos)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -11,15 +11,10 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 interface ProductionVideo {
   id: number
+  benchmark_id: number
+  placeholder: string
   status: string
   is_processing: boolean
-}
-
-interface BenchmarkVideo {
-  id: number
-  title: string
-  status: string
-  categorization: Record<string, any>
 }
 
 serve(async (req) => {
@@ -35,7 +30,7 @@ serve(async (req) => {
       )
     }
 
-    console.log('[Queue Control] Starting queue check...')
+    console.log('[Pipeline Starter] Starting production queue check...')
 
     // ========================================================================
     // Conectar ao banco (usa variáveis padrão do Supabase)
@@ -48,53 +43,60 @@ serve(async (req) => {
     })
 
     // ========================================================================
-    // Step 1: Verificar se já tem vídeo em processamento
+    // Step 1: Verificar se já tem vídeo em processamento (CATRACA)
     // ========================================================================
     const { data: processingVideos, error: checkError } = await supabase
       .from('production_videos')
-      .select('id, status, is_processing')
+      .select('id, placeholder, status, is_processing')
       .eq('is_processing', true)
       .neq('status', 'canceled')
+      .neq('status', 'completed')
       .limit(1)
 
     if (checkError) {
-      console.error('[Queue Control] Error checking processing videos:', checkError)
+      console.error('[Pipeline Starter] Error checking processing videos:', checkError)
       throw new Error(`Failed to check processing videos: ${checkError.message}`)
     }
 
     // Se já tem vídeo processando, para por aqui (catraca)
     if (processingVideos && processingVideos.length > 0) {
-      console.log('[Queue Control] ⏸️  Queue blocked - video already processing:', processingVideos[0].id)
+      console.log(
+        '[Pipeline Starter] ⏸️  Queue blocked - video already processing:',
+        processingVideos[0].id,
+        `(${processingVideos[0].placeholder}, status: ${processingVideos[0].status})`
+      )
       return new Response(
         JSON.stringify({
           status: 'blocked',
           message: 'A video is already being processed',
           processing_video_id: processingVideos[0].id,
+          processing_video_placeholder: processingVideos[0].placeholder,
+          processing_video_status: processingVideos[0].status,
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('[Queue Control] ✅ No videos processing - queue is clear')
+    console.log('[Pipeline Starter] ✅ No videos processing - queue is clear')
 
     // ========================================================================
-    // Step 2: Pegar próximo vídeo em 'add_to_production'
+    // Step 2: Pegar próximo vídeo em 'queued'
     // ========================================================================
     const { data: nextVideos, error: fetchError } = await supabase
-      .from('benchmark_videos')
-      .select('id, title, status, categorization')
-      .eq('status', 'add_to_production')
+      .from('production_videos')
+      .select('id, benchmark_id, placeholder, status, is_processing')
+      .eq('status', 'queued')
       .order('created_at', { ascending: true })
       .limit(1)
 
     if (fetchError) {
-      console.error('[Queue Control] Error fetching next video:', fetchError)
+      console.error('[Pipeline Starter] Error fetching next video:', fetchError)
       throw new Error(`Failed to fetch next video: ${fetchError.message}`)
     }
 
     // Se não tem vídeo aguardando, nada a fazer
     if (!nextVideos || nextVideos.length === 0) {
-      console.log('[Queue Control] 📭 No videos waiting for distribution')
+      console.log('[Pipeline Starter] 📭 No videos in queue')
       return new Response(
         JSON.stringify({
           status: 'idle',
@@ -104,43 +106,52 @@ serve(async (req) => {
       )
     }
 
-    const nextVideo = nextVideos[0] as BenchmarkVideo
+    const nextVideo = nextVideos[0] as ProductionVideo
 
-    console.log('[Queue Control] 🎬 Found next video:', {
+    console.log('[Pipeline Starter] 🎬 Found next video:', {
       id: nextVideo.id,
-      title: nextVideo.title,
+      placeholder: nextVideo.placeholder,
+      benchmark_id: nextVideo.benchmark_id,
     })
 
     // ========================================================================
-    // Step 3: Marcar vídeo como 'pending_distribution'
+    // Step 3: Iniciar processamento do vídeo
     // ========================================================================
     const { error: updateError } = await supabase
-      .from('benchmark_videos')
-      .update({ status: 'pending_distribution' })
+      .from('production_videos')
+      .update({
+        is_processing: true,
+        status: 'create_title', // Primeira etapa do pipeline
+      })
       .eq('id', nextVideo.id)
 
     if (updateError) {
-      console.error('[Queue Control] Error updating video status:', updateError)
+      console.error('[Pipeline Starter] Error updating video status:', updateError)
       throw new Error(`Failed to update video status: ${updateError.message}`)
     }
 
-    console.log('[Queue Control] ✅ Video marked as pending_distribution:', nextVideo.id)
+    console.log(
+      '[Pipeline Starter] ✅ Video started processing:',
+      nextVideo.id,
+      `(${nextVideo.placeholder})`
+    )
 
     // ========================================================================
     // Step 4: Retornar sucesso
     // ========================================================================
     return new Response(
       JSON.stringify({
-        status: 'processed',
-        message: 'Video moved to pending distribution',
+        status: 'started',
+        message: 'Video processing started',
         video_id: nextVideo.id,
-        video_title: nextVideo.title,
+        video_placeholder: nextVideo.placeholder,
+        benchmark_id: nextVideo.benchmark_id,
+        new_status: 'create_title',
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     )
-
   } catch (error) {
-    console.error('[Queue Control] Fatal error:', error)
+    console.error('[Pipeline Starter] Fatal error:', error)
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : 'Unknown error',

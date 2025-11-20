@@ -28,6 +28,13 @@ export function ManageFoldersModal({ folders: initialFolders, onClose }: ManageF
   const [newFolderName, setNewFolderName] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
+  // Force page refresh with cache busting to show updated folders
+  const refreshFolders = () => {
+    const params = new URLSearchParams(window.location.search)
+    params.set('_refresh', Date.now().toString())
+    router.push(`${window.location.pathname}?${params.toString()}`)
+  }
+
   const handleStartEdit = (folder: FolderItem) => {
     setEditingId(folder.id)
     setEditingName(folder.name)
@@ -49,7 +56,7 @@ export function ManageFoldersModal({ folders: initialFolders, onClose }: ManageF
         setEditingId(null)
         setEditingName('')
         toast.success('Pasta atualizada com sucesso!')
-        router.refresh()
+        refreshFolders()
       } else {
         toast.error(result.error || 'Erro ao atualizar pasta')
       }
@@ -77,7 +84,7 @@ export function ManageFoldersModal({ folders: initialFolders, onClose }: ManageF
       if (result.success) {
         setFolders(folders.filter(f => f.id !== id))
         toast.success('Pasta deletada com sucesso!')
-        router.refresh()
+        refreshFolders()
       } else {
         toast.error(result.error || 'Erro ao deletar pasta')
       }
@@ -110,7 +117,7 @@ export function ManageFoldersModal({ folders: initialFolders, onClose }: ManageF
         setNewFolderName('')
         setIsCreating(false)
         toast.success('Pasta criada com sucesso!')
-        router.refresh()
+        refreshFolders()
       } else {
         toast.error(result.error || 'Erro ao criar pasta')
       }

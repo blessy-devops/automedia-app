@@ -58,6 +58,7 @@ interface DistributionResult {
   error?: string
   jobsCreated?: number
   channels?: string[]
+  productionJobIds?: number[] // IDs of created production jobs (for undo)
 }
 
 // ============================================================================
@@ -232,12 +233,10 @@ export async function distributeVideoToChannels({
       placeholder: channel.placeholder,
       language: channel.language,
       description: video.description,
-      status: 'create_title', // First stage of production pipeline
+      status: 'queued', // Jobs start in queue, pipeline starter moves to 'create_title'
       is_processing: false,
       distribution_mode: 'manual', // Track how this was distributed
       distributed_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     }))
 
     const { data: createdJobs, error: insertError } = await gobbiClient
@@ -255,10 +254,7 @@ export async function distributeVideoToChannels({
     // ========================================================================
     const { error: updateError } = await gobbiClient
       .from('benchmark_videos')
-      .update({
-        status: 'used',
-        updated_at: new Date().toISOString(),
-      })
+      .update({ status: 'used' })
       .eq('id', benchmarkVideoId)
 
     if (updateError) {
@@ -267,6 +263,11 @@ export async function distributeVideoToChannels({
         updateError
       )
       // Don't return error here because production jobs were already created
+      // But we should still notify about this issue
+      console.error(
+        '[distributeVideoToChannels] WARNING: Video will remain in pending_distribution!',
+        'Video ID:', benchmarkVideoId
+      )
     }
 
     // ========================================================================
@@ -284,6 +285,7 @@ export async function distributeVideoToChannels({
       success: true,
       jobsCreated: createdJobs.length,
       channels: channels.map((c) => c.placeholder),
+      productionJobIds: createdJobs.map((job) => job.id), // Return job IDs for undo
     }
   } catch (error) {
     console.error('[distributeVideoToChannels] Unexpected error:', error)
@@ -323,10 +325,7 @@ export async function removeVideoFromQueue(
     // Update status back to 'available' (so it can be re-added later if needed)
     const { error: updateError } = await gobbiClient
       .from('benchmark_videos')
-      .update({
-        status: 'available',
-        updated_at: new Date().toISOString(),
-      })
+      .update({ status: 'available' })
       .eq('id', benchmarkVideoId)
 
     if (updateError) {
@@ -343,6 +342,141 @@ export async function removeVideoFromQueue(
     return { success: true }
   } catch (error) {
     console.error('[removeVideoFromQueue] Unexpected error:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }
+  }
+}
+
+// ============================================================================
+// Server Action 5: Undo Distribution (Restore video + Delete production jobs)
+// ============================================================================
+
+export async function undoDistribution(
+  benchmarkVideoId: number,
+  productionJobIds: number[]
+): Promise<{ success: boolean; error?: string }> {
+  ensureServerSide()
+
+  try {
+    // ========================================================================
+    // Step 1: Validate video exists and is in 'used' status
+    // ========================================================================
+    const { data: video, error: videoError } = await gobbiClient
+      .from('benchmark_videos')
+      .select('id, status')
+      .eq('id', benchmarkVideoId)
+      .eq('status', 'used')
+      .single()
+
+    if (videoError || !video) {
+      console.error('[undoDistribution] Video not found or not in used status:', benchmarkVideoId)
+      return {
+        success: false,
+        error: 'Video not found or not in used status',
+      }
+    }
+
+    // ========================================================================
+    // Step 2: Delete production jobs created from this distribution
+    // ========================================================================
+    if (productionJobIds.length > 0) {
+      const { error: deleteError } = await gobbiClient
+        .from('production_videos')
+        .delete()
+        .in('id', productionJobIds)
+
+      if (deleteError) {
+        console.error('[undoDistribution] Error deleting production jobs:', deleteError)
+        return { success: false, error: deleteError.message }
+      }
+    }
+
+    // ========================================================================
+    // Step 3: Update video status back to pending_distribution
+    // ========================================================================
+    const { error: updateError } = await gobbiClient
+      .from('benchmark_videos')
+      .update({ status: 'pending_distribution' })
+      .eq('id', benchmarkVideoId)
+
+    if (updateError) {
+      console.error('[undoDistribution] Error updating video status:', updateError)
+      return { success: false, error: updateError.message }
+    }
+
+    // ========================================================================
+    // Step 4: Revalidate affected pages
+    // ========================================================================
+    revalidatePath('/production/distribution')
+    revalidatePath('/production/videos')
+    revalidatePath('/benchmark/videos')
+
+    console.log(`[undoDistribution] Successfully undone distribution for video ${benchmarkVideoId}`)
+
+    return { success: true }
+  } catch (error) {
+    console.error('[undoDistribution] Unexpected error:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }
+  }
+}
+
+// ============================================================================
+// Server Action 6: Restore Video to Queue
+// ============================================================================
+
+export async function restoreVideoToQueue(
+  benchmarkVideoId: number
+): Promise<{ success: boolean; error?: string }> {
+  ensureServerSide()
+
+  try {
+    // ========================================================================
+    // Step 1: Validate video exists and is in 'available' status
+    // ========================================================================
+    const { data: video, error: videoError } = await gobbiClient
+      .from('benchmark_videos')
+      .select('id, status')
+      .eq('id', benchmarkVideoId)
+      .eq('status', 'available')
+      .single()
+
+    if (videoError || !video) {
+      console.error('[restoreVideoToQueue] Video not found or not in available status:', benchmarkVideoId)
+      return {
+        success: false,
+        error: 'Video not found or not in available status',
+      }
+    }
+
+    // ========================================================================
+    // Step 2: Update status back to pending_distribution
+    // ========================================================================
+    const { error: updateError } = await gobbiClient
+      .from('benchmark_videos')
+      .update({ status: 'pending_distribution' })
+      .eq('id', benchmarkVideoId)
+
+    if (updateError) {
+      console.error('[restoreVideoToQueue] Error updating video status:', updateError)
+      return { success: false, error: updateError.message }
+    }
+
+    // ========================================================================
+    // Step 3: Revalidate affected pages
+    // ========================================================================
+    revalidatePath('/production/distribution')
+    revalidatePath('/benchmark/videos')
+
+    console.log(`[restoreVideoToQueue] Successfully restored video ${benchmarkVideoId} to queue`)
+
+    return { success: true }
+  } catch (error) {
+    console.error('[restoreVideoToQueue] Unexpected error:', error)
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

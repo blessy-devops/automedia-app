@@ -161,16 +161,15 @@ serve(async (req) => {
 
     // Fetch complete channel data for all unique channels in the videos
     const channelIds = [...new Set(videos.map(v => v.channel_id))]
-    const { data: channels } = await supabase
+    const { data: channels, error: channelsError } = await supabase
       .from('benchmark_channels')
       .select(`
         channel_id,
         channel_name,
         description,
         subscriber_count,
-        video_count,
-        view_count,
-        published_at,
+        video_upload_count,
+        total_views,
         thumbnail_url,
         banner_url,
         custom_url,
@@ -179,19 +178,40 @@ serve(async (req) => {
       `)
       .in('channel_id', channelIds)
 
+    if (channelsError) {
+      console.error('[send-to-gobbi] Error fetching channels:', channelsError)
+      console.error('[send-to-gobbi] Channel IDs:', channelIds)
+    }
+
+    // Map channel names for video fallback
     const channelMap = new Map(
       (channels || []).map(c => [c.channel_id, c.channel_name])
     )
 
-    console.log(`[send-to-gobbi] Fetched ${videos.length} videos and ${channels?.length || 0} channels from local database`)
+    // Map channel fields from our schema to Gobbi's schema
+    // Note: Only send fields that exist in Gobbi's benchmark_channels table
+    const mappedChannels = (channels || []).map(channel => ({
+      channel_id: channel.channel_id,
+      channel_name: channel.channel_name,
+      description: channel.description,
+      subscriber_count: channel.subscriber_count,
+      // Note: video_count, view_count, published_at removed - columns don't exist in Gobbi's table
+      thumbnail_url: channel.thumbnail_url,
+      banner_url: channel.banner_url,
+      custom_url: channel.custom_url,
+      country: channel.country,
+      is_verified: channel.is_verified,
+    }))
+
+    console.log(`[send-to-gobbi] Fetched ${videos.length} videos and ${mappedChannels.length} channels from local database`)
 
     // Prepare videos for webhook
-    // Force status to "add_to_production" for all videos
+    // Force status to "pending_distribution" so videos appear in distribution queue
     // Ensure channel_name is populated from benchmark_channels if missing
     // Note: Do NOT add youtube_url (GENERATED column in Gobbi's DB)
     const videosWithMetadata = videos.map((video) => ({
       ...video,
-      status: 'add_to_production', // Override status
+      status: 'pending_distribution', // Override status - videos go to distribution queue
       channel_name: video.channel_name || channelMap.get(video.channel_id) || null, // Fallback to channel map
     }))
 
@@ -211,13 +231,13 @@ serve(async (req) => {
         // Prepare webhook payload
         // Send channels only once (in the first batch) to avoid duplicates
         const webhookPayload = {
-          ...(i === 0 && channels && channels.length > 0 && { channels }),
+          ...(i === 0 && mappedChannels && mappedChannels.length > 0 && { channels: mappedChannels }),
           videos: batch,
           metadata: {
             sent_at: new Date().toISOString(),
             source: 'automedia-platform',
             video_count: batch.length,
-            ...(i === 0 && channels && { channel_count: channels.length }),
+            ...(i === 0 && mappedChannels && { channel_count: mappedChannels.length }),
           },
         }
 
@@ -236,15 +256,15 @@ serve(async (req) => {
           console.error('[send-to-gobbi] Webhook error:', errorText)
 
           // Try to identify which videos/channels failed
-          if (i === 0 && channels && channels.length > 0) {
-            channels.forEach((channel) => {
+          if (i === 0 && mappedChannels && mappedChannels.length > 0) {
+            mappedChannels.forEach((channel) => {
               errors.push({
                 type: 'channel',
                 id: channel.channel_id,
                 error: `Webhook returned ${webhookResponse.status}: ${errorText}`,
               })
             })
-            totalChannelsFailed += channels.length
+            totalChannelsFailed += mappedChannels.length
           }
           batch.forEach((video, idx) => {
             errors.push({
@@ -280,14 +300,18 @@ serve(async (req) => {
               })
             }
           } else {
-            // Total failure
-            if (i === 0 && channels && channels.length > 0) {
-              totalChannelsFailed += channels.length
-              channels.forEach((channel) => {
+            // Total failure - log full webhook response for debugging
+            console.error('[send-to-gobbi] Webhook returned failure. Full response:', JSON.stringify(webhookResult, null, 2))
+
+            const errorMessage = webhookResult.error || webhookResult.message || 'Unknown webhook error'
+
+            if (i === 0 && mappedChannels && mappedChannels.length > 0) {
+              totalChannelsFailed += mappedChannels.length
+              mappedChannels.forEach((channel) => {
                 errors.push({
                   type: 'channel',
                   id: channel.channel_id,
-                  error: webhookResult.error || 'Unknown webhook error',
+                  error: errorMessage,
                 })
               })
             }
@@ -296,22 +320,22 @@ serve(async (req) => {
               errors.push({
                 type: 'video',
                 id: payload.video_ids[i + idx],
-                error: webhookResult.error || 'Unknown webhook error',
+                error: errorMessage,
               })
             })
           }
         }
       } catch (batchError) {
         console.error('[send-to-gobbi] Batch error:', batchError)
-        if (i === 0 && channels && channels.length > 0) {
-          channels.forEach((channel) => {
+        if (i === 0 && mappedChannels && mappedChannels.length > 0) {
+          mappedChannels.forEach((channel) => {
             errors.push({
               type: 'channel',
               id: channel.channel_id,
               error: batchError instanceof Error ? batchError.message : 'Unknown batch error',
             })
           })
-          totalChannelsFailed += channels.length
+          totalChannelsFailed += mappedChannels.length
         }
         batch.forEach((video, idx) => {
           errors.push({

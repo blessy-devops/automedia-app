@@ -8,6 +8,10 @@ import { getFolderTree } from './actions'
 import { parseVideoFilters, applyVideoFiltersToQuery } from '@/lib/video-filters'
 import { MetricCard } from '@/components/metric-card'
 
+// Force dynamic rendering to prevent stale cache after folder mutations
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 /**
  * Videos Listing Page (New Design)
  *
