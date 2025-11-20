@@ -129,10 +129,10 @@ Deno.serve(async (req) => {
     console.log('[Step 5: Outlier Calc] Collecting base data...')
 
     const [baselineStatsResult, channelDataResult, allVideosViewsResult] = await Promise.all([
-      // Baseline stats
+      // Baseline stats (with availability flag)
       supabase
         .from('benchmark_channels_baseline_stats')
-        .select('total_views_14d')
+        .select('total_views_14d, is_available')
         .eq('channel_id', channelId)
         .single(),
 
@@ -156,7 +156,10 @@ Deno.serve(async (req) => {
       .map((v) => v.views || 0)
       .filter((v) => v > 0)
 
+    const socialBladeAvailable = baselineStats.is_available ?? false
+
     console.log('[Step 5: Outlier Calc] Base data collected:', {
+      socialBladeAvailable,
       hasBaselineStats: !!baselineStats.total_views_14d,
       channelTotalViews: channelData.total_views,
       channelVideoCount: channelData.video_upload_count,
@@ -188,6 +191,12 @@ Deno.serve(async (req) => {
       medianHistoricalViews: medianHistoricalViews?.toFixed(0),
       dailyAvg14d: dailyAvg14d?.toFixed(0),
     })
+
+    // Warn if Social Blade metrics are unavailable
+    if (!dailyAvg14d || !socialBladeAvailable) {
+      console.log('[Step 5: Outlier Calc] ⚠️  Social Blade metrics unavailable - performance_vs_recent_14d will be NULL for all videos')
+      console.log('[Step 5: Outlier Calc] This is expected for very new channels not yet indexed in Social Blade')
+    }
 
     // ========================================================================
     // STEP 4: Process videos and batch update using Supabase Client

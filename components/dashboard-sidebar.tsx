@@ -30,8 +30,8 @@ export function DashboardSidebar() {
       ),
     },
     {
-      label: "Channels",
-      href: "/channels",
+      label: "Benchmark Channels",
+      href: "/benchmark/channels",
       icon: (
         <Youtube className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
       ),
@@ -45,14 +45,14 @@ export function DashboardSidebar() {
     },
     {
       label: "Channel Radar",
-      href: "/radar",
+      href: "/benchmark/radar",
       icon: (
         <Radar className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
       ),
     },
     {
       label: "New Benchmark",
-      href: "/benchmark/channels-v2",
+      href: "/benchmark/new-channel-benchmark",
       icon: (
         <Search className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
       ),

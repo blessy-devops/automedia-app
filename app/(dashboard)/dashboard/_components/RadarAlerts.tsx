@@ -28,7 +28,7 @@ export function RadarAlerts({ alerts }: RadarAlertsProps) {
               No alerts yet. Add channels to your Radar to get notified about new viral videos!
             </p>
             <Button asChild variant="outline">
-              <Link href="/radar">Go to Radar</Link>
+              <Link href="/benchmark/radar">Go to Radar</Link>
             </Button>
           </div>
         </CardContent>
@@ -131,7 +131,7 @@ export function RadarAlerts({ alerts }: RadarAlertsProps) {
 
         <div className="mt-4 text-center">
           <Button variant="outline" asChild>
-            <Link href="/radar">View All Radar Channels</Link>
+            <Link href="/benchmark/radar">View All Radar Channels</Link>
           </Button>
         </div>
       </CardContent>

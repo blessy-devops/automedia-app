@@ -1,5 +1,30 @@
 # Production Queue Control - Edge Function
 
+**⚠️ ARQUITETURA ANTIGA - NÃO MAIS NECESSÁRIA (2025-11-19)**
+
+Esta função implementa a arquitetura CRON-controlled que **não é mais usada**.
+
+**Arquitetura Antiga (esta função):**
+```
+Video → add_to_production → [CRON a cada 2min] → pending_distribution → Distribution UI
+```
+
+**Arquitetura Nova (atual):**
+```
+Video → pending_distribution → Distribution UI → [catraca ao distribuir] → production_videos
+```
+
+**Por que mudamos?**
+- ✅ Vídeos aparecem instantaneamente na tela (sem delay de 2min)
+- ✅ Menos componentes = menos bugs
+- ✅ Controle de fila acontece no momento certo: ao distribuir para production
+
+**Ver:** `docs/gobbi-database/WEBHOOK_ARCHITECTURE.md` (seção "MUDANÇA DE ARQUITETURA DA FILA")
+
+---
+
+## 📖 Documentação Original (Arquitetura Antiga)
+
 **Função:** Substituir WF0 do N8N (controle de fila de produção)
 **Trigger:** Supabase Cron (a cada 2 minutos)
 **Database:** Gobbi's Supabase
