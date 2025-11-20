@@ -77,15 +77,32 @@ interface EligibleChannel {
   }>
 }
 
+interface DistributedVideo {
+  id: number
+  title: string
+  youtube_video_id: string
+  youtube_url: string
+  distributed_at: string
+  channels: Array<{
+    placeholder: string
+    production_video_id: number
+    status: string
+  }>
+}
+
 interface DistributionListProps {
   initialVideos: VideoWithChannels[]
+  initialDistributedVideos: DistributedVideo[]
 }
 
 // ============================================================================
 // Main Component
 // ============================================================================
 
-export function DistributionList({ initialVideos }: DistributionListProps) {
+export function DistributionList({
+  initialVideos,
+  initialDistributedVideos,
+}: DistributionListProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -97,8 +114,11 @@ export function DistributionList({ initialVideos }: DistributionListProps) {
   const [isDistributing, setIsDistributing] = useState(false)
   const [showAllChannels, setShowAllChannels] = useState(false)
   const [videos, setVideos] = useState(initialVideos)
+  const [distributedVideos, setDistributedVideos] = useState<DistributedVideo[]>(
+    initialDistributedVideos
+  )
 
-  // History & Undo State
+  // History & Undo State (for local session only - undo functionality)
   const [activeTab, setActiveTab] = useState<'pending' | 'distributed' | 'removed'>('pending')
   const [distributedHistory, setDistributedHistory] = useState<DistributionRecord[]>([])
   const [removedHistory, setRemovedHistory] = useState<RemovedRecord[]>([])
@@ -106,7 +126,8 @@ export function DistributionList({ initialVideos }: DistributionListProps) {
   // Sync local state when server data changes (after router.refresh())
   useEffect(() => {
     setVideos(initialVideos)
-  }, [initialVideos])
+    setDistributedVideos(initialDistributedVideos)
+  }, [initialVideos, initialDistributedVideos])
 
   // Filter videos by search term
   const filteredVideos = videos.filter(
@@ -579,24 +600,81 @@ export function DistributionList({ initialVideos }: DistributionListProps) {
           )}
         </TabsContent>
 
-        {/* TAB 2: Distributed History */}
+        {/* TAB 2: Distributed Videos */}
         <TabsContent value="distributed" className="mt-6">
-          {distributedHistory.length > 0 ? (
-            <div className="space-y-3">
-              {distributedHistory.map((record) => (
-                <VideoHistoryCard
-                  key={record.id}
-                  record={record}
-                  type="distributed"
-                  onUndo={handleUndoDistribution}
-                  disabled={isDistributing}
-                />
+          {distributedVideos.length > 0 ? (
+            <div className="space-y-4">
+              {distributedVideos.map((video) => (
+                <div
+                  key={video.id}
+                  className="bg-card border border-border rounded-lg p-4 hover:border-primary/30 transition-colors"
+                >
+                  <div className="flex items-start gap-4">
+                    {/* Thumbnail */}
+                    <ImageWithFallback
+                      src={getThumbnailUrl(video.youtube_video_id)}
+                      alt={video.title}
+                      className="w-40 h-[90px] rounded object-cover flex-shrink-0"
+                    />
+
+                    {/* Video Info */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium text-foreground mb-1 line-clamp-2">
+                        {video.title}
+                      </h3>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+                        <span>ID: {video.id}</span>
+                        <span>•</span>
+                        <span>
+                          {new Date(video.distributed_at).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </span>
+                        <span>•</span>
+                        <a
+                          href={video.youtube_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline inline-flex items-center gap-1"
+                        >
+                          View on YouTube
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+
+                      {/* Distributed Channels */}
+                      <div className="space-y-1.5">
+                        <div className="text-xs text-muted-foreground mb-1.5">
+                          Distributed to {video.channels.length} channel
+                          {video.channels.length !== 1 ? 's' : ''}:
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {video.channels.map((channel) => (
+                            <Badge
+                              key={channel.production_video_id}
+                              variant="outline"
+                              className="text-xs"
+                            >
+                              {channel.placeholder}
+                              <span className="ml-1.5 text-muted-foreground">
+                                ({channel.status})
+                              </span>
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           ) : (
             <div className="text-center py-12 text-muted-foreground">
               <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
-              <p>No distribution history yet</p>
+              <p>No distributed videos yet</p>
+              <p className="text-sm mt-1">Videos will appear here after distribution</p>
             </div>
           )}
         </TabsContent>

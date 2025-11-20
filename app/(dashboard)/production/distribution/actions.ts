@@ -483,3 +483,94 @@ export async function restoreVideoToQueue(
     }
   }
 }
+
+// ============================================================================
+// Server Action 7: Get Distributed Videos (for "Distributed" tab)
+// ============================================================================
+
+interface DistributedVideo {
+  id: number
+  title: string
+  youtube_video_id: string
+  youtube_url: string
+  distributed_at: string
+  channels: Array<{
+    placeholder: string
+    production_video_id: number
+    status: string
+  }>
+}
+
+export async function getDistributedVideos(): Promise<{
+  videos: DistributedVideo[]
+  error: string | null
+}> {
+  ensureServerSide()
+
+  try {
+    // Fetch benchmark videos with status = 'used' (distributed)
+    // and their production_videos
+    const { data: distributedVideos, error: fetchError } = await gobbiClient
+      .from('benchmark_videos')
+      .select(`
+        id,
+        title,
+        youtube_video_id,
+        youtube_url,
+        production_videos (
+          id,
+          placeholder,
+          status,
+          distributed_at
+        )
+      `)
+      .eq('status', 'used')
+      .order('id', { ascending: false })
+      .limit(50)
+
+    if (fetchError) {
+      console.error('[getDistributedVideos] Error fetching distributed videos:', fetchError)
+      return { videos: [], error: fetchError.message }
+    }
+
+    if (!distributedVideos || distributedVideos.length === 0) {
+      return { videos: [], error: null }
+    }
+
+    // Transform data to match interface
+    const videos: DistributedVideo[] = distributedVideos.map((video: any) => {
+      const productionVideos = Array.isArray(video.production_videos)
+        ? video.production_videos
+        : []
+
+      // Get the earliest distributed_at timestamp
+      const distributedAt =
+        productionVideos.length > 0 && productionVideos[0].distributed_at
+          ? productionVideos[0].distributed_at
+          : new Date().toISOString()
+
+      return {
+        id: video.id,
+        title: video.title,
+        youtube_video_id: video.youtube_video_id,
+        youtube_url: video.youtube_url,
+        distributed_at: distributedAt,
+        channels: productionVideos.map((pv: any) => ({
+          placeholder: pv.placeholder || 'Unknown',
+          production_video_id: pv.id,
+          status: pv.status,
+        })),
+      }
+    })
+
+    console.log(`[getDistributedVideos] Fetched ${videos.length} distributed videos`)
+
+    return { videos, error: null }
+  } catch (error) {
+    console.error('[getDistributedVideos] Unexpected error:', error)
+    return {
+      videos: [],
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }
+  }
+}
