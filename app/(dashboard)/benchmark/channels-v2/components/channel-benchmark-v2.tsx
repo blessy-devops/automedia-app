@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Play, Clock, CheckCircle2, Circle, Loader2, BarChart3, TrendingUp, Video, Search, RotateCcw, ChevronDown, ExternalLink } from 'lucide-react'
 import { startChannelBenchmark } from '../actions'
-import { BenchmarkProgressMonitor } from '../../channels/components/benchmark-progress-monitor'
+import { BenchmarkProgressMonitor } from '../channels/components/benchmark-progress-monitor'
 import { createClient } from '@/lib/supabase/client'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 
