@@ -8,8 +8,14 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { PerformanceBadge } from "../../components/performance-badge"
-import { TrendingUp } from "lucide-react"
+import { TrendingUp, Info } from "lucide-react"
 
 interface PerformanceMetricsCardProps {
   video: {
@@ -19,6 +25,7 @@ interface PerformanceMetricsCardProps {
     performanceVsRecent30d: number | null
     performanceVsRecent90d: number | null
   }
+  socialBladeAvailable?: boolean
 }
 
 /**
@@ -26,7 +33,10 @@ interface PerformanceMetricsCardProps {
  *
  * Displays all 5 performance scores with color-coded badges
  */
-export function PerformanceMetricsCard({ video }: PerformanceMetricsCardProps) {
+export function PerformanceMetricsCard({
+  video,
+  socialBladeAvailable = true
+}: PerformanceMetricsCardProps) {
   return (
     <Card>
       <CardHeader>
@@ -57,9 +67,25 @@ export function PerformanceMetricsCard({ video }: PerformanceMetricsCardProps) {
 
         {/* Recent 14 Days */}
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">
-            vs. Recent 14d
-          </Label>
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-muted-foreground">
+              vs. Recent 14d
+            </Label>
+            {!socialBladeAvailable && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-xs">
+                      Recent performance metrics unavailable. Channel may be too new for Social Blade indexing.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
           <PerformanceBadge score={video.performanceVsRecent14d} />
         </div>
 

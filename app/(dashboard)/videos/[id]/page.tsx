@@ -78,12 +78,23 @@ export default async function VideoDetailPage({
     notFound()
   }
 
-  // Fetch channel information separately
-  const { data: channelData } = await supabase
-    .from('benchmark_channels')
-    .select('channel_name, id')
-    .eq('channel_id', result.channel_id)
-    .single()
+  // Fetch channel information and baseline stats separately
+  const [channelResult, baselineStatsResult] = await Promise.all([
+    supabase
+      .from('benchmark_channels')
+      .select('channel_name, id')
+      .eq('channel_id', result.channel_id)
+      .single(),
+
+    supabase
+      .from('benchmark_channels_baseline_stats')
+      .select('is_available')
+      .eq('channel_id', result.channel_id)
+      .single()
+  ])
+
+  const channelData = channelResult.data
+  const socialBladeAvailable = baselineStatsResult.data?.is_available ?? true
 
   // Calculate video age in days
   const uploadDate = new Date(result.upload_date)
@@ -147,7 +158,7 @@ export default async function VideoDetailPage({
 
         {/* Sidebar Column (Right - 1/3 width) */}
         <div className="space-y-6">
-          <PerformanceMetricsCard video={video} />
+          <PerformanceMetricsCard video={video} socialBladeAvailable={socialBladeAvailable} />
           <VideoStatsCard video={video} />
           <CategorizationCard video={video} />
           <ChannelCard

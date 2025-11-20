@@ -1,9 +1,10 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { formatLargeNumber, cn } from "@/lib/utils"
 import Image from "next/image"
-import { Users, Eye, Video, TrendingUp, Globe, Sparkles } from "lucide-react"
+import { Users, Eye, Video, TrendingUp, Globe, Sparkles, AlertCircle } from "lucide-react"
 import { AddToRadarButton } from "@/app/(dashboard)/radar/components/add-to-radar-button"
 
 // Types based on Supabase schema
@@ -32,6 +33,7 @@ interface BenchmarkChannelBaselineStats {
 interface ChannelDetailHeaderProps {
   channel: BenchmarkChannel
   baselineStats: BenchmarkChannelBaselineStats | undefined
+  socialBladeAvailable?: boolean
 }
 
 /**
@@ -46,6 +48,7 @@ interface ChannelDetailHeaderProps {
 export function ChannelDetailHeader({
   channel,
   baselineStats,
+  socialBladeAvailable = true,
 }: ChannelDetailHeaderProps) {
   const categorization = channel.categorization as {
     niche?: string
@@ -111,6 +114,19 @@ export function ChannelDetailHeader({
           </div>
         </div>
       </div>
+
+      {/* Social Blade Warning Alert */}
+      {!socialBladeAvailable && (
+        <Alert variant="default" className="border-amber-500/50 bg-amber-500/5">
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertTitle>Social Blade Metrics Unavailable</AlertTitle>
+          <AlertDescription className="text-sm">
+            Recent performance metrics (14-day data) could not be retrieved from Social Blade.
+            This usually happens with very new channels or channels not yet indexed.
+            Historical performance metrics based on YouTube data are still available.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Modern Statistics Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -236,8 +252,8 @@ export function ChannelDetailHeader({
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
         </div>
 
-        {/* Recent Performance (14 Days) Card */}
-        {baselineStats && (
+        {/* Recent Performance (14 Days) Card - Only show if Social Blade available */}
+        {baselineStats && socialBladeAvailable && (
           <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-gradient-to-br from-orange-500/10 via-amber-500/10 to-yellow-500/10 backdrop-blur-sm transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30 hover:-translate-y-1">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 

@@ -95,6 +95,7 @@ export default async function ChannelDetailPage({
     ? {
         id: baselineStatsResult.data.id,
         channelId: baselineStatsResult.data.channel_id,
+        isAvailable: baselineStatsResult.data.is_available ?? true, // Social Blade availability flag
         // 14-day metrics (populated by SocialBlade)
         totalViews14d: baselineStatsResult.data.total_views_14d,
         videosCount14d: baselineStatsResult.data.videos_count_14d,
@@ -150,6 +151,7 @@ export default async function ChannelDetailPage({
       <ChannelDetailHeader
         channel={channelData}
         baselineStats={baselineStats}
+        socialBladeAvailable={baselineStats?.isAvailable ?? false}
       />
 
       {/* Channel Videos Section */}
