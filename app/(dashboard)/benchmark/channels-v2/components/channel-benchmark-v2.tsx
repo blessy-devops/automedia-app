@@ -13,6 +13,7 @@ interface BenchmarkHistoryItem {
   channel_id: string
   overall_status: 'completed' | 'processing' | 'failed' | 'pending'
   created_at: string
+  benchmark_channels: { id: number } | null
 }
 
 interface ChannelBenchmarkV2Props {
@@ -272,30 +273,42 @@ export function ChannelBenchmarkV2({ initialHistory }: ChannelBenchmarkV2Props) 
                   No benchmarks yet
                 </div>
               ) : (
-                history.slice(0, 10).map((item) => (
-                  <div
-                    key={item.id}
-                    className="bg-accent hover:bg-accent/70 rounded-lg p-3 cursor-pointer transition-colors border border-border"
-                  >
-                    <div className="flex items-start justify-between mb-1.5">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm text-foreground truncate">
-                          {item.channel_id}
+                history.slice(0, 10).map((item) => {
+                  const isClickable = item.benchmark_channels !== null
+                  const handleClick = () => {
+                    if (isClickable && item.benchmark_channels) {
+                      router.push(`/benchmark/channels/${item.benchmark_channels.id}`)
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={handleClick}
+                      className={`bg-accent hover:bg-accent/70 rounded-lg p-3 transition-colors border border-border ${
+                        isClickable ? 'cursor-pointer' : 'cursor-default opacity-70'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-1.5">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-foreground truncate">
+                            {item.channel_id}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate mt-0.5">
+                            Task #{item.id}
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground truncate mt-0.5">
-                          Task #{item.id}
-                        </div>
+                        {getStatusBadge(item.overall_status)}
                       </div>
-                      {getStatusBadge(item.overall_status)}
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {formatRelativeTime(item.created_at)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {formatRelativeTime(item.created_at)}
-                      </span>
-                    </div>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           </div>

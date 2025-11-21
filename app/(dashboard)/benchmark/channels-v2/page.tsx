@@ -16,10 +16,10 @@ import { ChannelBenchmarkV2 } from './components/channel-benchmark-v2'
 export default async function ChannelBenchmarkV2Page() {
   const supabase = await createClient()
 
-  // Fetch recent benchmark tasks
+  // Fetch recent benchmark tasks with channel details (LEFT JOIN for channels not yet enriched)
   const { data: history, error } = await supabase
     .from('channel_enrichment_tasks')
-    .select('id, channel_id, overall_status, created_at')
+    .select('id, channel_id, overall_status, created_at, benchmark_channels(id)')
     .order('created_at', { ascending: false })
     .limit(20)
 

@@ -371,7 +371,7 @@ export function AppSidebar() {
             )}
           </div>
 
-          {/* My Channels - Standalone Item with NEW badge */}
+          {/* My Channels - Standalone Item */}
           <div className="mt-1">
             <SidebarMenuButton
               asChild
@@ -382,9 +382,6 @@ export function AppSidebar() {
               <Link href="/channels" className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
                 <Tv className="w-5 h-5 flex-shrink-0" />
                 <span className="text-sm group-data-[collapsible=icon]:hidden">My Channels</span>
-                <span className="ml-auto text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-foreground text-background group-data-[collapsible=icon]:hidden">
-                  NEW
-                </span>
               </Link>
             </SidebarMenuButton>
           </div>
@@ -479,7 +476,7 @@ export function AppSidebar() {
             )}
           </div>
 
-          {/* Analytics - Standalone Item with NEW badge */}
+          {/* Analytics - Standalone Item */}
           <div className="mt-1">
             <SidebarMenuButton
               asChild
@@ -490,9 +487,6 @@ export function AppSidebar() {
               <Link href="/analytics" className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
                 <BarChart3 className="w-5 h-5 flex-shrink-0" />
                 <span className="text-sm group-data-[collapsible=icon]:hidden">Analytics</span>
-                <span className="ml-auto text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-foreground text-background group-data-[collapsible=icon]:hidden">
-                  NEW
-                </span>
               </Link>
             </SidebarMenuButton>
           </div>

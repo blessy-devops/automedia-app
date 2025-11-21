@@ -515,80 +515,67 @@ export async function getDistributedVideos(options: {
   const { offset = 0, limit = 20 } = options
 
   try {
-    // Get total count of distributed videos
-    const { count, error: countError } = await gobbiClient
-      .from('benchmark_videos')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'used')
-
-    if (countError) {
-      console.error('[getDistributedVideos] Error counting videos:', countError)
-      throw countError
-    }
-
-    // Fetch benchmark videos with status = 'used' (distributed)
-    // and their production_videos
-    const { data: distributedVideos, error: fetchError } = await gobbiClient
-      .from('benchmark_videos')
-      .select(`
-        id,
-        title,
-        youtube_video_id,
-        youtube_url,
-        production_videos (
-          id,
-          placeholder,
-          status,
-          distributed_at
-        )
-      `)
-      .eq('status', 'used')
-      .order('id', { ascending: false })
-      .range(offset, offset + limit - 1)
-
-    if (fetchError) {
-      console.error('[getDistributedVideos] Error fetching distributed videos:', fetchError)
-      return { videos: [], totalCount: 0, hasMore: false, error: fetchError.message }
-    }
-
-    if (!distributedVideos || distributedVideos.length === 0) {
-      return { videos: [], totalCount: count || 0, hasMore: false, error: null }
-    }
-
-    // Transform data to match interface
-    const videos: DistributedVideo[] = distributedVideos.map((video: any) => {
-      const productionVideos = Array.isArray(video.production_videos)
-        ? video.production_videos
-        : []
-
-      // Get the earliest distributed_at timestamp
-      const distributedAt =
-        productionVideos.length > 0 && productionVideos[0].distributed_at
-          ? productionVideos[0].distributed_at
-          : new Date().toISOString()
-
-      return {
-        id: video.id,
-        title: video.title,
-        youtube_video_id: video.youtube_video_id,
-        youtube_url: video.youtube_url,
-        distributed_at: distributedAt,
-        channels: productionVideos.map((pv: any) => ({
-          placeholder: pv.placeholder || 'Unknown',
-          production_video_id: pv.id,
-          status: pv.status,
-        })),
+    // Call optimized RPC function
+    const { data, error: rpcError } = await gobbiClient.rpc(
+      'get_distributed_videos_paginated',
+      {
+        p_offset: offset,
+        p_limit: limit,
       }
-    })
-
-    const hasMore = videos.length === limit
-    const totalCount = count || 0
-
-    console.log(
-      `[getDistributedVideos] Fetched ${videos.length} videos (offset: ${offset}, total: ${totalCount}, hasMore: ${hasMore})`
     )
 
-    return { videos, totalCount, hasMore, error: null }
+    if (rpcError) {
+      console.error('[getDistributedVideos] RPC error:', rpcError)
+      return { videos: [], totalCount: 0, hasMore: false, error: rpcError.message }
+    }
+
+    if (!data) {
+      return { videos: [], totalCount: 0, hasMore: false, error: null }
+    }
+
+    // RPC returns { videos: [...], totalCount: number, hasMore: boolean }
+    const result = data as {
+      videos: Array<{
+        id: number
+        title: string
+        youtube_video_id: string
+        youtube_url: string
+        distributed_at: string
+        production_videos: Array<{
+          id: number
+          placeholder: string
+          status: string
+          distributed_at: string
+        }>
+      }>
+      totalCount: number
+      hasMore: boolean
+    }
+
+    // Transform to match interface
+    const videos: DistributedVideo[] = result.videos.map((video) => ({
+      id: video.id,
+      title: video.title,
+      youtube_video_id: video.youtube_video_id,
+      youtube_url: video.youtube_url,
+      distributed_at: video.distributed_at,
+      channels: video.production_videos.map((pv) => ({
+        placeholder: pv.placeholder || 'Unknown',
+        production_video_id: pv.id,
+        status: pv.status,
+      })),
+    }))
+
+    console.log(
+      `[getDistributedVideos] Fetched ${videos.length} videos via RPC (offset: ${offset}, total: ${result.totalCount}, hasMore: ${result.hasMore})`
+    )
+
+    return {
+      videos,
+      totalCount: result.totalCount,
+      hasMore: result.hasMore,
+      error: null,
+    }
   } catch (error) {
     console.error('[getDistributedVideos] Unexpected error:', error)
     return {
