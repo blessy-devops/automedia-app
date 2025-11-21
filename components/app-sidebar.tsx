@@ -31,7 +31,7 @@ import {
   FileVideo,
   Workflow,
   Zap,
-  FileTemplate,
+  FileText,
   User,
   Palette,
   Bell,
@@ -167,7 +167,7 @@ const collapsibleSections: CollapsibleSection[] = [
       {
         title: "Templates",
         href: "/ai-automation/templates",
-        icon: FileTemplate,
+        icon: FileText,
       },
     ],
   },
