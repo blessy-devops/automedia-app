@@ -14,7 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { PerformanceBadge } from "../../components/performance-badge"
+import { PerformanceBadge } from "@/app/(dashboard)/videos/components/performance-badge"
 import { TrendingUp, Info } from "lucide-react"
 
 interface PerformanceMetricsCardProps {
