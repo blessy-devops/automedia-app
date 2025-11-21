@@ -21,22 +21,24 @@ import {
   Settings,
   ChevronUp,
   ChevronDown,
+  FileCheck,
+  Loader,
   Calendar,
-  Send,
-  ListVideo,
-  ImagePlus,
+  Link,
+  ClipboardList,
+  Pencil,
   Image,
   Headphones,
   Wand2,
   FileVideo,
-  Workflow,
-  Zap,
-  FileText,
-  User,
-  Palette,
-  Bell,
-  Plug,
+  Brain,
+  BookText,
+  DollarSign,
+  Settings2,
+  Key,
   Cog,
+  Layers,
+  Webhook,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -101,19 +103,37 @@ const collapsibleSections: CollapsibleSection[] = [
     icon: Film,
     items: [
       {
-        title: "Schedule",
-        href: "/production/schedule",
+        title: "Videos",
+        href: "/production/videos",
+        icon: Video,
+      },
+      {
+        title: "Queue",
+        href: "/production/queue",
+        icon: FileCheck,
+      },
+      {
+        title: "API Queue",
+        href: "/production/api-queue",
+        icon: Loader,
+        isPlaceholder: true,
+      },
+      {
+        title: "Calendar",
+        href: "/production/calendar",
         icon: Calendar,
+        isPlaceholder: true,
       },
       {
-        title: "Publishing",
-        href: "/production/publishing",
-        icon: Send,
+        title: "Workflows",
+        href: "/production/workflows",
+        icon: Link,
+        isPlaceholder: true,
       },
       {
-        title: "Render Queue",
-        href: "/production/render-queue",
-        icon: ListVideo,
+        title: "Distribution",
+        href: "/production/distribution",
+        icon: ClipboardList,
       },
     ],
   },
@@ -125,7 +145,8 @@ const collapsibleSections: CollapsibleSection[] = [
       {
         title: "Thumbnail Creator",
         href: "/visual-lab/thumbnail-creator",
-        icon: ImagePlus,
+        icon: Pencil,
+        isPlaceholder: true,
       },
       {
         title: "Image Assets",
@@ -155,19 +176,22 @@ const collapsibleSections: CollapsibleSection[] = [
     icon: Bot,
     items: [
       {
-        title: "AI Workflows",
-        href: "/ai-automation/workflows",
-        icon: Workflow,
+        title: "AI Agents",
+        href: "/ai-automation/agents",
+        icon: Brain,
+        isPlaceholder: true,
       },
       {
-        title: "Automation Rules",
-        href: "/ai-automation/rules",
-        icon: Zap,
+        title: "Narrative Library",
+        href: "/ai-automation/narrative-library",
+        icon: BookText,
+        isPlaceholder: true,
       },
       {
-        title: "Templates",
-        href: "/ai-automation/templates",
-        icon: FileText,
+        title: "AI Cost Tracking",
+        href: "/ai-automation/cost-tracking",
+        icon: DollarSign,
+        isPlaceholder: true,
       },
     ],
   },
@@ -177,29 +201,30 @@ const collapsibleSections: CollapsibleSection[] = [
     icon: Settings,
     items: [
       {
-        title: "Account",
-        href: "/settings/account",
-        icon: User,
+        title: "Platform Settings",
+        href: "/settings/platform",
+        icon: Settings2,
       },
       {
-        title: "Appearance",
-        href: "/settings/appearance",
-        icon: Palette,
-      },
-      {
-        title: "Notifications",
-        href: "/settings/notifications",
-        icon: Bell,
-      },
-      {
-        title: "Integrations",
-        href: "/settings/integrations",
-        icon: Plug,
+        title: "API Keys Pool",
+        href: "/settings/api-keys",
+        icon: Key,
       },
       {
         title: "FFMPEG Config",
         href: "/settings/ffmpeg",
         icon: Cog,
+        isPlaceholder: true,
+      },
+      {
+        title: "Categorization",
+        href: "/settings/categorization",
+        icon: Layers,
+      },
+      {
+        title: "Webhooks",
+        href: "/settings/webhooks",
+        icon: Webhook,
       },
     ],
   },
@@ -333,6 +358,11 @@ export function AppSidebar() {
                       <Link href={item.href} className="flex items-center gap-3">
                         <ItemIcon className="w-4 h-4 flex-shrink-0" />
                         <span className="text-sm">{item.title}</span>
+                        {item.isPlaceholder && (
+                          <span className="ml-auto text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-foreground text-background">
+                            NEW
+                          </span>
+                        )}
                       </Link>
                     </SidebarMenuButton>
                   )
@@ -391,6 +421,11 @@ export function AppSidebar() {
                       <Link href={item.href} className="flex items-center gap-3">
                         <ItemIcon className="w-4 h-4 flex-shrink-0" />
                         <span className="text-sm">{item.title}</span>
+                        {item.isPlaceholder && (
+                          <span className="ml-auto text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-foreground text-background">
+                            NEW
+                          </span>
+                        )}
                       </Link>
                     </SidebarMenuButton>
                   )
@@ -431,6 +466,11 @@ export function AppSidebar() {
                       <Link href={item.href} className="flex items-center gap-3">
                         <ItemIcon className="w-4 h-4 flex-shrink-0" />
                         <span className="text-sm">{item.title}</span>
+                        {item.isPlaceholder && (
+                          <span className="ml-auto text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-foreground text-background">
+                            NEW
+                          </span>
+                        )}
                       </Link>
                     </SidebarMenuButton>
                   )
@@ -489,6 +529,11 @@ export function AppSidebar() {
                       <Link href={item.href} className="flex items-center gap-3">
                         <ItemIcon className="w-4 h-4 flex-shrink-0" />
                         <span className="text-sm">{item.title}</span>
+                        {item.isPlaceholder && (
+                          <span className="ml-auto text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-foreground text-background">
+                            NEW
+                          </span>
+                        )}
                       </Link>
                     </SidebarMenuButton>
                   )
