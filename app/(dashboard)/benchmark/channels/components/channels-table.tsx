@@ -177,7 +177,7 @@ export function ChannelsTable({ channels }: ChannelsTableProps) {
             <th className="p-3 w-12">
               <Checkbox
                 checked={isAllSelected}
-                indeterminate={isSomeSelected}
+                indeterminate={isSomeSelected || undefined}
                 onCheckedChange={handleSelectAll}
                 aria-label="Select all channels"
               />
