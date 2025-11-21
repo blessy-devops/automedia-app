@@ -54,10 +54,11 @@ export function CustomSidebar({ children }: { children: React.ReactNode }) {
 
           {/* Sidebar fixa */}
           <aside
+            data-collapsible={isExpanded ? "" : "icon"}
             onMouseEnter={() => setIsExpanded(true)}
             onMouseLeave={() => setIsExpanded(false)}
             className={cn(
-              "fixed inset-y-0 left-0 z-20 flex flex-col border-r bg-sidebar text-sidebar-foreground transition-all duration-300 ease-in-out",
+              "group fixed inset-y-0 left-0 z-20 flex flex-col border-r bg-sidebar text-sidebar-foreground transition-all duration-300 ease-in-out",
               isExpanded ? "w-56" : "w-16"
             )}
           >

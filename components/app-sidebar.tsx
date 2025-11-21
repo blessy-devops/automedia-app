@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -34,6 +34,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { useSidebar } from "@/components/custom-sidebar"
 import { cn } from "@/lib/utils"
 
 // Collapsible section type
@@ -107,9 +108,17 @@ const collapsibleSections: CollapsibleSection[] = [
 export function AppSidebar() {
   const pathname = usePathname()
   const { theme, setTheme } = useTheme()
+  const { state } = useSidebar()
 
   // Track which section is expanded (only one at a time, starts all collapsed)
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
+
+  // Reset expanded section when sidebar collapses
+  useEffect(() => {
+    if (state === "collapsed") {
+      setExpandedSection(null)
+    }
+  }, [state])
 
   const toggleSection = (sectionId: string) => {
     setExpandedSection(prev => (prev === sectionId ? null : sectionId))
@@ -159,11 +168,11 @@ export function AppSidebar() {
               className="flex items-center gap-3 px-4 py-2 rounded-md hover:bg-muted transition-colors w-full text-left"
             >
               <Search className="w-5 h-5 flex-shrink-0" />
-              <span className="text-sm">Benchmark</span>
+              <span className="text-sm group-data-[collapsible=icon]:hidden">Benchmark</span>
               {expandedSection === "benchmark" ? (
-                <ChevronUp className="w-4 h-4 ml-auto flex-shrink-0" />
+                <ChevronUp className="w-4 h-4 ml-auto flex-shrink-0 group-data-[collapsible=icon]:hidden" />
               ) : (
-                <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0" />
+                <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0 group-data-[collapsible=icon]:hidden" />
               )}
             </button>
 
@@ -192,20 +201,12 @@ export function AppSidebar() {
             )}
           </div>
 
-          {/* Production Section - Collapsible */}
+          {/* Production Section - Non-Collapsible (empty) */}
           <div className="mt-1">
-            <button
-              onClick={() => toggleSection("production")}
-              className="flex items-center gap-3 px-4 py-2 rounded-md hover:bg-muted transition-colors w-full text-left"
-            >
+            <div className="flex items-center gap-3 px-4 py-2 text-muted-foreground cursor-default">
               <Film className="w-5 h-5 flex-shrink-0" />
-              <span className="text-sm">Production</span>
-              {expandedSection === "production" ? (
-                <ChevronUp className="w-4 h-4 ml-auto flex-shrink-0" />
-              ) : (
-                <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0" />
-              )}
-            </button>
+              <span className="text-sm group-data-[collapsible=icon]:hidden">Production</span>
+            </div>
           </div>
 
           {/* My Channels - Standalone Item with NEW badge */}
@@ -219,43 +220,27 @@ export function AppSidebar() {
               <Link href="/channels" className="flex items-center gap-3">
                 <Tv className="w-5 h-5 flex-shrink-0" />
                 <span className="text-sm">My Channels</span>
-                <span className="ml-auto text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-foreground text-background">
+                <span className="ml-auto text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-foreground text-background group-data-[collapsible=icon]:hidden">
                   NEW
                 </span>
               </Link>
             </SidebarMenuButton>
           </div>
 
-          {/* Visual Lab Section - Collapsible */}
+          {/* Visual Lab Section - Non-Collapsible (empty) */}
           <div className="mt-1">
-            <button
-              onClick={() => toggleSection("visual-lab")}
-              className="flex items-center gap-3 px-4 py-2 rounded-md hover:bg-muted transition-colors w-full text-left"
-            >
+            <div className="flex items-center gap-3 px-4 py-2 text-muted-foreground cursor-default">
               <Sparkles className="w-5 h-5 flex-shrink-0" />
-              <span className="text-sm">Visual Lab</span>
-              {expandedSection === "visual-lab" ? (
-                <ChevronUp className="w-4 h-4 ml-auto flex-shrink-0" />
-              ) : (
-                <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0" />
-              )}
-            </button>
+              <span className="text-sm group-data-[collapsible=icon]:hidden">Visual Lab</span>
+            </div>
           </div>
 
-          {/* AI & Automation Section - Collapsible */}
+          {/* AI & Automation Section - Non-Collapsible (empty) */}
           <div className="mt-1">
-            <button
-              onClick={() => toggleSection("ai-automation")}
-              className="flex items-center gap-3 px-4 py-2 rounded-md hover:bg-muted transition-colors w-full text-left"
-            >
+            <div className="flex items-center gap-3 px-4 py-2 text-muted-foreground cursor-default">
               <Bot className="w-5 h-5 flex-shrink-0" />
-              <span className="text-sm">AI & Automation</span>
-              {expandedSection === "ai-automation" ? (
-                <ChevronUp className="w-4 h-4 ml-auto flex-shrink-0" />
-              ) : (
-                <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0" />
-              )}
-            </button>
+              <span className="text-sm group-data-[collapsible=icon]:hidden">AI & Automation</span>
+            </div>
           </div>
 
           {/* Analytics - Standalone Item with NEW badge */}
@@ -269,27 +254,19 @@ export function AppSidebar() {
               <Link href="/analytics" className="flex items-center gap-3">
                 <BarChart3 className="w-5 h-5 flex-shrink-0" />
                 <span className="text-sm">Analytics</span>
-                <span className="ml-auto text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-foreground text-background">
+                <span className="ml-auto text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-foreground text-background group-data-[collapsible=icon]:hidden">
                   NEW
                 </span>
               </Link>
             </SidebarMenuButton>
           </div>
 
-          {/* Settings Section - Collapsible */}
+          {/* Settings Section - Non-Collapsible (empty) */}
           <div className="mt-1">
-            <button
-              onClick={() => toggleSection("settings")}
-              className="flex items-center gap-3 px-4 py-2 rounded-md hover:bg-muted transition-colors w-full text-left"
-            >
+            <div className="flex items-center gap-3 px-4 py-2 text-muted-foreground cursor-default">
               <Settings className="w-5 h-5 flex-shrink-0" />
-              <span className="text-sm">Settings</span>
-              {expandedSection === "settings" ? (
-                <ChevronUp className="w-4 h-4 ml-auto flex-shrink-0" />
-              ) : (
-                <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0" />
-              )}
-            </button>
+              <span className="text-sm group-data-[collapsible=icon]:hidden">Settings</span>
+            </div>
           </div>
         </nav>
       </SidebarContent>
