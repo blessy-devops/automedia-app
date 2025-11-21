@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle2, Circle, Loader2, XCircle } from 'lucide-react'
+import { CheckCircle2, Circle, Loader2, XCircle, AlertCircle } from 'lucide-react'
 
-export type StepStatus = 'pending' | 'processing' | 'completed' | 'failed'
+export type StepStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'skipped'
 
 interface StatusStepProps {
   stepNumber: number
@@ -30,6 +30,8 @@ export function StatusStep({ stepNumber, title, status, description }: StatusSte
         return 'success'
       case 'failed':
         return 'destructive'
+      case 'skipped':
+        return 'warning'
       default:
         return 'outline'
     }
@@ -46,6 +48,8 @@ export function StatusStep({ stepNumber, title, status, description }: StatusSte
         return <CheckCircle2 className="h-5 w-5 text-green-500" />
       case 'failed':
         return <XCircle className="h-5 w-5 text-red-500" />
+      case 'skipped':
+        return <AlertCircle className="h-5 w-5 text-amber-500" />
       default:
         return <Circle className="h-5 w-5 text-muted-foreground" />
     }
@@ -62,6 +66,8 @@ export function StatusStep({ stepNumber, title, status, description }: StatusSte
         return 'Completed'
       case 'failed':
         return 'Failed'
+      case 'skipped':
+        return 'Skipped'
       default:
         return 'Unknown'
     }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusStep, type StepStatus } from './status-step'
@@ -50,6 +50,12 @@ export function BenchmarkProgressMonitor({
   })
 
   const [isSubscribed, setIsSubscribed] = useState(false)
+
+  // Stable ref for onComplete callback to prevent unnecessary re-subscriptions
+  const onCompleteRef = useRef(onComplete)
+  useEffect(() => {
+    onCompleteRef.current = onComplete
+  }, [onComplete])
 
   useEffect(() => {
     console.log('[Monitor] Setting up Realtime subscription for task:', taskId)
@@ -116,17 +122,21 @@ export function BenchmarkProgressMonitor({
       console.log('[Monitor] Updating task status:', newStatus)
       setTaskStatus(newStatus)
 
-      // Call onComplete callback if all steps are completed
+      // Call onComplete callback if all steps are completed (or skipped - non-blocking)
+      // Social Blade can be 'skipped' for new channels without data
+      const isSocialBladeComplete =
+        newStatus.socialbladeStatus === 'completed' || newStatus.socialbladeStatus === 'skipped'
+
       if (
         newStatus.overallStatus === 'completed' &&
         newStatus.categorizationStatus === 'completed' &&
-        newStatus.socialbladeStatus === 'completed' &&
+        isSocialBladeComplete &&
         newStatus.recentVideosStatus === 'completed' &&
         newStatus.trendingVideosStatus === 'completed' &&
         newStatus.outlierAnalysisStatus === 'completed'
       ) {
         console.log('[Monitor] All steps completed!')
-        onComplete?.()
+        onCompleteRef.current?.()
       }
     }
 
@@ -141,7 +151,7 @@ export function BenchmarkProgressMonitor({
         supabase.removeChannel(channel)
       }
     }
-  }, [taskId, onComplete])
+  }, [taskId]) // Only re-subscribe when taskId changes, not onComplete
 
   // Get overall badge variant
   const getOverallBadgeVariant = () => {
