@@ -116,7 +116,6 @@ const collapsibleSections: CollapsibleSection[] = [
         title: "API Queue",
         href: "/production/api-queue",
         icon: Loader,
-        isPlaceholder: true,
       },
       {
         title: "Calendar",

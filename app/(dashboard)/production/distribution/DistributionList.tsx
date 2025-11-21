@@ -21,8 +21,15 @@ import {
   AlertCircle,
   ExternalLink,
   Trash2,
+  Lock,
 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { toast } from 'sonner'
 import { ImageWithFallback } from '@/components/ui/image-with-fallback'
 import {
@@ -85,6 +92,13 @@ interface DistributedVideo {
   youtube_video_id: string
   youtube_url: string
   distributed_at: string
+  can_undo: boolean // True if all production jobs are still in 'queued' status
+  status_summary: {
+    queued: number
+    processing: number
+    completed: number
+    failed: number
+  }
   channels: Array<{
     placeholder: string
     production_video_id: number
@@ -659,50 +673,111 @@ export function DistributionList({
 
                     {/* Video Info */}
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-medium text-foreground mb-1 line-clamp-2">
-                        {video.title}
-                      </h3>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
-                        <span>ID: {video.id}</span>
-                        <span>•</span>
-                        <span>
-                          {new Date(video.distributed_at).toLocaleDateString('pt-BR', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric',
-                          })}
-                        </span>
-                        <span>•</span>
-                        <a
-                          href={video.youtube_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline inline-flex items-center gap-1"
-                        >
-                          View on YouTube
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
+                      {/* Header with Title and Action Button */}
+                      <div className="flex items-start justify-between gap-4 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-medium text-foreground mb-1 line-clamp-2">
+                            {video.title}
+                          </h3>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>ID: {video.id}</span>
+                            <span>•</span>
+                            <span>
+                              {new Date(video.distributed_at).toLocaleDateString('pt-BR', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                              })}
+                            </span>
+                            <span>•</span>
+                            <a
+                              href={video.youtube_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline inline-flex items-center gap-1"
+                            >
+                              View on YouTube
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        </div>
+
+                        {/* Conditional Undo Button or Locked Badge */}
+                        {video.can_undo ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              // TODO: Implement undo for distributed videos
+                              toast.info('Undo feature coming soon for distributed videos')
+                            }}
+                            disabled={isDistributing}
+                          >
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Undo
+                          </Button>
+                        ) : (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="outline" className="text-xs cursor-help">
+                                  <Lock className="w-3 h-3 mr-1" />
+                                  Locked
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Cannot undo: production has started</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
+
+                      {/* Status Summary Badges */}
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {video.status_summary.queued > 0 && (
+                          <Badge variant="secondary" className="text-xs">
+                            {video.status_summary.queued} queued
+                          </Badge>
+                        )}
+                        {video.status_summary.processing > 0 && (
+                          <Badge variant="default" className="text-xs">
+                            {video.status_summary.processing} in production
+                          </Badge>
+                        )}
+                        {video.status_summary.completed > 0 && (
+                          <Badge variant="outline" className="text-xs border-green-600 text-green-600">
+                            {video.status_summary.completed} completed
+                          </Badge>
+                        )}
+                        {video.status_summary.failed > 0 && (
+                          <Badge variant="destructive" className="text-xs">
+                            {video.status_summary.failed} failed
+                          </Badge>
+                        )}
                       </div>
 
                       {/* Distributed Channels */}
                       <div className="space-y-1.5">
-                        <div className="text-xs text-muted-foreground mb-1.5">
+                        <div className="text-xs text-muted-foreground">
                           Distributed to {video.channels.length} channel
                           {video.channels.length !== 1 ? 's' : ''}:
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          {video.channels.map((channel) => (
+                        <div className="flex flex-wrap gap-1.5">
+                          {video.channels.slice(0, 6).map((channel) => (
                             <Badge
                               key={channel.production_video_id}
                               variant="outline"
                               className="text-xs"
                             >
                               {channel.placeholder}
-                              <span className="ml-1.5 text-muted-foreground">
-                                ({channel.status})
-                              </span>
                             </Badge>
                           ))}
+                          {video.channels.length > 6 && (
+                            <Badge variant="secondary" className="text-xs">
+                              +{video.channels.length - 6} more
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </div>

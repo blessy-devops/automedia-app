@@ -379,9 +379,35 @@ export async function undoDistribution(
     }
 
     // ========================================================================
-    // Step 2: Delete production jobs created from this distribution
+    // Step 2: Validate ALL production jobs are still in 'queued' status
     // ========================================================================
     if (productionJobIds.length > 0) {
+      const { data: jobs, error: jobsError } = await gobbiClient
+        .from('production_videos')
+        .select('id, status')
+        .in('id', productionJobIds)
+
+      if (jobsError) {
+        console.error('[undoDistribution] Error fetching production jobs:', jobsError)
+        return { success: false, error: jobsError.message }
+      }
+
+      // Check if any job has started production (status !== 'queued')
+      const jobsInProduction = jobs.filter(job => job.status !== 'queued')
+
+      if (jobsInProduction.length > 0) {
+        const channelWord = jobsInProduction.length === 1 ? 'channel' : 'channels'
+        console.error(
+          `[undoDistribution] Cannot undo: ${jobsInProduction.length} job(s) already in production`,
+          jobsInProduction.map(j => ({ id: j.id, status: j.status }))
+        )
+        return {
+          success: false,
+          error: `Cannot undo: this video has already begun production for ${jobsInProduction.length} ${channelWord}.`,
+        }
+      }
+
+      // All jobs are still in 'queued', safe to delete
       const { error: deleteError } = await gobbiClient
         .from('production_videos')
         .delete()
@@ -494,6 +520,13 @@ interface DistributedVideo {
   youtube_video_id: string
   youtube_url: string
   distributed_at: string
+  can_undo: boolean // True if all production jobs are still in 'queued' status
+  status_summary: {
+    queued: number
+    processing: number
+    completed: number
+    failed: number
+  }
   channels: Array<{
     placeholder: string
     production_video_id: number
@@ -515,9 +548,9 @@ export async function getDistributedVideos(options: {
   const { offset = 0, limit = 20 } = options
 
   try {
-    // Call optimized RPC function
+    // Call optimized RPC function (using new name to avoid audit trigger conflict)
     const { data, error: rpcError } = await gobbiClient.rpc(
-      'get_distributed_videos_paginated',
+      'get_distributed_videos_with_status',
       {
         p_offset: offset,
         p_limit: limit,
@@ -541,6 +574,13 @@ export async function getDistributedVideos(options: {
         youtube_video_id: string
         youtube_url: string
         distributed_at: string
+        can_undo: boolean
+        status_summary: {
+          queued: number
+          processing: number
+          completed: number
+          failed: number
+        }
         production_videos: Array<{
           id: number
           placeholder: string
@@ -559,6 +599,8 @@ export async function getDistributedVideos(options: {
       youtube_video_id: video.youtube_video_id,
       youtube_url: video.youtube_url,
       distributed_at: video.distributed_at,
+      can_undo: video.can_undo,
+      status_summary: video.status_summary,
       channels: video.production_videos.map((pv) => ({
         placeholder: pv.placeholder || 'Unknown',
         production_video_id: pv.id,

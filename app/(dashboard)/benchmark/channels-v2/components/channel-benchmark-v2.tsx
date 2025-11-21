@@ -285,9 +285,11 @@ export function ChannelBenchmarkV2({ initialHistory }: ChannelBenchmarkV2Props) 
                     <div
                       key={item.id}
                       onClick={handleClick}
-                      className={`bg-accent hover:bg-accent/70 rounded-lg p-3 transition-colors border border-border ${
-                        isClickable ? 'cursor-pointer' : 'cursor-default opacity-70'
-                      }`}
+                      className={`bg-accent rounded-lg p-3 transition-all border ${
+                        isClickable
+                          ? 'cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 hover:border-primary/50 dark:hover:border-blue-400 hover:shadow-lg dark:hover:shadow-blue-500/20'
+                          : 'cursor-default opacity-70 border-border'
+                      } ${isClickable ? 'border-border' : ''}`}
                     >
                       <div className="flex items-start justify-between mb-1.5">
                         <div className="flex-1 min-w-0">
@@ -509,7 +511,7 @@ export function ChannelBenchmarkV2({ initialHistory }: ChannelBenchmarkV2Props) 
                 <div className="flex items-center justify-center gap-3">
                   {channelPreview && (
                     <button
-                      onClick={() => router.push(`/channels/${channelPreview.id}`)}
+                      onClick={() => router.push(`/benchmark/channels/${channelPreview.id}`)}
                       className="bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 rounded-md transition-colors flex items-center gap-2"
                     >
                       <ExternalLink className="w-4 h-4" />

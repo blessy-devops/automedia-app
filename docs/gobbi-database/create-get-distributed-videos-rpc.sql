@@ -1,6 +1,10 @@
 -- create-get-distributed-videos-rpc.sql
+-- ⚠️ DEPRECATED - NÃO USE ESTE ARQUIVO
+-- Este é a versão antiga da RPC sem os campos can_undo e status_summary
+-- Use: create-rpc-get-distributed-videos-paginated.sql (função: get_distributed_videos_with_status)
+--
 -- RPC otimizada para buscar vídeos distribuídos ordenados por data de distribuição
--- ⚠️ RODE ESTE SQL NO SQL EDITOR DO SUPABASE DO GOBBI
+-- ⚠️ NÃO RODE ESTE SQL - USE A VERSÃO NOVA
 
 -- ========================================================================
 -- RPC: get_distributed_videos_paginated
@@ -37,12 +41,13 @@ BEGIN
       bv.youtube_video_id,
       bv.youtube_url,
       -- Get the EARLIEST distributed_at for this benchmark video
-      MIN(pv.distributed_at) as distributed_at
+      -- COALESCE fallback to created_at for old records with NULL distributed_at
+      MIN(COALESCE(pv.distributed_at, pv.created_at)) as distributed_at
     FROM benchmark_videos bv
     INNER JOIN production_videos pv ON pv.benchmark_id = bv.id
     WHERE bv.status = 'used'
     GROUP BY bv.id, bv.title, bv.youtube_video_id, bv.youtube_url
-    ORDER BY MIN(pv.distributed_at) DESC  -- Order by distribution date (newest first)
+    ORDER BY MIN(COALESCE(pv.distributed_at, pv.created_at)) DESC  -- Order by distribution date (newest first)
     LIMIT p_limit
     OFFSET p_offset
   ),
@@ -58,9 +63,9 @@ BEGIN
           'id', pv.id,
           'placeholder', pv.placeholder,
           'status', pv.status,
-          'distributed_at', pv.distributed_at
+          'distributed_at', COALESCE(pv.distributed_at, pv.created_at)
         )
-        ORDER BY pv.distributed_at ASC
+        ORDER BY COALESCE(pv.distributed_at, pv.created_at) ASC
       ) as production_videos
     FROM distributed_videos dv
     INNER JOIN production_videos pv ON pv.benchmark_id = dv.id
@@ -111,7 +116,8 @@ SELECT get_distributed_videos_paginated(0, 5);
 DO $$
 BEGIN
   RAISE NOTICE '✅ Created RPC: get_distributed_videos_paginated(offset, limit)';
-  RAISE NOTICE '   - Returns videos ordered by distributed_at DESC';
+  RAISE NOTICE '   - Returns videos ordered by distributed_at DESC (with COALESCE fallback to created_at)';
   RAISE NOTICE '   - Includes totalCount and hasMore for pagination';
   RAISE NOTICE '   - Optimized with indexes for performance';
+  RAISE NOTICE '   - Handles NULL distributed_at gracefully (old records before column was added)';
 END $$;
