@@ -24,7 +24,7 @@ import {
   FileCheck,
   Loader,
   Calendar,
-  Link,
+  Link as LinkIcon,
   ClipboardList,
   Pencil,
   Image,
@@ -127,7 +127,7 @@ const collapsibleSections: CollapsibleSection[] = [
       {
         title: "Workflows",
         href: "/production/workflows",
-        icon: Link,
+        icon: LinkIcon,
         isPlaceholder: true,
       },
       {
