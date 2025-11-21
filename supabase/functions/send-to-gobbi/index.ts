@@ -206,12 +206,26 @@ serve(async (req) => {
     console.log(`[send-to-gobbi] Fetched ${videos.length} videos and ${mappedChannels.length} channels from local database`)
 
     // Prepare videos for webhook
-    // Force status to "pending_distribution" so videos appear in distribution queue
-    // Ensure channel_name is populated from benchmark_channels if missing
+    //
+    // ⚠️ ARCHITECTURAL DECISION (2025-11-19): Status is forced to "pending_distribution"
+    //
+    // NEW ARCHITECTURE (current):
+    //   Video → pending_distribution → Distribution UI → [catraca ao distribuir] → production_videos
+    //
+    // OLD ARCHITECTURE (deprecated):
+    //   Video → add_to_production → [CRON a cada 2min] → pending_distribution → Distribution UI
+    //
+    // Why we changed:
+    //   - Videos appear instantly in distribution screen (no 2-minute delay)
+    //   - Simpler: no CRON needed just to change status
+    //   - Queue control ("catraca") happens at the right moment: when distributing to production
+    //
+    // See: docs/gobbi-database/WEBHOOK_ARCHITECTURE.md (section "MUDANÇA DE ARQUITETURA DA FILA")
+    //
     // Note: Do NOT add youtube_url (GENERATED column in Gobbi's DB)
     const videosWithMetadata = videos.map((video) => ({
       ...video,
-      status: 'pending_distribution', // Override status - videos go to distribution queue
+      status: 'pending_distribution', // Videos go directly to distribution queue
       channel_name: video.channel_name || channelMap.get(video.channel_id) || null, // Fallback to channel map
     }))
 

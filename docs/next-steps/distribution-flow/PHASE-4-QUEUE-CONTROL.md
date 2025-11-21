@@ -1,6 +1,26 @@
 # Phase 4: Queue Control (Substituir WF0)
 
-**Status:** Pronto para Deploy
+**⚠️ ARQUITETURA ANTIGA - NÃO MAIS NECESSÁRIA (2025-11-19)**
+
+Esta fase descreve a implementação da arquitetura CRON-controlled que **não é mais usada**.
+
+**Arquitetura Antiga (esta fase):**
+```
+Video → add_to_production → [CRON a cada 2min] → pending_distribution → Distribution UI
+```
+
+**Arquitetura Nova (atual):**
+```
+Video → pending_distribution → Distribution UI → [catraca ao distribuir] → production_videos
+```
+
+**Ver:** `docs/gobbi-database/WEBHOOK_ARCHITECTURE.md` (seção "MUDANÇA DE ARQUITETURA DA FILA")
+
+---
+
+## 📖 Documentação Original (Arquitetura Antiga)
+
+**Status:** Pronto para Deploy (mas não mais necessário)
 **Tempo estimado:** 30 minutos
 **Pré-requisitos:** Phases 0-3 implementadas ✅
 

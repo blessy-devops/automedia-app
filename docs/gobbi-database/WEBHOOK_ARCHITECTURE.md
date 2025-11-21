@@ -247,7 +247,7 @@ if (!webhookResponse.ok) {
       "video_age_days": 14,
       "views_per_day": 714.29,
       "momentum_vs_14d": 1.1,
-      "status": "add_to_production",
+      "status": "pending_distribution",  // ⚠️ UPDATED: Videos now go directly to distribution queue
       "last_enriched_at": "2025-11-14T22:00:00Z",
       "video_transcript": "Full transcript here..." // Opcional
     }
@@ -471,7 +471,42 @@ ORDER BY updated_at DESC;
 
 ---
 
-**Última atualização:** 2025-11-14 23:00
+## 🔄 MUDANÇA DE ARQUITETURA DA FILA (2025-11-19)
+
+**Status Antigo:** Vídeos eram enviados com `status: 'add_to_production'`
+**Status Novo:** Vídeos são enviados com `status: 'pending_distribution'`
+
+### Por que mudamos?
+
+#### ❌ Arquitetura Antiga (CRON-controlled)
+```
+Video → add_to_production → [CRON a cada 2min] → pending_distribution → Distribution UI
+```
+
+**Problemas:**
+- Delay de até 2 minutos para vídeo aparecer na tela
+- CRON desnecessário apenas para mudar status
+- Complexidade adicional sem benefício
+
+#### ✅ Arquitetura Nova (Direct-to-distribution)
+```
+Video → pending_distribution → Distribution UI → [catraca ao distribuir] → production_videos
+```
+
+**Vantagens:**
+- Vídeos aparecem instantaneamente na tela de distribuição
+- Simplicidade: menos componentes = menos bugs
+- Controle de fila ("catraca") acontece no momento certo: ao distribuir para production_videos
+
+### Implicações
+
+1. **send-to-gobbi Edge Function**: Agora força `status: 'pending_distribution'` (linha 214)
+2. **production-queue-control Edge Function**: Não é mais necessária no novo fluxo (ver seu README para detalhes)
+3. **Tela de Distribuição**: Funciona exatamente igual, vídeos aparecem mais rápido
+
+---
+
+**Última atualização:** 2025-11-19 (arquitetura de fila), 2025-11-14 (webhook HTTP)
 **Autor:** Claude Code + Davi Luis
-**Status:** ✅ Pronto para deploy e teste
+**Status:** ✅ Implementado e testado
 
