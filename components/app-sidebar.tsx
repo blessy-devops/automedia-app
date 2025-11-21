@@ -251,7 +251,7 @@ export function AppSidebar() {
 
   return (
     <>
-      <SidebarHeader className="border-b border-border p-4">
+      <SidebarHeader className="border-b border-border p-4 group-data-[collapsible=icon]:p-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
@@ -282,7 +282,7 @@ export function AppSidebar() {
           >
             <Link href="/dashboard" className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
               <Home className="w-5 h-5 flex-shrink-0" />
-              <span className="text-sm">Dashboard</span>
+              <span className="text-sm group-data-[collapsible=icon]:hidden">Dashboard</span>
             </Link>
           </SidebarMenuButton>
 
