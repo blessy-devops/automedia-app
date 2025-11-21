@@ -174,7 +174,7 @@ export function RadarChannelsTable({ data, onChannelRemoved }: RadarChannelsTabl
                     )}
                   </TableCell>
                   <TableCell className="font-medium">
-                    <Link href={`/channels/${channel.channel_database_id}`} className="hover:underline">
+                    <Link href={`/benchmark/channels/${channel.channel_database_id}`} className="hover:underline">
                       <div className="flex flex-col gap-1">
                         <span>{channel.channel_name || 'Unnamed Channel'}</span>
                         {channel.has_10x_outlier && <Outlier10xBadge has10xOutlier={true} />}

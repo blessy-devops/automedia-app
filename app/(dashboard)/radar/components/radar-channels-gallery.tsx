@@ -52,7 +52,7 @@ export function RadarChannelsGallery({
           <CardHeader className="pb-3 space-y-0">
             <div className="flex items-start gap-3">
               {/* Avatar */}
-              <Link href={`/channels/${channel.channel_database_id}`}>
+              <Link href={`/benchmark/channels/${channel.channel_database_id}`}>
                 <Avatar className="h-12 w-12 border-2 cursor-pointer hover:border-primary transition-colors">
                   <AvatarImage
                     src={channel.thumbnail_url || undefined}
@@ -66,7 +66,7 @@ export function RadarChannelsGallery({
 
               {/* Name & Badges */}
               <div className="flex-1 space-y-1.5 min-w-0">
-                <Link href={`/channels/${channel.channel_database_id}`}>
+                <Link href={`/benchmark/channels/${channel.channel_database_id}`}>
                   <h3 className="font-semibold text-sm line-clamp-1 hover:text-primary transition-colors cursor-pointer">
                     {channel.channel_name || 'Unknown Channel'}
                   </h3>
@@ -135,7 +135,7 @@ export function RadarChannelsGallery({
             {/* Actions */}
             <div className="flex gap-2">
               <Button variant="outline" size="sm" asChild className="flex-1">
-                <Link href={`/channels/${channel.channel_database_id}`}>View Channel</Link>
+                <Link href={`/benchmark/channels/${channel.channel_database_id}`}>View Channel</Link>
               </Button>
               <ManualUpdateButton
                 channelId={channel.channel_id}

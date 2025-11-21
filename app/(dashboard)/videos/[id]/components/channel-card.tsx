@@ -40,7 +40,7 @@ export function ChannelCard({ channelName, channelDatabaseId }: ChannelCardProps
         </div>
 
         {channelDatabaseId && (
-          <Link href={`/channels/${channelDatabaseId}`} className="block">
+          <Link href={`/benchmark/channels/${channelDatabaseId}`} className="block">
             <Button variant="outline" size="sm" className="w-full">
               <ExternalLink className="h-4 w-4 mr-2" />
               View Channel Details

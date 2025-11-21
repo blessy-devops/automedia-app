@@ -188,7 +188,7 @@ export function SimpleChannelsTable({ data }: SimpleChannelsTableProps) {
                     </TableCell>
                     <TableCell className="font-medium">
                       <Link
-                        href={`/channels/${channel.id}`}
+                        href={`/benchmark/channels/${channel.id}`}
                         className="hover:underline flex items-center gap-2"
                       >
                         {channel.channelName || "Unnamed Channel"}

@@ -38,7 +38,7 @@ export function ChannelGalleryView({ channels }: ChannelGalleryViewProps) {
       {channels.map((channel) => (
         <Link
           key={channel.id}
-          href={`/channels/${channel.id}`}
+          href={`/benchmark/channels/${channel.id}`}
           className="group"
         >
           <Card className="h-full overflow-hidden border-2 hover:border-primary/50 transition-all duration-200 hover:shadow-xl">
