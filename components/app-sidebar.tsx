@@ -109,7 +109,7 @@ const collapsibleSections: CollapsibleSection[] = [
       },
       {
         title: "Queue",
-        href: "/production/queue",
+        href: "/production-videos",
         icon: FileCheck,
       },
       {
