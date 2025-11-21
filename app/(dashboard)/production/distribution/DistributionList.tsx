@@ -29,7 +29,8 @@ import {
   distributeVideoToChannels,
   removeVideoFromQueue,
   undoDistribution,
-  restoreVideoToQueue
+  restoreVideoToQueue,
+  getDistributedVideos,
 } from './actions'
 import { useRouter } from 'next/navigation'
 import {
@@ -37,6 +38,7 @@ import {
   type DistributionRecord,
   type RemovedRecord
 } from '@/components/shared/VideoHistoryCard'
+import { formatNumber } from '@/lib/utils'
 
 // ============================================================================
 // Type Definitions
@@ -93,6 +95,8 @@ interface DistributedVideo {
 interface DistributionListProps {
   initialVideos: VideoWithChannels[]
   initialDistributedVideos: DistributedVideo[]
+  initialDistributedTotalCount: number
+  initialDistributedHasMore: boolean
 }
 
 // ============================================================================
@@ -102,6 +106,8 @@ interface DistributionListProps {
 export function DistributionList({
   initialVideos,
   initialDistributedVideos,
+  initialDistributedTotalCount,
+  initialDistributedHasMore,
 }: DistributionListProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -114,9 +120,14 @@ export function DistributionList({
   const [isDistributing, setIsDistributing] = useState(false)
   const [showAllChannels, setShowAllChannels] = useState(false)
   const [videos, setVideos] = useState(initialVideos)
+
+  // Distributed Videos State (with pagination)
   const [distributedVideos, setDistributedVideos] = useState<DistributedVideo[]>(
     initialDistributedVideos
   )
+  const [distributedTotalCount, setDistributedTotalCount] = useState(initialDistributedTotalCount)
+  const [distributedHasMore, setDistributedHasMore] = useState(initialDistributedHasMore)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   // History & Undo State (for local session only - undo functionality)
   const [activeTab, setActiveTab] = useState<'pending' | 'distributed' | 'removed'>('pending')
@@ -127,7 +138,9 @@ export function DistributionList({
   useEffect(() => {
     setVideos(initialVideos)
     setDistributedVideos(initialDistributedVideos)
-  }, [initialVideos, initialDistributedVideos])
+    setDistributedTotalCount(initialDistributedTotalCount)
+    setDistributedHasMore(initialDistributedHasMore)
+  }, [initialVideos, initialDistributedVideos, initialDistributedTotalCount, initialDistributedHasMore])
 
   // Filter videos by search term
   const filteredVideos = videos.filter(
@@ -392,6 +405,33 @@ export function DistributionList({
     setIsDistributing(false)
   }
 
+  const handleLoadMoreDistributed = async () => {
+    if (isLoadingMore || !distributedHasMore) return
+
+    setIsLoadingMore(true)
+
+    try {
+      const result = await getDistributedVideos({
+        offset: distributedVideos.length,
+        limit: 20,
+      })
+
+      if (result.error) {
+        toast.error('Failed to load more videos', {
+          description: result.error,
+        })
+      } else {
+        setDistributedVideos((prev) => [...prev, ...result.videos])
+        setDistributedHasMore(result.hasMore)
+        // totalCount stays the same
+      }
+    } catch (error) {
+      toast.error('Failed to load more videos')
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }
+
   // ============================================================================
   // Render
   // ============================================================================
@@ -429,15 +469,15 @@ export function DistributionList({
             Pending
             {videos.length > 0 && (
               <Badge variant="secondary" className="ml-2 text-xs">
-                {videos.length}
+                {formatNumber(videos.length)}
               </Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="distributed" className="relative">
             Distributed
-            {distributedHistory.length > 0 && (
+            {distributedTotalCount > 0 && (
               <Badge variant="secondary" className="ml-2 text-xs">
-                {distributedHistory.length}
+                {formatNumber(distributedTotalCount)}
               </Badge>
             )}
           </TabsTrigger>
@@ -445,7 +485,7 @@ export function DistributionList({
             Removed
             {removedHistory.length > 0 && (
               <Badge variant="secondary" className="ml-2 text-xs">
-                {removedHistory.length}
+                {formatNumber(removedHistory.length)}
               </Badge>
             )}
           </TabsTrigger>
@@ -669,6 +709,27 @@ export function DistributionList({
                   </div>
                 </div>
               ))}
+
+              {/* Load More Button */}
+              {distributedHasMore && (
+                <div className="flex justify-center mt-6">
+                  <Button
+                    variant="outline"
+                    onClick={handleLoadMoreDistributed}
+                    disabled={isLoadingMore}
+                    className="min-w-[140px]"
+                  >
+                    {isLoadingMore ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      'Load More Videos'
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-12 text-muted-foreground">

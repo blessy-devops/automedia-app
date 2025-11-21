@@ -501,13 +501,31 @@ interface DistributedVideo {
   }>
 }
 
-export async function getDistributedVideos(): Promise<{
+export async function getDistributedVideos(options: {
+  offset?: number
+  limit?: number
+} = {}): Promise<{
   videos: DistributedVideo[]
+  totalCount: number
+  hasMore: boolean
   error: string | null
 }> {
   ensureServerSide()
 
+  const { offset = 0, limit = 20 } = options
+
   try {
+    // Get total count of distributed videos
+    const { count, error: countError } = await gobbiClient
+      .from('benchmark_videos')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'used')
+
+    if (countError) {
+      console.error('[getDistributedVideos] Error counting videos:', countError)
+      throw countError
+    }
+
     // Fetch benchmark videos with status = 'used' (distributed)
     // and their production_videos
     const { data: distributedVideos, error: fetchError } = await gobbiClient
@@ -526,15 +544,15 @@ export async function getDistributedVideos(): Promise<{
       `)
       .eq('status', 'used')
       .order('id', { ascending: false })
-      .limit(50)
+      .range(offset, offset + limit - 1)
 
     if (fetchError) {
       console.error('[getDistributedVideos] Error fetching distributed videos:', fetchError)
-      return { videos: [], error: fetchError.message }
+      return { videos: [], totalCount: 0, hasMore: false, error: fetchError.message }
     }
 
     if (!distributedVideos || distributedVideos.length === 0) {
-      return { videos: [], error: null }
+      return { videos: [], totalCount: count || 0, hasMore: false, error: null }
     }
 
     // Transform data to match interface
@@ -563,13 +581,20 @@ export async function getDistributedVideos(): Promise<{
       }
     })
 
-    console.log(`[getDistributedVideos] Fetched ${videos.length} distributed videos`)
+    const hasMore = videos.length === limit
+    const totalCount = count || 0
 
-    return { videos, error: null }
+    console.log(
+      `[getDistributedVideos] Fetched ${videos.length} videos (offset: ${offset}, total: ${totalCount}, hasMore: ${hasMore})`
+    )
+
+    return { videos, totalCount, hasMore, error: null }
   } catch (error) {
     console.error('[getDistributedVideos] Unexpected error:', error)
     return {
       videos: [],
+      totalCount: 0,
+      hasMore: false,
       error: error instanceof Error ? error.message : 'Unknown error',
     }
   }

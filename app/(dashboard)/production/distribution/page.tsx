@@ -12,11 +12,16 @@ export default async function ProductionDistributionPage() {
   // Fetch both pending and distributed videos in parallel
   const [pendingResult, distributedResult] = await Promise.all([
     getVideosAwaitingDistribution(),
-    getDistributedVideos(),
+    getDistributedVideos({ offset: 0, limit: 20 }),
   ])
 
   const { videos, error } = pendingResult
-  const { videos: distributedVideos, error: distributedError } = distributedResult
+  const {
+    videos: distributedVideos,
+    totalCount: distributedTotalCount,
+    hasMore: distributedHasMore,
+    error: distributedError,
+  } = distributedResult
 
   if (error) {
     return (
@@ -50,6 +55,8 @@ export default async function ProductionDistributionPage() {
         <DistributionList
           initialVideos={videos}
           initialDistributedVideos={distributedVideos}
+          initialDistributedTotalCount={distributedTotalCount}
+          initialDistributedHasMore={distributedHasMore}
         />
       </div>
     </div>
