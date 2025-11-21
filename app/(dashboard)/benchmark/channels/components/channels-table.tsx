@@ -101,11 +101,11 @@ export function ChannelsTable({ channels }: ChannelsTableProps) {
   }, [channels, sortBy, sortDirection])
 
   const handleRowClick = (channelId: number) => {
-    router.push(`/channels/${channelId}`)
+    router.push(`/benchmark/channels/${channelId}`)
   }
 
   const handleAnalyze = (channelId: number) => {
-    router.push(`/channels/${channelId}`)
+    router.push(`/benchmark/channels/${channelId}`)
   }
 
   const handleEdit = (channelId: number) => {

@@ -53,7 +53,7 @@ export function RadarAlerts({ alerts }: RadarAlertsProps) {
             >
               {/* Thumbnail */}
               <Link
-                href={`/videos/${alert.youtube_video_id}`}
+                href={`/benchmark/videos/${alert.youtube_video_id}`}
                 className="relative flex-shrink-0 w-24 h-14 rounded overflow-hidden bg-slate-100"
               >
                 {alert.thumbnail_url ? (
@@ -75,7 +75,7 @@ export function RadarAlerts({ alerts }: RadarAlertsProps) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <Link
-                    href={`/videos/${alert.youtube_video_id}`}
+                    href={`/benchmark/videos/${alert.youtube_video_id}`}
                     className="flex-1"
                   >
                     <h4 className="font-medium text-sm line-clamp-2 hover:underline">

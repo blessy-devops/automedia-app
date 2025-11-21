@@ -62,7 +62,7 @@ export async function enrichVideo(
     }
 
     // Revalidate the page to show new data
-    revalidatePath(`/videos/${videoId}`)
+    revalidatePath(`/benchmark/videos/${videoId}`)
 
     return {
       success: true,
@@ -131,9 +131,9 @@ export async function addVideosToQueue(
     )
 
     // Revalidate relevant pages
-    revalidatePath('/videos')
+    revalidatePath('/benchmark/videos')
     if (parentVideoId) {
-      revalidatePath(`/videos/${parentVideoId}`)
+      revalidatePath(`/benchmark/videos/${parentVideoId}`)
     }
 
     return {

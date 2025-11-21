@@ -448,7 +448,7 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
                     </td>
                     <td className="px-4 py-4 text-sm text-foreground max-w-xl">
                       <Link
-                        href={`/videos/${video.id}`}
+                        href={`/benchmark/videos/${video.id}`}
                         className="hover:underline line-clamp-2"
                       >
                         {video.title || "Untitled"}

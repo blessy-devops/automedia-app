@@ -482,7 +482,7 @@ export async function addVideoToQueue(
       return { success: false, error: 'Failed to add video to queue' }
     }
 
-    revalidatePath(`/videos/${videoId}`)
+    revalidatePath(`/benchmark/videos/${videoId}`)
     return { success: true }
   } catch (error) {
     console.error('Error adding video to queue:', error)

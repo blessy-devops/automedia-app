@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ChannelDetailHeader } from './components/channel-detail-header'
-import { SimpleVideosTableNew } from '../../videos/components/simple-videos-table-new'
+import { SimpleVideosTableNew } from '@/app/(dashboard)/videos/components/simple-videos-table-new'
 import { parseVideoFilters, applyVideoFiltersToQuery } from '@/lib/video-filters'
 
 /**
@@ -129,6 +129,7 @@ export default async function ChannelDetailPage({
       youtubeVideoId: video.youtube_video_id,
       channelId: video.channel_id,
       channelName: channelData.channelName,
+      channelDbId: channelData.id,
       title: video.title,
       views: video.views,
       likes: video.likes,
