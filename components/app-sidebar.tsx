@@ -87,12 +87,12 @@ const collapsibleSections: CollapsibleSection[] = [
       },
       {
         title: "New Benchmark",
-        href: "/benchmark/channels-v2",
+        href: "/benchmark/new-channel-benchmark",
         icon: Target,
       },
       {
         title: "Radar",
-        href: "/radar",
+        href: "/benchmark/radar",
         icon: Radar,
       },
     ],
