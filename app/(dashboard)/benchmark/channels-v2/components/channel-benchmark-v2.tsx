@@ -13,6 +13,7 @@ interface BenchmarkHistoryItem {
   channel_id: string
   overall_status: 'completed' | 'processing' | 'failed' | 'pending'
   created_at: string
+  benchmark_channels: { id: number } | null
 }
 
 interface ChannelBenchmarkV2Props {
@@ -272,30 +273,44 @@ export function ChannelBenchmarkV2({ initialHistory }: ChannelBenchmarkV2Props) 
                   No benchmarks yet
                 </div>
               ) : (
-                history.slice(0, 10).map((item) => (
-                  <div
-                    key={item.id}
-                    className="bg-accent hover:bg-accent/70 rounded-lg p-3 cursor-pointer transition-colors border border-border"
-                  >
-                    <div className="flex items-start justify-between mb-1.5">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm text-foreground truncate">
-                          {item.channel_id}
+                history.slice(0, 10).map((item) => {
+                  const isClickable = item.benchmark_channels !== null
+                  const handleClick = () => {
+                    if (isClickable && item.benchmark_channels) {
+                      router.push(`/benchmark/channels/${item.benchmark_channels.id}`)
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={handleClick}
+                      className={`bg-accent rounded-lg p-3 transition-all border ${
+                        isClickable
+                          ? 'cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 hover:border-primary/50 dark:hover:border-blue-400 hover:shadow-lg dark:hover:shadow-blue-500/20'
+                          : 'cursor-default opacity-70 border-border'
+                      } ${isClickable ? 'border-border' : ''}`}
+                    >
+                      <div className="flex items-start justify-between mb-1.5">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-foreground truncate">
+                            {item.channel_id}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate mt-0.5">
+                            Task #{item.id}
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground truncate mt-0.5">
-                          Task #{item.id}
-                        </div>
+                        {getStatusBadge(item.overall_status)}
                       </div>
-                      {getStatusBadge(item.overall_status)}
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {formatRelativeTime(item.created_at)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {formatRelativeTime(item.created_at)}
-                      </span>
-                    </div>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           </div>
@@ -496,7 +511,7 @@ export function ChannelBenchmarkV2({ initialHistory }: ChannelBenchmarkV2Props) 
                 <div className="flex items-center justify-center gap-3">
                   {channelPreview && (
                     <button
-                      onClick={() => router.push(`/channels/${channelPreview.id}`)}
+                      onClick={() => router.push(`/benchmark/channels/${channelPreview.id}`)}
                       className="bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 rounded-md transition-colors flex items-center gap-2"
                     >
                       <ExternalLink className="w-4 h-4" />

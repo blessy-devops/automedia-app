@@ -448,7 +448,7 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
                     </td>
                     <td className="px-4 py-4 text-sm text-foreground max-w-xl">
                       <Link
-                        href={`/videos/${video.id}`}
+                        href={`/benchmark/videos/${video.id}`}
                         className="hover:underline line-clamp-2"
                       >
                         {video.title || "Untitled"}
@@ -457,7 +457,7 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
                     <td className="px-4 py-4 text-sm">
                       {video.channelDbId ? (
                         <Link
-                          href={`/channels/${video.channelDbId}`}
+                          href={`/benchmark/channels/${video.channelDbId}`}
                           className="text-primary hover:text-primary/80 hover:underline transition-colors"
                         >
                           @{video.channelName || "-"}

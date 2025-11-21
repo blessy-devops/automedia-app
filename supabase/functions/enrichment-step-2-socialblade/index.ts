@@ -45,22 +45,108 @@ Deno.serve(async (req) => {
       .eq('id', taskId)
 
     // ========================================================================
-    // STEP 2: Scrape Social Blade using V2 scraper
+    // STEP 2: Scrape Social Blade using V2 scraper (non-blocking on failure)
     // ========================================================================
     console.log('[Step 2: SocialBlade] Calling SocialBlade scraper V2...')
 
-    const scrapedData = await scrapeSocialBladeV2(channelId)
+    let scrapedData = null
+    let socialBladeAvailable = true
 
-    console.log(`[Step 2: SocialBlade] Received ${scrapedData.dailyStats.length} days of data`)
-
-    // ========================================================================
-    // STEP 3: Extract metrics from scraped data (already calculated by V2)
-    // ========================================================================
-    const { aggregated, dailyStats } = scrapedData
-
-    if (dailyStats.length === 0) {
-      throw new Error('No daily stats returned from scraper')
+    try {
+      scrapedData = await scrapeSocialBladeV2(channelId)
+      if (scrapedData) {
+        console.log(`[Step 2: SocialBlade] Received ${scrapedData.dailyStats.length} days of data`)
+      } else {
+        console.warn('[Step 2: SocialBlade] Scraper returned null - channel may be too small or not indexed')
+        socialBladeAvailable = false
+      }
+    } catch (scrapeError) {
+      console.warn('[Step 2: SocialBlade] ⚠️  Scraping failed - channel may be too new or not indexed in Social Blade')
+      console.warn('[Step 2: SocialBlade] Error details:', scrapeError instanceof Error ? scrapeError.message : scrapeError)
+      socialBladeAvailable = false
     }
+
+    // ========================================================================
+    // STEP 3: Handle Social Blade unavailability (skip but continue pipeline)
+    // ========================================================================
+    if (!socialBladeAvailable || !scrapedData || !scrapedData.dailyStats || scrapedData.dailyStats.length === 0) {
+      console.log('[Step 2: SocialBlade] No Social Blade data available - creating empty baseline record and continuing pipeline')
+
+      // Create empty baseline stats record to maintain data consistency
+      const { error: emptyUpsertError } = await supabase
+        .from('benchmark_channels_baseline_stats')
+        .upsert({
+          channel_id: channelId,
+          is_available: false,
+          total_views_14d: null,
+          videos_count_14d: null,
+          avg_views_per_video_14d: null,
+          avg_views_per_video_historical: null,
+          media_diaria_views_14d: null,
+          taxa_crescimento: null,
+          calculated_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'channel_id'
+        })
+
+      if (emptyUpsertError) {
+        console.error('[Step 2: SocialBlade] Error creating empty baseline record:', emptyUpsertError)
+        // Don't throw - we can continue without baseline stats
+      }
+
+      // Mark task as 'skipped' (not failed - this is expected for new channels)
+      await supabase
+        .from('channel_enrichment_tasks')
+        .update({
+          socialblade_status: 'skipped',
+          socialblade_available: false,
+          socialblade_completed_at: new Date().toISOString(),
+          socialblade_result: {
+            message: 'Social Blade data not available (channel too new or not indexed)',
+            skipped: true,
+          },
+        })
+        .eq('id', taskId)
+
+      // CRITICAL: Continue to Step 3 despite Social Blade failure
+      console.log('[Step 2: SocialBlade] Invoking Step 3: Recent Videos (despite Social Blade skip)')
+
+      const nextStepResponse = await supabase.functions.invoke('enrichment-step-3-recent-videos', {
+        body: { channelId, taskId },
+      })
+
+      if (nextStepResponse.error) {
+        console.error('[Step 2: SocialBlade] Error invoking Step 3:', nextStepResponse.error)
+      }
+
+      console.log('[Step 2: SocialBlade] Completed with Social Blade skipped - pipeline continues')
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Social Blade skipped, pipeline continues',
+          channelId,
+          taskId,
+          socialBladeAvailable: false,
+        }),
+        {
+          headers: { 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      )
+    }
+
+    // ========================================================================
+    // STEP 4: Extract metrics from scraped data (already calculated by V2)
+    // ========================================================================
+    // Defensive null check to prevent crashes
+    if (!scrapedData || !scrapedData.aggregated || !scrapedData.dailyStats) {
+      console.error('[Step 2: SocialBlade] Invalid scraper response - missing required fields')
+      throw new Error('Scraper returned invalid data structure')
+    }
+
+    const { aggregated, dailyStats } = scrapedData
 
     // Use aggregated metrics from V2 scraper
     const totalSubscribers14d = aggregated.totalSubscribers
@@ -129,6 +215,7 @@ Deno.serve(async (req) => {
       .from('benchmark_channels_baseline_stats')
       .upsert({
         channel_id: channelId,
+        is_available: true, // Social Blade data successfully retrieved
         total_views_14d: totalViews14d,
         videos_count_14d: videosCount14d,
         avg_views_per_video_14d: avgViewsPerVideo14d,
@@ -155,6 +242,7 @@ Deno.serve(async (req) => {
       .from('channel_enrichment_tasks')
       .update({
         socialblade_status: 'completed',
+        socialblade_available: true, // Data successfully retrieved
         socialblade_completed_at: new Date().toISOString(),
         socialblade_result: {
           totalSubscribers14d,
@@ -207,33 +295,73 @@ Deno.serve(async (req) => {
       }
     )
   } catch (error) {
-    console.error('[Step 2: SocialBlade] Error:', error)
+    console.error('[Step 2: SocialBlade] Unexpected error:', error)
 
-    // Update task status to failed
+    // Update task status to skipped (not failed - we want pipeline to continue)
     if (taskId) {
+      // Retry logic to ensure status update succeeds (prevents stuck "processing" state)
+      let updateSuccess = false
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const { error: updateError } = await supabase
+            .from('channel_enrichment_tasks')
+            .update({
+              socialblade_status: 'skipped',
+              socialblade_available: false,
+              socialblade_error: error instanceof Error ? error.message : 'Unknown error',
+              socialblade_completed_at: new Date().toISOString(),
+            })
+            .eq('id', taskId)
+
+          if (!updateError) {
+            console.log(`[Step 2: SocialBlade] Status updated to 'skipped' on attempt ${attempt}`)
+            updateSuccess = true
+            break
+          }
+
+          console.error(`[Step 2: SocialBlade] Update attempt ${attempt} failed:`, updateError)
+          if (attempt < 3) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+          }
+        } catch (updateError) {
+          console.error(`[Step 2: SocialBlade] Update attempt ${attempt} threw error:`, updateError)
+          if (attempt < 3) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+          }
+        }
+      }
+
+      if (!updateSuccess) {
+        console.error('[Step 2: SocialBlade] ⚠️  CRITICAL: Failed to update status after 3 attempts - task may be stuck!')
+      }
+
+      // Try to continue pipeline even after unexpected error
+      console.log('[Step 2: SocialBlade] Attempting to continue pipeline despite error...')
       try {
-        await supabase
-          .from('channel_enrichment_tasks')
-          .update({
-            socialblade_status: 'failed',
-            socialblade_error: error instanceof Error ? error.message : 'Unknown error',
-            socialblade_completed_at: new Date().toISOString(),
-          })
-          .eq('id', taskId)
-      } catch (updateError) {
-        console.error('[Step 2: SocialBlade] Failed to update error status:', updateError)
+        const nextStepResponse = await supabase.functions.invoke('enrichment-step-3-recent-videos', {
+          body: { channelId, taskId },
+        })
+        if (nextStepResponse.error) {
+          console.error('[Step 2: SocialBlade] Error invoking Step 3:', nextStepResponse.error)
+        } else {
+          console.log('[Step 2: SocialBlade] Successfully invoked Step 3 despite error')
+        }
+      } catch (invokeError) {
+        console.error('[Step 2: SocialBlade] Could not invoke Step 3:', invokeError)
       }
     }
 
+    // Return success (200) to prevent blocking - pipeline should continue
     return new Response(
       JSON.stringify({
-        success: false,
+        success: true, // Changed from false - we want pipeline to continue
+        socialBladeAvailable: false,
+        warning: 'Social Blade step encountered error but pipeline continues',
         error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
       }),
       {
         headers: { 'Content-Type': 'application/json' },
-        status: 500,
+        status: 200, // Changed from 500 - non-blocking
       }
     )
   }

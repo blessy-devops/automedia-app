@@ -86,7 +86,7 @@ function parseNumber(text: string): number {
  * @returns Scraped daily statistics for the last 14 days
  * @throws Error if scraping fails or channel not found
  */
-export async function scrapeSocialBladeV2(channelId: string): Promise<SocialBladeData> {
+export async function scrapeSocialBladeV2(channelId: string): Promise<SocialBladeData | null> {
   console.log(`[SocialBlade V2] Starting scrape for channel: ${channelId}`)
 
   // Validate channel ID
@@ -108,6 +108,11 @@ export async function scrapeSocialBladeV2(channelId: string): Promise<SocialBlad
     })
 
     if (!response.ok) {
+      // Return null for 404 (channel not found) instead of throwing
+      if (response.status === 404) {
+        console.warn(`[SocialBlade V2] Channel not found (HTTP 404) - returning null`)
+        return null
+      }
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
 
@@ -126,7 +131,8 @@ export async function scrapeSocialBladeV2(channelId: string): Promise<SocialBlad
     const tables = doc.querySelectorAll('table')
 
     if (!tables || tables.length === 0) {
-      throw new Error(`No statistics table found for channel ${channelId}. Channel may not exist or be private.`)
+      console.warn(`[SocialBlade V2] No statistics table found for channel ${channelId} - channel may be too small or new`)
+      return null
     }
 
     // Get the first table (daily stats)
@@ -193,7 +199,8 @@ export async function scrapeSocialBladeV2(channelId: string): Promise<SocialBlad
     console.log(`[SocialBlade V2] Successfully extracted ${dailyStats.length} days of statistics`)
 
     if (dailyStats.length === 0) {
-      throw new Error('No valid statistics found in table')
+      console.warn('[SocialBlade V2] No valid statistics found in table - channel may be too small or new')
+      return null
     }
 
     // Calculate aggregated metrics

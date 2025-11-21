@@ -379,9 +379,35 @@ export async function undoDistribution(
     }
 
     // ========================================================================
-    // Step 2: Delete production jobs created from this distribution
+    // Step 2: Validate ALL production jobs are still in 'queued' status
     // ========================================================================
     if (productionJobIds.length > 0) {
+      const { data: jobs, error: jobsError } = await gobbiClient
+        .from('production_videos')
+        .select('id, status')
+        .in('id', productionJobIds)
+
+      if (jobsError) {
+        console.error('[undoDistribution] Error fetching production jobs:', jobsError)
+        return { success: false, error: jobsError.message }
+      }
+
+      // Check if any job has started production (status !== 'queued')
+      const jobsInProduction = jobs.filter(job => job.status !== 'queued')
+
+      if (jobsInProduction.length > 0) {
+        const channelWord = jobsInProduction.length === 1 ? 'channel' : 'channels'
+        console.error(
+          `[undoDistribution] Cannot undo: ${jobsInProduction.length} job(s) already in production`,
+          jobsInProduction.map(j => ({ id: j.id, status: j.status }))
+        )
+        return {
+          success: false,
+          error: `Cannot undo: this video has already begun production for ${jobsInProduction.length} ${channelWord}.`,
+        }
+      }
+
+      // All jobs are still in 'queued', safe to delete
       const { error: deleteError } = await gobbiClient
         .from('production_videos')
         .delete()
@@ -479,6 +505,125 @@ export async function restoreVideoToQueue(
     console.error('[restoreVideoToQueue] Unexpected error:', error)
     return {
       success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }
+  }
+}
+
+// ============================================================================
+// Server Action 7: Get Distributed Videos (for "Distributed" tab)
+// ============================================================================
+
+interface DistributedVideo {
+  id: number
+  title: string
+  youtube_video_id: string
+  youtube_url: string
+  distributed_at: string
+  can_undo: boolean // True if all production jobs are still in 'queued' status
+  status_summary: {
+    queued: number
+    processing: number
+    completed: number
+    failed: number
+  }
+  channels: Array<{
+    placeholder: string
+    production_video_id: number
+    status: string
+  }>
+}
+
+export async function getDistributedVideos(options: {
+  offset?: number
+  limit?: number
+} = {}): Promise<{
+  videos: DistributedVideo[]
+  totalCount: number
+  hasMore: boolean
+  error: string | null
+}> {
+  ensureServerSide()
+
+  const { offset = 0, limit = 20 } = options
+
+  try {
+    // Call optimized RPC function (using new name to avoid audit trigger conflict)
+    const { data, error: rpcError } = await gobbiClient.rpc(
+      'get_distributed_videos_with_status',
+      {
+        p_offset: offset,
+        p_limit: limit,
+      }
+    )
+
+    if (rpcError) {
+      console.error('[getDistributedVideos] RPC error:', rpcError)
+      return { videos: [], totalCount: 0, hasMore: false, error: rpcError.message }
+    }
+
+    if (!data) {
+      return { videos: [], totalCount: 0, hasMore: false, error: null }
+    }
+
+    // RPC returns { videos: [...], totalCount: number, hasMore: boolean }
+    const result = data as {
+      videos: Array<{
+        id: number
+        title: string
+        youtube_video_id: string
+        youtube_url: string
+        distributed_at: string
+        can_undo: boolean
+        status_summary: {
+          queued: number
+          processing: number
+          completed: number
+          failed: number
+        }
+        production_videos: Array<{
+          id: number
+          placeholder: string
+          status: string
+          distributed_at: string
+        }>
+      }>
+      totalCount: number
+      hasMore: boolean
+    }
+
+    // Transform to match interface
+    const videos: DistributedVideo[] = result.videos.map((video) => ({
+      id: video.id,
+      title: video.title,
+      youtube_video_id: video.youtube_video_id,
+      youtube_url: video.youtube_url,
+      distributed_at: video.distributed_at,
+      can_undo: video.can_undo,
+      status_summary: video.status_summary,
+      channels: video.production_videos.map((pv) => ({
+        placeholder: pv.placeholder || 'Unknown',
+        production_video_id: pv.id,
+        status: pv.status,
+      })),
+    }))
+
+    console.log(
+      `[getDistributedVideos] Fetched ${videos.length} videos via RPC (offset: ${offset}, total: ${result.totalCount}, hasMore: ${result.hasMore})`
+    )
+
+    return {
+      videos,
+      totalCount: result.totalCount,
+      hasMore: result.hasMore,
+      error: null,
+    }
+  } catch (error) {
+    console.error('[getDistributedVideos] Unexpected error:', error)
+    return {
+      videos: [],
+      totalCount: 0,
+      hasMore: false,
       error: error instanceof Error ? error.message : 'Unknown error',
     }
   }

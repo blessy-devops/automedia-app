@@ -243,7 +243,7 @@ export function SimpleVideosTable({ data, folders = [], currentFolderId }: Simpl
                     </TableCell>
                     <TableCell className="font-medium">
                       <Link
-                        href={`/videos/${video.id}`}
+                        href={`/benchmark/videos/${video.id}`}
                         className="hover:underline line-clamp-2"
                       >
                         {video.title || "Untitled"}

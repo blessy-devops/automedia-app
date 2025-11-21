@@ -296,7 +296,7 @@ export function RadarPageClient({ initialChannels }: RadarPageClientProps) {
 
             {/* Add Channel Button */}
             <Button asChild>
-              <Link href="/channels">
+              <Link href="/benchmark/channels">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Channels
               </Link>
@@ -346,7 +346,7 @@ export function RadarPageClient({ initialChannels }: RadarPageClientProps) {
             <div className="text-center space-y-3">
               <p className="text-muted-foreground">No channels in radar yet</p>
               <Button asChild>
-                <Link href="/channels">
+                <Link href="/benchmark/channels">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Your First Channel
                 </Link>

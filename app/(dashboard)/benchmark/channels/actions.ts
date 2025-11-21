@@ -1,167 +1,252 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { revalidatePath } from 'next/cache'
+
+interface ActionResult<T = unknown> {
+  success: boolean
+  data?: T
+  error?: string
+}
+
+interface ChannelDependencies {
+  videosCount: number
+  baselineStatsCount: number
+  radarEntriesCount: number
+  hasAnyDependencies: boolean
+}
 
 /**
- * Server Action: Start Channel Benchmark
- *
- * Creates a new enrichment job and task, then triggers the Edge Function pipeline.
- *
- * This action:
- * 1. Creates an enrichment job record
- * 2. Creates an enrichment task with 'pending' status
- * 3. Invokes the enrichment-pipeline-starter Edge Function
- * 4. Returns immediately (non-blocking)
- *
- * @param channelId - The YouTube Channel ID to benchmark
- * @returns Object with success status, jobId, taskId, and optional error message
+ * Get channel dependencies (videos, baseline stats, radar entries)
+ * Used to show warnings before deletion
  */
-export async function startChannelBenchmark(channelId: string) {
+export async function getChannelDependencies(
+  channelId: string
+): Promise<ActionResult<ChannelDependencies>> {
   try {
-    // Validate channel ID
-    if (!channelId || channelId.trim().length === 0) {
-      return {
-        success: false,
-        error: 'Channel ID is required',
-      }
-    }
-
-    // Sanitize channel ID
-    const sanitizedChannelId = channelId.trim()
-
-    console.log(`[Benchmark] Starting benchmark for channel: ${sanitizedChannelId}`)
-
-    // Step 1: Create enrichment job using Supabase client
     const supabase = await createClient()
 
-    const { data: job, error: jobError } = await supabase
-      .from('channel_enrichment_jobs')
-      .insert({
-        channel_ids: [sanitizedChannelId],
-        total_channels: 1,
-        channels_completed: 0,
-        channels_failed: 0,
-        status: 'pending',
-      })
-      .select()
-      .single()
+    // Count dependencies in parallel
+    const [videosResult, statsResult, radarResult] = await Promise.all([
+      // Count videos
+      supabase
+        .from('benchmark_videos')
+        .select('*', { count: 'exact', head: true })
+        .eq('channel_id', channelId),
 
-    if (jobError || !job) {
-      console.error('[Benchmark] Error creating job:', jobError)
-      return {
-        success: false,
-        error: 'Failed to create enrichment job',
-      }
-    }
+      // Count baseline stats
+      supabase
+        .from('benchmark_channels_baseline_stats')
+        .select('*', { count: 'exact', head: true })
+        .eq('channel_id', channelId),
 
-    console.log(`[Benchmark] Created job #${job.id}`)
+      // Count radar entries
+      supabase
+        .from('channel_radar')
+        .select('*', { count: 'exact', head: true })
+        .eq('channel_id', channelId),
+    ])
 
-    // Step 2: Create enrichment task
-    const { data: task, error: taskError } = await supabase
-      .from('channel_enrichment_tasks')
-      .insert({
-        enrichment_job_id: job.id,
-        channel_id: sanitizedChannelId,
-        overall_status: 'pending',
-        retry_count: 0,
-      })
-      .select()
-      .single()
-
-    if (taskError || !task) {
-      console.error('[Benchmark] Error creating task:', taskError)
-      return {
-        success: false,
-        error: 'Failed to create enrichment task',
-      }
-    }
-
-    console.log(`[Benchmark] Created task #${task.id} for channel ${sanitizedChannelId}`)
-
-    // Step 3: Invoke Edge Function to start the pipeline
-    try {
-      const adminClient = createAdminClient()
-
-      console.log(`[Benchmark] Invoking enrichment-pipeline-starter for task #${task.id}`)
-
-      // Invoke Edge Function without waiting (fire and forget)
-      const { error: invokeError } = await adminClient.functions.invoke(
-        'enrichment-pipeline-starter',
-        {
-          body: {
-            channelId: sanitizedChannelId,
-            taskId: task.id,
-          },
-        }
-      )
-
-      if (invokeError) {
-        console.error('[Benchmark] Error invoking Edge Function:', invokeError)
-        // Don't fail the entire operation, just log it
-        // The task is created and can be retried manually
-      } else {
-        console.log(`[Benchmark] Edge Function invoked successfully for task #${task.id}`)
-      }
-    } catch (invokeError) {
-      console.error('[Benchmark] Exception invoking Edge Function:', invokeError)
-      // Continue - task is created and can be processed later
-    }
+    const videosCount = videosResult.count || 0
+    const baselineStatsCount = statsResult.count || 0
+    const radarEntriesCount = radarResult.count || 0
 
     return {
       success: true,
-      jobId: job.id,
-      taskId: task.id,
-      message: `Benchmark pipeline started for channel ${sanitizedChannelId}`,
+      data: {
+        videosCount,
+        baselineStatsCount,
+        radarEntriesCount,
+        hasAnyDependencies: videosCount > 0 || baselineStatsCount > 0 || radarEntriesCount > 0,
+      },
     }
   } catch (error) {
-    console.error('[Benchmark] Error starting benchmark:', error)
-
+    console.error('[getChannelDependencies] Error:', error)
     return {
       success: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : 'An unexpected error occurred while starting the benchmark',
+      error: error instanceof Error ? error.message : 'Failed to get channel dependencies',
     }
   }
 }
 
 /**
- * Server Action: Get Enrichment Job Status
+ * Delete a single channel and optionally its related data
  *
- * Retrieves the current status of an enrichment job.
- *
- * @param jobId - The enrichment job ID
- * @returns Object with job details and status
+ * @param id - Channel database ID
+ * @param cascade - If true, deletes videos, baseline stats, and radar entries
  */
-export async function getEnrichmentJobStatus(jobId: number) {
+export async function deleteChannel(
+  id: number,
+  cascade: boolean = false
+): Promise<ActionResult> {
   try {
     const supabase = await createClient()
 
-    const { data: job, error } = await supabase
-      .from('channel_enrichment_jobs')
-      .select('*')
-      .eq('id', jobId)
+    // Get the channel first to retrieve channel_id
+    const { data: channel, error: fetchError } = await supabase
+      .from('benchmark_channels')
+      .select('channel_id, channel_name')
+      .eq('id', id)
       .single()
 
-    if (error || !job) {
+    if (fetchError || !channel) {
       return {
         success: false,
-        error: 'Job not found',
+        error: 'Channel not found',
       }
     }
 
-    return {
-      success: true,
-      job,
+    const channelId = channel.channel_id
+
+    // Check dependencies
+    const depsResult = await getChannelDependencies(channelId)
+    if (!depsResult.success || !depsResult.data) {
+      return {
+        success: false,
+        error: 'Failed to check channel dependencies',
+      }
     }
-  } catch (error) {
-    console.error('[Benchmark] Error fetching job status:', error)
+
+    const deps = depsResult.data
+
+    // If has dependencies and cascade is false, return error
+    if (deps.hasAnyDependencies && !cascade) {
+      return {
+        success: false,
+        error: `Cannot delete channel with ${deps.videosCount} videos, ${deps.baselineStatsCount} baseline stats, and ${deps.radarEntriesCount} radar entries. Enable cascade delete to remove all related data.`,
+      }
+    }
+
+    // If cascade is true, delete related data first (in order)
+    if (cascade) {
+      // 1. Delete videos
+      if (deps.videosCount > 0) {
+        const { error: videosError } = await supabase
+          .from('benchmark_videos')
+          .delete()
+          .eq('channel_id', channelId)
+
+        if (videosError) {
+          console.error('[deleteChannel] Error deleting videos:', videosError)
+          return {
+            success: false,
+            error: 'Failed to delete channel videos',
+          }
+        }
+      }
+
+      // 2. Delete baseline stats
+      if (deps.baselineStatsCount > 0) {
+        const { error: statsError } = await supabase
+          .from('benchmark_channels_baseline_stats')
+          .delete()
+          .eq('channel_id', channelId)
+
+        if (statsError) {
+          console.error('[deleteChannel] Error deleting baseline stats:', statsError)
+          return {
+            success: false,
+            error: 'Failed to delete channel baseline stats',
+          }
+        }
+      }
+
+      // 3. Delete radar entries (has CASCADE on FK, but delete explicitly for consistency)
+      if (deps.radarEntriesCount > 0) {
+        const { error: radarError } = await supabase
+          .from('channel_radar')
+          .delete()
+          .eq('channel_id', channelId)
+
+        if (radarError) {
+          console.error('[deleteChannel] Error deleting radar entries:', radarError)
+          // Not critical, FK cascade should handle it
+        }
+      }
+    }
+
+    // 4. Finally, delete the channel itself
+    const { error: deleteError } = await supabase
+      .from('benchmark_channels')
+      .delete()
+      .eq('id', id)
+
+    if (deleteError) {
+      console.error('[deleteChannel] Error deleting channel:', deleteError)
+      return {
+        success: false,
+        error: 'Failed to delete channel',
+      }
+    }
+
+    // Revalidate the channels page
+    revalidatePath('/channels')
 
     return {
+      success: true,
+      data: {
+        channelName: channel.channel_name,
+        deletedDependencies: cascade ? deps : null,
+      },
+    }
+  } catch (error) {
+    console.error('[deleteChannel] Error:', error)
+    return {
       success: false,
-      error: 'Failed to fetch job status',
+      error: error instanceof Error ? error.message : 'Failed to delete channel',
+    }
+  }
+}
+
+/**
+ * Delete multiple channels in bulk
+ *
+ * @param ids - Array of channel database IDs
+ * @param cascade - If true, deletes all related data for each channel
+ */
+export async function bulkDeleteChannels(
+  ids: number[],
+  cascade: boolean = false
+): Promise<ActionResult<{ deleted: number; failed: number; errors: string[] }>> {
+  try {
+    if (!ids || ids.length === 0) {
+      return {
+        success: false,
+        error: 'No channels selected for deletion',
+      }
+    }
+
+    let deleted = 0
+    let failed = 0
+    const errors: string[] = []
+
+    // Delete channels one by one (could be optimized with batch operations)
+    for (const id of ids) {
+      const result = await deleteChannel(id, cascade)
+      if (result.success) {
+        deleted++
+      } else {
+        failed++
+        errors.push(`Channel ID ${id}: ${result.error}`)
+      }
+    }
+
+    // Revalidate once at the end
+    revalidatePath('/channels')
+
+    return {
+      success: true,
+      data: {
+        deleted,
+        failed,
+        errors,
+      },
+    }
+  } catch (error) {
+    console.error('[bulkDeleteChannels] Error:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to bulk delete channels',
     }
   }
 }

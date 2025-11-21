@@ -37,7 +37,7 @@ export function GalleryView({ videos }: GalleryViewProps) {
       {videos.map((video) => (
         <Link
           key={video.id}
-          href={`/videos/${video.youtubeVideoId}`}
+          href={`/benchmark/videos/${video.youtubeVideoId}`}
           className="group"
         >
           <Card className="h-full overflow-hidden border-2 hover:border-primary/50 transition-all duration-200">

@@ -1,0 +1,4 @@
+{
+  "schedule": "0 6 * * *",
+  "description": "Daily radar update at 6 AM UTC"
+}

@@ -47,7 +47,7 @@ export function CloneTheseNow({ videos }: CloneTheseNowProps) {
             >
               {/* Thumbnail */}
               <Link
-                href={`/videos/${video.youtube_video_id}`}
+                href={`/benchmark/videos/${video.youtube_video_id}`}
                 className="relative flex-shrink-0 w-32 h-18 rounded overflow-hidden bg-slate-100"
               >
                 {video.thumbnail_url ? (
@@ -68,7 +68,7 @@ export function CloneTheseNow({ videos }: CloneTheseNowProps) {
               {/* Content */}
               <div className="flex-1 min-w-0">
                 <Link
-                  href={`/videos/${video.youtube_video_id}`}
+                  href={`/benchmark/videos/${video.youtube_video_id}`}
                   className="block"
                 >
                   <h4 className="font-medium text-sm line-clamp-2 hover:underline">
