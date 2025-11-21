@@ -358,11 +358,6 @@ export function AppSidebar() {
                       <Link href={item.href} className="flex items-center gap-3">
                         <ItemIcon className="w-4 h-4 flex-shrink-0" />
                         <span className="text-sm">{item.title}</span>
-                        {item.isPlaceholder && (
-                          <span className="ml-auto text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-foreground text-background">
-                            NEW
-                          </span>
-                        )}
                       </Link>
                     </SidebarMenuButton>
                   )
@@ -418,11 +413,6 @@ export function AppSidebar() {
                       <Link href={item.href} className="flex items-center gap-3">
                         <ItemIcon className="w-4 h-4 flex-shrink-0" />
                         <span className="text-sm">{item.title}</span>
-                        {item.isPlaceholder && (
-                          <span className="ml-auto text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-foreground text-background">
-                            NEW
-                          </span>
-                        )}
                       </Link>
                     </SidebarMenuButton>
                   )
@@ -463,11 +453,6 @@ export function AppSidebar() {
                       <Link href={item.href} className="flex items-center gap-3">
                         <ItemIcon className="w-4 h-4 flex-shrink-0" />
                         <span className="text-sm">{item.title}</span>
-                        {item.isPlaceholder && (
-                          <span className="ml-auto text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-foreground text-background">
-                            NEW
-                          </span>
-                        )}
                       </Link>
                     </SidebarMenuButton>
                   )
@@ -523,11 +508,6 @@ export function AppSidebar() {
                       <Link href={item.href} className="flex items-center gap-3">
                         <ItemIcon className="w-4 h-4 flex-shrink-0" />
                         <span className="text-sm">{item.title}</span>
-                        {item.isPlaceholder && (
-                          <span className="ml-auto text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-foreground text-background">
-                            NEW
-                          </span>
-                        )}
                       </Link>
                     </SidebarMenuButton>
                   )
