@@ -2,10 +2,11 @@
 
 /**
  * My Channels Client Component
- * Displays and manages user's YouTube channels
+ * Displays and manages user's YouTube channels with Grid and List views
  */
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,7 +20,9 @@ import {
   Eye,
   Clock,
   Settings,
-  ExternalLink
+  ExternalLink,
+  Grid3x3,
+  List
 } from 'lucide-react'
 import type { Channel, ChannelStatus } from '../types'
 
@@ -27,8 +30,12 @@ interface MyChannelsClientProps {
   channels: Channel[]
 }
 
+type ViewMode = 'grid' | 'list'
+
 export function MyChannelsClient({ channels }: MyChannelsClientProps) {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
 
   // Filter channels by search query
   const filteredChannels = channels.filter(channel =>
@@ -52,8 +59,7 @@ export function MyChannelsClient({ channels }: MyChannelsClientProps) {
   }
 
   const handleChannelClick = (channelId: number) => {
-    // TODO: Navigate to channel detail page
-    console.log('Navigate to channel:', channelId)
+    router.push(`/channels/${channelId}`)
   }
 
   const handleNewChannel = () => {
@@ -66,7 +72,7 @@ export function MyChannelsClient({ channels }: MyChannelsClientProps) {
       {/* Header */}
       <div className="border-b border-border bg-card">
         <div className="p-8">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between">
             <div>
               <h1 className="text-foreground mb-2">My Channels</h1>
               <p className="text-muted-foreground">
@@ -78,8 +84,13 @@ export function MyChannelsClient({ channels }: MyChannelsClientProps) {
               New Channel
             </Button>
           </div>
+        </div>
+      </div>
 
-          {/* Search */}
+      {/* Content */}
+      <div className="p-8">
+        {/* Search and View Toggle */}
+        <div className="flex items-center justify-between mb-6">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -87,16 +98,33 @@ export function MyChannelsClient({ channels }: MyChannelsClientProps) {
               placeholder="Search channels..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 bg-background border-border w-[400px]"
             />
           </div>
-        </div>
-      </div>
 
-      {/* Channels Grid */}
-      <div className="p-8">
+          {/* View Toggle */}
+          <div className="flex items-center gap-1 border border-border rounded-md p-1">
+            <Button
+              variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('grid')}
+              className="gap-2"
+            >
+              <Grid3x3 className="w-4 h-4" />
+              Grid
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('list')}
+              className="gap-2"
+            >
+              <List className="w-4 h-4" />
+              List
+            </Button>
+          </div>
+        </div>
         {filteredChannels.length === 0 ? (
-          /* Empty State */
           <div className="text-center py-12">
             <Video className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-foreground mb-2">No channels found</h3>
@@ -107,7 +135,7 @@ export function MyChannelsClient({ channels }: MyChannelsClientProps) {
               Clear Search
             </Button>
           </div>
-        ) : (
+        ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredChannels.map((channel) => (
               <Card
@@ -206,6 +234,99 @@ export function MyChannelsClient({ channels }: MyChannelsClientProps) {
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                     </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredChannels.map((channel) => (
+              <Card
+                key={channel.id}
+                className="group hover:shadow-lg transition-all cursor-pointer"
+                onClick={() => handleChannelClick(channel.id)}
+              >
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-6">
+                    {/* Avatar and Info */}
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <img
+                        src={channel.avatar}
+                        alt={channel.name}
+                        className="w-16 h-16 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: channel.color }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-1">
+                          <h3 className="font-medium text-foreground truncate">
+                            {channel.name}
+                          </h3>
+                          {getStatusBadge(channel.status)}
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {channel.handle}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Metrics - Horizontal */}
+                    <div className="hidden lg:flex items-center gap-8">
+                      <div className="text-center">
+                        <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                          <Users className="w-3.5 h-3.5" />
+                          <span className="text-xs">Subscribers</span>
+                        </div>
+                        <span className="text-sm font-medium">{channel.subscribers}</span>
+                      </div>
+                      <div className="text-center">
+                        <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                          <Video className="w-3.5 h-3.5" />
+                          <span className="text-xs">Videos</span>
+                        </div>
+                        <span className="text-sm font-medium">{channel.totalVideos}</span>
+                      </div>
+                      <div className="text-center">
+                        <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                          <Eye className="w-3.5 h-3.5" />
+                          <span className="text-xs">Total Views</span>
+                        </div>
+                        <span className="text-sm font-medium">{channel.totalViews}</span>
+                      </div>
+                      <div className="text-center">
+                        <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                          <TrendingUp className="w-3.5 h-3.5" />
+                          <span className="text-xs">Avg Views</span>
+                        </div>
+                        <span className="text-sm font-medium">{channel.avgViews}</span>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleChannelClick(channel.id)
+                        }}
+                      >
+                        <Settings className="w-3.5 h-3.5" />
+                        Manage
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          window.open(`https://youtube.com/${channel.handle}`, '_blank')
+                        }}
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
