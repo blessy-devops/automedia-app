@@ -1,5 +1,16 @@
-import { UnderConstruction } from "@/components/under-construction"
+/**
+ * My Channels Page - Manage YouTube channels
+ */
 
-export default function ChannelsPage() {
-  return <UnderConstruction featureName="My Channels" />
+import { MyChannelsClient } from '@/features/my-channels/components/my-channels-client'
+import { myChannels } from '@/features/my-channels/lib/mock-data'
+
+export const dynamic = 'force-dynamic'
+
+export default async function ChannelsPage() {
+  // TODO: Fetch real data from Gobbi's database
+  // For now, using mock data
+  const channels = myChannels
+
+  return <MyChannelsClient channels={channels} />
 }

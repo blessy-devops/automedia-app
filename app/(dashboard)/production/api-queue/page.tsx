@@ -18,52 +18,59 @@ export default async function ApiQueuePage({ searchParams }: { searchParams: Sea
   const params = await searchParams
   const period = params.period || '7d'
 
-  // Calculate date cutoff based on period
-  const getCutoffDate = (period: string): string | null => {
-    const now = new Date()
-    switch (period) {
-      case '1h':
-        return new Date(now.getTime() - 1 * 60 * 60 * 1000).toISOString()
-      case '24h':
-        return new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
-      case '7d':
-        return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
-      case '30d':
-        return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
-      case 'all':
-      default:
-        return null
-    }
-  }
-
-  const cutoffDate = getCutoffDate(period)
-
-  // Fetch real data from enriched VIEW with period filter
-  let query = supabase
-    .from('vw_api_queue_enriched')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  // Apply period filter if not "all"
-  if (cutoffDate) {
-    query = query.gte('created_at', cutoffDate)
-  }
-
-  const { data: viewData, error } = await query.limit(500)
-
   let allJobs
 
-  if (error) {
-    console.error('Error fetching queue data:', error)
-    console.error('Error details:', JSON.stringify(error, null, 2))
-
-    // Fallback to mock data if VIEW query fails
-    console.log('Using mock data as fallback')
+  // If Gobbi client is not available (missing env vars), use mock data
+  if (!supabase) {
+    console.log('Gobbi Supabase not configured - using mock data')
     const { mockImageJobs, mockAudioJobs, mockVideoJobs } = await import('@/features/api-queue/lib/mock-data')
     allJobs = [...mockImageJobs, ...mockAudioJobs, ...mockVideoJobs]
   } else {
-    allJobs = mapViewRowsToApiQueueJobs(viewData || [])
-    console.log(`Loaded ${allJobs.length} jobs from database`)
+    // Calculate date cutoff based on period
+    const getCutoffDate = (period: string): string | null => {
+      const now = new Date()
+      switch (period) {
+        case '1h':
+          return new Date(now.getTime() - 1 * 60 * 60 * 1000).toISOString()
+        case '24h':
+          return new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
+        case '7d':
+          return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+        case '30d':
+          return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
+        case 'all':
+        default:
+          return null
+      }
+    }
+
+    const cutoffDate = getCutoffDate(period)
+
+    // Fetch real data from enriched VIEW with period filter
+    let query = supabase
+      .from('vw_api_queue_enriched')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    // Apply period filter if not "all"
+    if (cutoffDate) {
+      query = query.gte('created_at', cutoffDate)
+    }
+
+    const { data: viewData, error } = await query.limit(500)
+
+    if (error) {
+      console.error('Error fetching queue data:', error)
+      console.error('Error details:', JSON.stringify(error, null, 2))
+
+      // Fallback to mock data if VIEW query fails
+      console.log('Using mock data as fallback')
+      const { mockImageJobs, mockAudioJobs, mockVideoJobs } = await import('@/features/api-queue/lib/mock-data')
+      allJobs = [...mockImageJobs, ...mockAudioJobs, ...mockVideoJobs]
+    } else {
+      allJobs = mapViewRowsToApiQueueJobs(viewData || [])
+      console.log(`Loaded ${allJobs.length} jobs from database`)
+    }
   }
 
   // Separate jobs by type
