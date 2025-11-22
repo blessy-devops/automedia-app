@@ -6,6 +6,24 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 /**
+ * Helper function to calculate median from array of numbers
+ * @param values - Array of numeric values
+ * @returns Median value or null if array is empty
+ */
+function calculateMedian(values: number[]): number | null {
+  if (!values || values.length === 0) return null
+
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+
+  if (sorted.length % 2 === 0) {
+    return (sorted[mid - 1] + sorted[mid]) / 2
+  } else {
+    return sorted[mid]
+  }
+}
+
+/**
  * Enrichment Step 2: SocialBlade Metrics
  *
  * Orchestrates the Social Blade scraping process:
@@ -23,7 +41,7 @@ Deno.serve(async (req) => {
   try {
     console.log('[Step 2: SocialBlade] Starting SocialBlade metrics orchestration')
 
-    const { channelId, taskId: reqTaskId } = await req.json()
+    const { channelId, taskId: reqTaskId, radarUpdate } = await req.json()
     taskId = reqTaskId
 
     if (!channelId || !taskId) {
@@ -113,7 +131,7 @@ Deno.serve(async (req) => {
       console.log('[Step 2: SocialBlade] Invoking Step 3: Recent Videos (despite Social Blade skip)')
 
       const nextStepResponse = await supabase.functions.invoke('enrichment-step-3-recent-videos', {
-        body: { channelId, taskId },
+        body: { channelId, taskId, radarUpdate },
       })
 
       if (nextStepResponse.error) {
@@ -157,6 +175,10 @@ Deno.serve(async (req) => {
       ? aggregated.totalViews / aggregated.totalVideosPosted
       : 0
 
+    // Calculate median of daily views
+    const dailyViewsArray = dailyStats.map(day => day.views)
+    const medianaDiariaViews14d = calculateMedian(dailyViewsArray)
+
     // Calculate growth rate (taxa_crescimento)
     // Compare first half vs second half of the period
     let taxaCrescimento = 0
@@ -179,6 +201,7 @@ Deno.serve(async (req) => {
       videosCount14d,
       avgViewsPerVideo14d: avgViewsPerVideo14d.toFixed(2),
       mediaDiariaViews14d: mediaDiariaViews14d.toFixed(2),
+      medianaDiariaViews14d: medianaDiariaViews14d?.toFixed(2) || 'null',
       taxaCrescimento: taxaCrescimento.toFixed(2),
     })
 
@@ -221,6 +244,7 @@ Deno.serve(async (req) => {
         avg_views_per_video_14d: avgViewsPerVideo14d,
         avg_views_per_video_historical: avgViewsPerVideoHistorical,
         media_diaria_views_14d: mediaDiariaViews14d,
+        mediana_diaria_views_14d: medianaDiariaViews14d,
         taxa_crescimento: taxaCrescimento,
         calculated_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -263,7 +287,7 @@ Deno.serve(async (req) => {
     console.log('[Step 2: SocialBlade] Invoking Step 3: Recent Videos')
 
     const nextStepResponse = await supabase.functions.invoke('enrichment-step-3-recent-videos', {
-      body: { channelId, taskId },
+      body: { channelId, taskId, radarUpdate },
     })
 
     if (nextStepResponse.error) {
@@ -339,7 +363,7 @@ Deno.serve(async (req) => {
       console.log('[Step 2: SocialBlade] Attempting to continue pipeline despite error...')
       try {
         const nextStepResponse = await supabase.functions.invoke('enrichment-step-3-recent-videos', {
-          body: { channelId, taskId },
+          body: { channelId, taskId, radarUpdate },
         })
         if (nextStepResponse.error) {
           console.error('[Step 2: SocialBlade] Error invoking Step 3:', nextStepResponse.error)

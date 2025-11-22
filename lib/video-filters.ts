@@ -14,6 +14,10 @@ export interface VideoFilters {
   minOutlierScore?: number
   maxOutlierScore?: number
 
+  // Performance score range (14d from SocialBlade)
+  minPerformanceVsMedian14d?: number
+  minPerformanceVsAvg14d?: number
+
   // Video age range (in days)
   minVideoAgeDays?: number
   maxVideoAgeDays?: number
@@ -54,6 +58,10 @@ export function parseVideoFilters(searchParams: { [key: string]: string | string
     minOutlierScore: parseNumber(searchParams.minOutlierScore),
     maxOutlierScore: parseNumber(searchParams.maxOutlierScore),
 
+    // Performance score range (14d from SocialBlade)
+    minPerformanceVsMedian14d: parseNumber(searchParams.minPerformanceVsMedian14d),
+    minPerformanceVsAvg14d: parseNumber(searchParams.minPerformanceVsAvg14d),
+
     // Video age range (in days)
     minVideoAgeDays: parseNumber(searchParams.minVideoAgeDays),
     maxVideoAgeDays: parseNumber(searchParams.maxVideoAgeDays),
@@ -89,6 +97,14 @@ export function applyVideoFiltersToQuery(query: any, filters: VideoFilters) {
   }
   if (filters.maxOutlierScore !== undefined && !isNaN(filters.maxOutlierScore)) {
     query = query.lte('performance_vs_median_historical', filters.maxOutlierScore)
+  }
+
+  // Apply performance score filters (14d from SocialBlade)
+  if (filters.minPerformanceVsMedian14d !== undefined && !isNaN(filters.minPerformanceVsMedian14d)) {
+    query = query.gte('performance_vs_median_14d', filters.minPerformanceVsMedian14d)
+  }
+  if (filters.minPerformanceVsAvg14d !== undefined && !isNaN(filters.minPerformanceVsAvg14d)) {
+    query = query.gte('performance_vs_avg_14d', filters.minPerformanceVsAvg14d)
   }
 
   // Apply video age range filters (using video_age_days column)
@@ -146,6 +162,10 @@ export function countActiveFilters(filters: VideoFilters): number {
     // Outlier score range
     filters.minOutlierScore !== undefined && filters.minOutlierScore > 0,
     filters.maxOutlierScore !== undefined && filters.maxOutlierScore > 0,
+
+    // Performance score range (14d from SocialBlade)
+    filters.minPerformanceVsMedian14d !== undefined && filters.minPerformanceVsMedian14d > 0,
+    filters.minPerformanceVsAvg14d !== undefined && filters.minPerformanceVsAvg14d > 0,
 
     // Video age range
     filters.minVideoAgeDays !== undefined && filters.minVideoAgeDays >= 0,

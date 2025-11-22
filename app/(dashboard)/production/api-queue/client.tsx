@@ -5,6 +5,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import {
   RefreshCw,
   Play,
@@ -16,6 +17,8 @@ import {
   Eye,
   Zap,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -45,7 +48,10 @@ interface ApiQueueClientProps {
   audioJobs: ApiQueueJob[]
   videoJobs: ApiQueueJob[]
   failedJobs: ApiQueueJob[]
+  currentPeriod: string
 }
+
+const ITEMS_PER_PAGE = 20
 
 export function ApiQueueClient({
   stats,
@@ -53,14 +59,30 @@ export function ApiQueueClient({
   audioJobs,
   videoJobs,
   failedJobs,
+  currentPeriod,
 }: ApiQueueClientProps) {
+  const router = useRouter()
+  const pathname = usePathname()
+
   const [activeTab, setActiveTab] = useState('image')
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [periodFilter, setPeriodFilter] = useState('24h')
+  const [currentPage, setCurrentPage] = useState(1)
 
   const handleRefresh = () => {
     setIsRefreshing(true)
+    router.refresh()
     setTimeout(() => setIsRefreshing(false), 1000)
+  }
+
+  const handlePeriodChange = (newPeriod: string) => {
+    router.push(`${pathname}?period=${newPeriod}`)
+    setCurrentPage(1) // Reset to first page when changing period
+  }
+
+  // Reset page when changing tabs
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab)
+    setCurrentPage(1)
   }
 
   // Helper functions
@@ -110,29 +132,41 @@ export function ApiQueueClient({
     )
   }
 
-  const renderJobsTable = (jobs: ApiQueueJob[]) => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>ID</TableHead>
-          <TableHead>Provider</TableHead>
-          <TableHead>Model</TableHead>
-          <TableHead>Video/Prompt</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>ETA</TableHead>
-          <TableHead>Created</TableHead>
-          <TableHead>Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {jobs.length === 0 ? (
-          <TableRow>
-            <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-              No jobs in queue
-            </TableCell>
-          </TableRow>
-        ) : (
-          jobs.map(job => (
+  const renderJobsTable = (jobs: ApiQueueJob[]) => {
+    // Pagination logic
+    const totalJobs = jobs.length
+    const totalPages = Math.ceil(totalJobs / ITEMS_PER_PAGE)
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+    const endIndex = startIndex + ITEMS_PER_PAGE
+    const paginatedJobs = jobs.slice(startIndex, endIndex)
+
+    const canGoPrevious = currentPage > 1
+    const canGoNext = currentPage < totalPages
+
+    return (
+      <div className="space-y-4">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>ID</TableHead>
+              <TableHead>Provider</TableHead>
+              <TableHead>Model</TableHead>
+              <TableHead>Video/Prompt</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>ETA</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paginatedJobs.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                  No jobs in queue
+                </TableCell>
+              </TableRow>
+            ) : (
+              paginatedJobs.map(job => (
             <TableRow key={job.id}>
               <TableCell className="font-mono text-sm">#{job.id}</TableCell>
               <TableCell>{getProviderBadge(job.provider)}</TableCell>
@@ -207,11 +241,47 @@ export function ApiQueueClient({
                 </DropdownMenu>
               </TableCell>
             </TableRow>
-          ))
+              ))
+            )}
+          </TableBody>
+        </Table>
+
+        {/* Pagination Controls */}
+        {totalJobs > 0 && (
+          <div className="flex items-center justify-between px-2 py-3 border-t">
+            <div className="text-sm text-muted-foreground">
+              Showing {startIndex + 1}-{Math.min(endIndex, totalJobs)} of {totalJobs} jobs
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => p - 1)}
+                disabled={!canGoPrevious}
+                className="gap-1"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Previous
+              </Button>
+              <div className="text-sm text-muted-foreground px-2">
+                Page {currentPage} of {totalPages}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => p + 1)}
+                disabled={!canGoNext}
+                className="gap-1"
+              >
+                Next
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
         )}
-      </TableBody>
-    </Table>
-  )
+      </div>
+    )
+  }
 
   return (
     <>

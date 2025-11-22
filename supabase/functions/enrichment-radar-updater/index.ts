@@ -206,10 +206,11 @@ Deno.serve(async (req) => {
         // 3d. Trigger enrichment pipeline (Step 2 → 3 → 4 → 5)
         // ====================================================================
         // Only invoke Step 2, which will automatically chain:
-        // Step 2 → Step 3 → Step 4 → Step 5 (Step 5 marks task as completed)
+        // Step 2 → Step 3 → Step 5 (Step 4 skipped for radar) → Step 5 marks task as completed
+        // Fire-and-forget pattern to avoid timeout issues
         console.log(`[Radar Updater] Triggering enrichment pipeline...`)
 
-        const { error: pipelineError } = await supabase.functions.invoke(
+        supabase.functions.invoke(
           'enrichment-step-2-socialblade',
           {
             body: {
@@ -218,14 +219,17 @@ Deno.serve(async (req) => {
               radarUpdate: true,
             },
           }
-        )
+        ).then(({ error: pipelineError }) => {
+          if (pipelineError) {
+            console.error(`[Radar Updater] ✗ Pipeline invocation error for ${channel.channel_id}:`, pipelineError)
+          } else {
+            console.log(`[Radar Updater] ✓ Pipeline invoked successfully for ${channel.channel_id}`)
+          }
+        }).catch((invokeError) => {
+          console.error(`[Radar Updater] ✗ Exception invoking pipeline for ${channel.channel_id}:`, invokeError)
+        })
 
-        if (pipelineError) {
-          console.error(`[Radar Updater] ✗ Pipeline failed: ${pipelineError.message}`)
-          throw new Error(`Pipeline invocation failed: ${pipelineError.message}`)
-        }
-
-        console.log(`[Radar Updater] ✓ Pipeline triggered (Step 2 → 3 → 4 → 5 running in background)`)
+        console.log(`[Radar Updater] ✓ Pipeline invocation sent (Step 2 → 3 → 5 will run in background, Step 4 skipped)`)
 
         // ====================================================================
         // 3e. Update channel_radar with next_update_at

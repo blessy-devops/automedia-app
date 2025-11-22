@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
   try {
     console.log('[Step 4: Trending Videos] Starting trending videos fetch orchestration')
 
-    const { channelId, taskId: reqTaskId } = await req.json()
+    const { channelId, taskId: reqTaskId, radarUpdate } = await req.json()
     taskId = reqTaskId
 
     if (!channelId || !taskId) {
@@ -427,7 +427,7 @@ Deno.serve(async (req) => {
 
     // Fire and forget - don't wait for response to avoid timeout
     supabase.functions.invoke('enrichment-step-5-outlier-calc', {
-      body: { channelId, taskId },
+      body: { channelId, taskId, radarUpdate },
     }).then(({ data, error: invokeError }) => {
       if (invokeError) {
         console.error('[Step 4: Trending Videos] Error invoking Step 5:', invokeError)

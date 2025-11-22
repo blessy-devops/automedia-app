@@ -124,15 +124,19 @@ export function BenchmarkProgressMonitor({
 
       // Call onComplete callback if all steps are completed (or skipped - non-blocking)
       // Social Blade can be 'skipped' for new channels without data
+      // Trending Videos can be 'skipped' for radar updates
       const isSocialBladeComplete =
         newStatus.socialbladeStatus === 'completed' || newStatus.socialbladeStatus === 'skipped'
+
+      const isTrendingVideosComplete =
+        newStatus.trendingVideosStatus === 'completed' || newStatus.trendingVideosStatus === 'skipped'
 
       if (
         newStatus.overallStatus === 'completed' &&
         newStatus.categorizationStatus === 'completed' &&
         isSocialBladeComplete &&
         newStatus.recentVideosStatus === 'completed' &&
-        newStatus.trendingVideosStatus === 'completed' &&
+        isTrendingVideosComplete &&
         newStatus.outlierAnalysisStatus === 'completed'
       ) {
         console.log('[Monitor] All steps completed!')

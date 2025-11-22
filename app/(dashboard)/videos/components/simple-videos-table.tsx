@@ -25,7 +25,7 @@ interface SimpleVideosTableProps {
   currentFolderId?: number
 }
 
-type SortField = 'title' | 'views' | 'likes' | 'uploadDate' | 'performanceVsMedianHistorical'
+type SortField = 'title' | 'views' | 'likes' | 'uploadDate' | 'performanceVsMedian14d' | 'performanceVsAvg14d'
 type SortOrder = 'asc' | 'desc'
 
 export function SimpleVideosTable({ data, folders = [], currentFolderId }: SimpleVideosTableProps) {
@@ -211,8 +211,11 @@ export function SimpleVideosTable({ data, folders = [], currentFolderId }: Simpl
                 <TableHead className="w-[150px]">
                   <SortButton field="uploadDate">Upload Date</SortButton>
                 </TableHead>
-                <TableHead className="w-[150px]">
-                  <SortButton field="performanceVsMedianHistorical">Performance</SortButton>
+                <TableHead className="w-[130px]">
+                  <SortButton field="performanceVsMedian14d">Median (14d)</SortButton>
+                </TableHead>
+                <TableHead className="w-[130px]">
+                  <SortButton field="performanceVsAvg14d">Average (14d)</SortButton>
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -255,18 +258,29 @@ export function SimpleVideosTable({ data, folders = [], currentFolderId }: Simpl
                       {video.uploadDate ? formatDate(video.uploadDate) : "-"}
                     </TableCell>
                     <TableCell>
-                      <PerformanceBadge score={video.performanceVsMedianHistorical} />
-                      {video.isOutlier && (
-                        <Badge variant="secondary" className="ml-2">
-                          Outlier
-                        </Badge>
-                      )}
+                      <PerformanceBadge
+                        score={video.performanceVsMedian14d || video.performanceVsMedianHistorical}
+                        isFallback={!video.performanceVsMedian14d}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <PerformanceBadge
+                          score={video.performanceVsAvg14d || video.performanceVsAvgHistorical}
+                          isFallback={!video.performanceVsAvg14d}
+                        />
+                        {video.isOutlier && (
+                          <Badge variant="secondary" className="text-xs">
+                            Outlier
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
+                  <TableCell colSpan={8} className="h-24 text-center">
                     No videos found.
                   </TableCell>
                 </TableRow>

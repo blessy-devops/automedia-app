@@ -39,6 +39,10 @@ export function VideoFiltersPopover() {
   const [minOutlierScore, setMinOutlierScore] = useState(searchParams.get("minOutlierScore") || "")
   const [maxOutlierScore, setMaxOutlierScore] = useState(searchParams.get("maxOutlierScore") || "")
 
+  // Performance score range (14d from SocialBlade)
+  const [minPerformanceVsMedian14d, setMinPerformanceVsMedian14d] = useState(searchParams.get("minPerformanceVsMedian14d") || "")
+  const [minPerformanceVsAvg14d, setMinPerformanceVsAvg14d] = useState(searchParams.get("minPerformanceVsAvg14d") || "")
+
   // Video age range
   const [minVideoAgeDays, setMinVideoAgeDays] = useState(searchParams.get("minVideoAgeDays") || "")
   const [maxVideoAgeDays, setMaxVideoAgeDays] = useState(searchParams.get("maxVideoAgeDays") || "")
@@ -56,6 +60,8 @@ export function VideoFiltersPopover() {
     setMaxViews(searchParams.get("maxViews") || "")
     setMinOutlierScore(searchParams.get("minOutlierScore") || "")
     setMaxOutlierScore(searchParams.get("maxOutlierScore") || "")
+    setMinPerformanceVsMedian14d(searchParams.get("minPerformanceVsMedian14d") || "")
+    setMinPerformanceVsAvg14d(searchParams.get("minPerformanceVsAvg14d") || "")
     setMinVideoAgeDays(searchParams.get("minVideoAgeDays") || "")
     setMaxVideoAgeDays(searchParams.get("maxVideoAgeDays") || "")
     setUploadDateFrom(searchParams.get("uploadDateFrom") || "")
@@ -90,6 +96,12 @@ export function VideoFiltersPopover() {
     if (maxOutlierScore) params.set("maxOutlierScore", maxOutlierScore)
     else params.delete("maxOutlierScore")
 
+    // Performance score range (14d from SocialBlade)
+    if (minPerformanceVsMedian14d) params.set("minPerformanceVsMedian14d", minPerformanceVsMedian14d)
+    else params.delete("minPerformanceVsMedian14d")
+    if (minPerformanceVsAvg14d) params.set("minPerformanceVsAvg14d", minPerformanceVsAvg14d)
+    else params.delete("minPerformanceVsAvg14d")
+
     // Video age range
     if (minVideoAgeDays) params.set("minVideoAgeDays", minVideoAgeDays)
     else params.delete("minVideoAgeDays")
@@ -116,6 +128,8 @@ export function VideoFiltersPopover() {
     setMaxViews("")
     setMinOutlierScore("")
     setMaxOutlierScore("")
+    setMinPerformanceVsMedian14d("")
+    setMinPerformanceVsAvg14d("")
     setMinVideoAgeDays("")
     setMaxVideoAgeDays("")
     setUploadDateFrom("")
@@ -127,6 +141,8 @@ export function VideoFiltersPopover() {
     params.delete("maxViews")
     params.delete("minOutlierScore")
     params.delete("maxOutlierScore")
+    params.delete("minPerformanceVsMedian14d")
+    params.delete("minPerformanceVsAvg14d")
     params.delete("minVideoAgeDays")
     params.delete("maxVideoAgeDays")
     params.delete("uploadDateFrom")
@@ -142,6 +158,8 @@ export function VideoFiltersPopover() {
     maxViews: maxViews ? Number(maxViews) : undefined,
     minOutlierScore: minOutlierScore ? Number(minOutlierScore) : undefined,
     maxOutlierScore: maxOutlierScore ? Number(maxOutlierScore) : undefined,
+    minPerformanceVsMedian14d: minPerformanceVsMedian14d ? Number(minPerformanceVsMedian14d) : undefined,
+    minPerformanceVsAvg14d: minPerformanceVsAvg14d ? Number(minPerformanceVsAvg14d) : undefined,
     minVideoAgeDays: minVideoAgeDays ? Number(minVideoAgeDays) : undefined,
     maxVideoAgeDays: maxVideoAgeDays ? Number(maxVideoAgeDays) : undefined,
     uploadDateFrom: uploadDateFrom || undefined,
@@ -235,6 +253,42 @@ export function VideoFiltersPopover() {
                 />
               </div>
             </div>
+          </div>
+
+          <Separator />
+
+          {/* Performance Score Range (14d from SocialBlade) */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Performance Score (14d)</Label>
+            <div className="space-y-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="min-median-14d" className="text-xs text-muted-foreground">Min Median Score</Label>
+                <Input
+                  id="min-median-14d"
+                  type="number"
+                  step="0.1"
+                  placeholder="e.g., 5.0"
+                  value={minPerformanceVsMedian14d}
+                  onChange={(e) => setMinPerformanceVsMedian14d(e.target.value)}
+                  className="h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="min-avg-14d" className="text-xs text-muted-foreground">Min Average Score</Label>
+                <Input
+                  id="min-avg-14d"
+                  type="number"
+                  step="0.1"
+                  placeholder="e.g., 4.0"
+                  value={minPerformanceVsAvg14d}
+                  onChange={(e) => setMinPerformanceVsAvg14d(e.target.value)}
+                  className="h-9"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Based on recent 14-day SocialBlade data
+            </p>
           </div>
 
           <Separator />

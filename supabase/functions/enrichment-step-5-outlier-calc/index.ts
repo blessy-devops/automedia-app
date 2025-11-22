@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
   try {
     console.log('[Step 5: Outlier Calc] Starting outlier calculation')
 
-    const { channelId, taskId: reqTaskId } = await req.json()
+    const { channelId, taskId: reqTaskId, radarUpdate } = await req.json()
     taskId = reqTaskId
 
     if (!channelId || !taskId) {
@@ -60,6 +60,10 @@ Deno.serve(async (req) => {
     }
 
     console.log(`[Step 5: Outlier Calc] Processing channel: ${channelId}, task: ${taskId}`)
+
+    if (radarUpdate) {
+      console.log('[Step 5: Outlier Calc] 🔄 Running in RADAR UPDATE mode (Step 4 was skipped)')
+    }
 
     // ========================================================================
     // STEP 1: Update task status to 'processing'
@@ -186,15 +190,20 @@ Deno.serve(async (req) => {
       ? baselineStats.total_views_14d / 14
       : null
 
+    // Metric: dailyMedian14d - Channel's median daily views in last 14 days
+    // New metric for more robust outlier detection
+    const dailyMedian14d = baselineStats.mediana_diaria_views_14d || null
+
     console.log('[Step 5: Outlier Calc] Base metrics:', {
       avgHistoricalViews: avgHistoricalViews?.toFixed(0),
       medianHistoricalViews: medianHistoricalViews?.toFixed(0),
       dailyAvg14d: dailyAvg14d?.toFixed(0),
+      dailyMedian14d: dailyMedian14d?.toFixed(0) || 'null',
     })
 
     // Warn if Social Blade metrics are unavailable
-    if (!dailyAvg14d || !socialBladeAvailable) {
-      console.log('[Step 5: Outlier Calc] ⚠️  Social Blade metrics unavailable - performance_vs_recent_14d will be NULL for all videos')
+    if (!dailyAvg14d || !dailyMedian14d || !socialBladeAvailable) {
+      console.log('[Step 5: Outlier Calc] ⚠️  Social Blade metrics unavailable - 14d performance ratios will be NULL for all videos')
       console.log('[Step 5: Outlier Calc] This is expected for very new channels not yet indexed in Social Blade')
     }
 
@@ -241,7 +250,23 @@ Deno.serve(async (req) => {
           ? Number((viewsPerDay / dailyAvg14d).toFixed(2))
           : null
 
-      // Metric 6 & 7: performance_vs_recent_30d and 90d (placeholders for future)
+      // Metric 6: performance_vs_avg_14d (NEW)
+      // Compare video's views_per_day to channel's average daily views (14d)
+      // Same as performanceVsRecent14d but with explicit naming for UI
+      const performanceVsAvg14d =
+        dailyAvg14d && dailyAvg14d > 0
+          ? Number((viewsPerDay / dailyAvg14d).toFixed(2))
+          : null
+
+      // Metric 7: performance_vs_median_14d (NEW)
+      // Compare video's views_per_day to channel's median daily views (14d)
+      // More robust against outliers than average
+      const performanceVsMedian14d =
+        dailyMedian14d && dailyMedian14d > 0
+          ? Number((viewsPerDay / dailyMedian14d).toFixed(2))
+          : null
+
+      // Metric 8 & 9: performance_vs_recent_30d and 90d (placeholders for future)
       // These would require collecting actual 30d/90d data per video
       const performanceVsRecent30d = null
       const performanceVsRecent90d = null
@@ -255,6 +280,8 @@ Deno.serve(async (req) => {
           performance_vs_avg_historical: performanceVsAvg,
           performance_vs_median_historical: performanceVsMedian,
           performance_vs_recent_14d: performanceVsRecent14d,
+          performance_vs_avg_14d: performanceVsAvg14d,
+          performance_vs_median_14d: performanceVsMedian14d,
           performance_vs_recent_30d: performanceVsRecent30d,
           performance_vs_recent_90d: performanceVsRecent90d,
           updated_at: now.toISOString(),
@@ -321,7 +348,7 @@ Deno.serve(async (req) => {
         outlier_analysis_result: JSON.stringify({
           videos_processed: successCount,
           videos_with_errors: errorCount,
-          metrics_calculated: 7,
+          metrics_calculated: 9, // Updated: added performance_vs_avg_14d and performance_vs_median_14d
           timestamp: completedAt.toISOString(),
         }),
         overall_status: 'completed', // FINAL STATUS

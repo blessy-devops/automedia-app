@@ -40,7 +40,7 @@ interface SimpleVideosTableNewProps {
   currentFolderId?: number
 }
 
-type SortField = 'title' | 'views' | 'likes' | 'uploadDate' | 'performanceVsMedianHistorical'
+type SortField = 'title' | 'views' | 'likes' | 'uploadDate' | 'performanceVsMedian14d' | 'performanceVsAvg14d'
 type SortOrder = 'asc' | 'desc'
 
 export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: SimpleVideosTableNewProps) {
@@ -404,13 +404,22 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
                     <ArrowUpDown className={`w-3 h-3 ${sortField === 'uploadDate' ? 'opacity-100' : 'opacity-40'}`} />
                   </button>
                 </th>
-                <th className="px-6 py-3 text-right text-xs text-muted-foreground uppercase tracking-wide">
+                <th className="px-4 py-3 text-right text-xs text-muted-foreground uppercase tracking-wide">
                   <button
-                    onClick={() => handleSort('performanceVsMedianHistorical')}
+                    onClick={() => handleSort('performanceVsMedian14d')}
                     className="flex items-center gap-1 hover:text-foreground transition-colors ml-auto"
                   >
-                    Performance
-                    <ArrowUpDown className={`w-3 h-3 ${sortField === 'performanceVsMedianHistorical' ? 'opacity-100' : 'opacity-40'}`} />
+                    Median (14d)
+                    <ArrowUpDown className={`w-3 h-3 ${sortField === 'performanceVsMedian14d' ? 'opacity-100' : 'opacity-40'}`} />
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-right text-xs text-muted-foreground uppercase tracking-wide">
+                  <button
+                    onClick={() => handleSort('performanceVsAvg14d')}
+                    className="flex items-center gap-1 hover:text-foreground transition-colors ml-auto"
+                  >
+                    Average (14d)
+                    <ArrowUpDown className={`w-3 h-3 ${sortField === 'performanceVsAvg14d' ? 'opacity-100' : 'opacity-40'}`} />
                   </button>
                 </th>
                 <th className="px-4 py-3 text-center text-xs text-muted-foreground uppercase tracking-wide">
@@ -472,13 +481,24 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
                     <td className="px-4 py-4 text-sm text-muted-foreground">
                       {video.uploadDate ? formatDate(video.uploadDate) : "-"}
                     </td>
-                    <td className="px-6 py-4 text-sm text-foreground text-right">
-                      <PerformanceBadge score={video.performanceVsMedianHistorical} />
-                      {video.isOutlier && (
-                        <Badge variant="secondary" className="ml-2">
-                          Outlier
-                        </Badge>
-                      )}
+                    <td className="px-4 py-4 text-sm text-foreground text-right">
+                      <PerformanceBadge
+                        score={video.performanceVsMedian14d || video.performanceVsMedianHistorical}
+                        isFallback={!video.performanceVsMedian14d}
+                      />
+                    </td>
+                    <td className="px-4 py-4 text-sm text-foreground text-right">
+                      <div className="flex flex-col gap-1.5 items-end">
+                        <PerformanceBadge
+                          score={video.performanceVsAvg14d || video.performanceVsAvgHistorical}
+                          isFallback={!video.performanceVsAvg14d}
+                        />
+                        {video.isOutlier && (
+                          <Badge variant="secondary" className="text-xs">
+                            Outlier
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex items-center justify-center">
@@ -504,7 +524,7 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} className="h-24 text-center text-muted-foreground">
+                  <td colSpan={9} className="h-24 text-center text-muted-foreground">
                     No videos found.
                   </td>
                 </tr>

@@ -20,6 +20,8 @@ export type Video = {
   performanceVsRecent14d: number | null
   performanceVsRecent30d: number | null
   performanceVsRecent90d: number | null
+  performanceVsMedian14d: number | null
+  performanceVsAvg14d: number | null
   isOutlier: boolean | null
   // Video age in days
   videoAgeDays: number | null

@@ -11,32 +11,30 @@ import {
   Search,
   TrendingUp,
   Video,
-  Target,
-  Radar,
+  PlayCircle,
+  Radio,
   Film,
   Tv,
   Sparkles,
   Bot,
   BarChart3,
   Settings,
-  ChevronUp,
   ChevronDown,
-  FileCheck,
+  FolderKanban,
   Loader,
   Calendar,
-  Link as LinkIcon,
+  Workflow,
   ClipboardList,
-  Pencil,
+  Brush,
   Image,
-  Headphones,
+  Music,
   Wand2,
-  FileVideo,
+  Clapperboard,
   Brain,
-  BookText,
+  Library,
   DollarSign,
-  Settings2,
   Key,
-  Cog,
+  Monitor,
   Layers,
   Webhook,
 } from "lucide-react"
@@ -88,12 +86,12 @@ const collapsibleSections: CollapsibleSection[] = [
       {
         title: "New Benchmark",
         href: "/benchmark/new-channel-benchmark",
-        icon: Target,
+        icon: PlayCircle,
       },
       {
         title: "Radar",
         href: "/benchmark/radar",
-        icon: Radar,
+        icon: Radio,
       },
     ],
   },
@@ -110,7 +108,7 @@ const collapsibleSections: CollapsibleSection[] = [
       {
         title: "Queue",
         href: "/production-videos",
-        icon: FileCheck,
+        icon: FolderKanban,
       },
       {
         title: "API Queue",
@@ -126,7 +124,7 @@ const collapsibleSections: CollapsibleSection[] = [
       {
         title: "Workflows",
         href: "/production/workflows",
-        icon: LinkIcon,
+        icon: Workflow,
         isPlaceholder: true,
       },
       {
@@ -144,7 +142,7 @@ const collapsibleSections: CollapsibleSection[] = [
       {
         title: "Thumbnail Creator",
         href: "/visual-lab/thumbnail-creator",
-        icon: Pencil,
+        icon: Brush,
         isPlaceholder: true,
       },
       {
@@ -155,7 +153,7 @@ const collapsibleSections: CollapsibleSection[] = [
       {
         title: "Audio Assets",
         href: "/visual-lab/audio-assets",
-        icon: Headphones,
+        icon: Music,
       },
       {
         title: "Visual FX",
@@ -165,7 +163,7 @@ const collapsibleSections: CollapsibleSection[] = [
       {
         title: "Video Inserts",
         href: "/visual-lab/video-inserts",
-        icon: FileVideo,
+        icon: Clapperboard,
       },
     ],
   },
@@ -183,7 +181,7 @@ const collapsibleSections: CollapsibleSection[] = [
       {
         title: "Narrative Library",
         href: "/ai-automation/narrative-library",
-        icon: BookText,
+        icon: Library,
         isPlaceholder: true,
       },
       {
@@ -202,7 +200,7 @@ const collapsibleSections: CollapsibleSection[] = [
       {
         title: "Platform Settings",
         href: "/settings/platform",
-        icon: Settings2,
+        icon: Settings,
       },
       {
         title: "API Keys Pool",
@@ -212,7 +210,7 @@ const collapsibleSections: CollapsibleSection[] = [
       {
         title: "FFMPEG Config",
         href: "/settings/ffmpeg",
-        icon: Cog,
+        icon: Monitor,
         isPlaceholder: true,
       },
       {
@@ -258,8 +256,8 @@ export function AppSidebar() {
                 href="/"
                 className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
               >
-                <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Play className="w-4 h-4 text-white fill-white" />
+                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Play className="w-4 h-4 text-primary-foreground fill-primary-foreground" />
                 </div>
                 <span className="text-foreground whitespace-nowrap overflow-hidden hidden group-data-[collapsible=icon]:hidden md:inline">
                   Automídia
@@ -293,15 +291,11 @@ export function AppSidebar() {
             >
               <Search className="w-5 h-5 flex-shrink-0" />
               <span className="text-sm group-data-[collapsible=icon]:hidden">Benchmark</span>
-              {expandedSection === "benchmark" ? (
-                <ChevronUp className="w-4 h-4 ml-auto flex-shrink-0 group-data-[collapsible=icon]:hidden" />
-              ) : (
-                <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0 group-data-[collapsible=icon]:hidden" />
-              )}
+              <ChevronDown className={`w-4 h-4 ml-auto flex-shrink-0 transition-transform group-data-[collapsible=icon]:hidden ${expandedSection === "benchmark" ? 'rotate-180' : ''}`} />
             </button>
 
             {expandedSection === "benchmark" && (
-              <div className="transition-all duration-200 ease-in-out">
+              <div className="mt-1 ml-4 border-l border-border pl-2">
                 {collapsibleSections[0].items?.map((item) => {
                   const ItemIcon = item.icon
                   const isActive = pathname === item.href
@@ -312,7 +306,7 @@ export function AppSidebar() {
                       asChild
                       isActive={isActive}
                       tooltip={item.title}
-                      className="pl-12 pr-4 py-2"
+                      className="pr-4 py-2"
                     >
                       <Link href={item.href} className="flex items-center gap-3">
                         <ItemIcon className="w-4 h-4 flex-shrink-0" />
@@ -333,15 +327,11 @@ export function AppSidebar() {
             >
               <Film className="w-5 h-5 flex-shrink-0" />
               <span className="text-sm group-data-[collapsible=icon]:hidden">Production</span>
-              {expandedSection === "production" ? (
-                <ChevronUp className="w-4 h-4 ml-auto flex-shrink-0 group-data-[collapsible=icon]:hidden" />
-              ) : (
-                <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0 group-data-[collapsible=icon]:hidden" />
-              )}
+              <ChevronDown className={`w-4 h-4 ml-auto flex-shrink-0 transition-transform group-data-[collapsible=icon]:hidden ${expandedSection === "production" ? 'rotate-180' : ''}`} />
             </button>
 
             {expandedSection === "production" && (
-              <div className="transition-all duration-200 ease-in-out">
+              <div className="mt-1 ml-4 border-l border-border pl-2">
                 {collapsibleSections[1].items?.map((item) => {
                   const ItemIcon = item.icon
                   const isActive = pathname === item.href
@@ -352,7 +342,7 @@ export function AppSidebar() {
                       asChild
                       isActive={isActive}
                       tooltip={item.title}
-                      className="pl-12 pr-4 py-2"
+                      className="pr-4 py-2"
                     >
                       <Link href={item.href} className="flex items-center gap-3">
                         <ItemIcon className="w-4 h-4 flex-shrink-0" />
@@ -388,15 +378,11 @@ export function AppSidebar() {
             >
               <Sparkles className="w-5 h-5 flex-shrink-0" />
               <span className="text-sm group-data-[collapsible=icon]:hidden">Visual Lab</span>
-              {expandedSection === "visual-lab" ? (
-                <ChevronUp className="w-4 h-4 ml-auto flex-shrink-0 group-data-[collapsible=icon]:hidden" />
-              ) : (
-                <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0 group-data-[collapsible=icon]:hidden" />
-              )}
+              <ChevronDown className={`w-4 h-4 ml-auto flex-shrink-0 transition-transform group-data-[collapsible=icon]:hidden ${expandedSection === "visual-lab" ? 'rotate-180' : ''}`} />
             </button>
 
             {expandedSection === "visual-lab" && (
-              <div className="transition-all duration-200 ease-in-out">
+              <div className="mt-1 ml-4 border-l border-border pl-2">
                 {collapsibleSections[2].items?.map((item) => {
                   const ItemIcon = item.icon
                   const isActive = pathname === item.href
@@ -407,7 +393,7 @@ export function AppSidebar() {
                       asChild
                       isActive={isActive}
                       tooltip={item.title}
-                      className="pl-12 pr-4 py-2"
+                      className="pr-4 py-2"
                     >
                       <Link href={item.href} className="flex items-center gap-3">
                         <ItemIcon className="w-4 h-4 flex-shrink-0" />
@@ -428,15 +414,11 @@ export function AppSidebar() {
             >
               <Bot className="w-5 h-5 flex-shrink-0" />
               <span className="text-sm group-data-[collapsible=icon]:hidden">AI & Automation</span>
-              {expandedSection === "ai-automation" ? (
-                <ChevronUp className="w-4 h-4 ml-auto flex-shrink-0 group-data-[collapsible=icon]:hidden" />
-              ) : (
-                <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0 group-data-[collapsible=icon]:hidden" />
-              )}
+              <ChevronDown className={`w-4 h-4 ml-auto flex-shrink-0 transition-transform group-data-[collapsible=icon]:hidden ${expandedSection === "ai-automation" ? 'rotate-180' : ''}`} />
             </button>
 
             {expandedSection === "ai-automation" && (
-              <div className="transition-all duration-200 ease-in-out">
+              <div className="mt-1 ml-4 border-l border-border pl-2">
                 {collapsibleSections[3].items?.map((item) => {
                   const ItemIcon = item.icon
                   const isActive = pathname === item.href
@@ -447,7 +429,7 @@ export function AppSidebar() {
                       asChild
                       isActive={isActive}
                       tooltip={item.title}
-                      className="pl-12 pr-4 py-2"
+                      className="pr-4 py-2"
                     >
                       <Link href={item.href} className="flex items-center gap-3">
                         <ItemIcon className="w-4 h-4 flex-shrink-0" />
@@ -483,15 +465,11 @@ export function AppSidebar() {
             >
               <Settings className="w-5 h-5 flex-shrink-0" />
               <span className="text-sm group-data-[collapsible=icon]:hidden">Settings</span>
-              {expandedSection === "settings" ? (
-                <ChevronUp className="w-4 h-4 ml-auto flex-shrink-0 group-data-[collapsible=icon]:hidden" />
-              ) : (
-                <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0 group-data-[collapsible=icon]:hidden" />
-              )}
+              <ChevronDown className={`w-4 h-4 ml-auto flex-shrink-0 transition-transform group-data-[collapsible=icon]:hidden ${expandedSection === "settings" ? 'rotate-180' : ''}`} />
             </button>
 
             {expandedSection === "settings" && (
-              <div className="transition-all duration-200 ease-in-out">
+              <div className="mt-1 ml-4 border-l border-border pl-2">
                 {collapsibleSections[4].items?.map((item) => {
                   const ItemIcon = item.icon
                   const isActive = pathname === item.href
@@ -502,7 +480,7 @@ export function AppSidebar() {
                       asChild
                       isActive={isActive}
                       tooltip={item.title}
-                      className="pl-12 pr-4 py-2"
+                      className="pr-4 py-2"
                     >
                       <Link href={item.href} className="flex items-center gap-3">
                         <ItemIcon className="w-4 h-4 flex-shrink-0" />

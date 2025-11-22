@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
   try {
     console.log('[Step 3: Recent Videos] Starting recent videos fetch orchestration')
 
-    const { channelId, taskId: reqTaskId } = await req.json()
+    const { channelId, taskId: reqTaskId, radarUpdate } = await req.json()
     taskId = reqTaskId
 
     if (!channelId || !taskId) {
@@ -359,11 +359,46 @@ Deno.serve(async (req) => {
     }
 
     // ========================================================================
+    // STEP 6.5: Filter videos for categorization (skip already-categorized ones for radar)
+    // ========================================================================
+    let videosNeedingCategorization = videosToInsert
+
+    if (radarUpdate) {
+      console.log('[Step 3: Recent Videos] Radar update detected - checking which videos need categorization...')
+
+      // Query database to get current categorization status
+      const videoIds = videosToInsert.map(v => v.youtube_video_id)
+      const { data: existingVideos, error: queryError } = await supabase
+        .from('benchmark_videos')
+        .select('youtube_video_id, categorization')
+        .in('youtube_video_id', videoIds)
+
+      if (queryError) {
+        console.warn('[Step 3: Recent Videos] Error querying existing videos:', queryError)
+        // Continue with all videos if query fails
+      } else {
+        const categorizedVideoIds = new Set(
+          existingVideos
+            ?.filter(v => v.categorization !== null && v.categorization !== undefined)
+            .map(v => v.youtube_video_id) || []
+        )
+
+        videosNeedingCategorization = videosToInsert.filter(
+          v => !categorizedVideoIds.has(v.youtube_video_id)
+        )
+
+        const skippedCount = videosToInsert.length - videosNeedingCategorization.length
+        console.log(`[Step 3: Recent Videos] Skipping categorization for ${skippedCount} already-categorized videos`)
+        console.log(`[Step 3: Recent Videos] Will categorize ${videosNeedingCategorization.length} new/uncategorized videos`)
+      }
+    }
+
+    // ========================================================================
     // STEP 7: Fan-out to video-categorization-manager for each video
     // ========================================================================
     console.log('[Step 3: Recent Videos] Starting fan-out to video-categorization-manager...')
 
-    const fanOutPromises = videosToInsert.map(async (video) => {
+    const fanOutPromises = videosNeedingCategorization.map(async (video) => {
       try {
         const response = await supabase.functions.invoke('video-categorization-manager', {
           body: {
@@ -385,12 +420,12 @@ Deno.serve(async (req) => {
 
     // Don't await - let categorizations run in background
     Promise.allSettled(fanOutPromises).then(() => {
-      console.log(`[Step 3: Recent Videos] All ${videosToInsert.length} video categorizations completed`)
+      console.log(`[Step 3: Recent Videos] All ${videosNeedingCategorization.length} video categorizations completed`)
     }).catch((error) => {
       console.error('[Step 3: Recent Videos] Error in categorization promises:', error)
     })
 
-    console.log(`[Step 3: Recent Videos] Fan-out initiated for ${videosToInsert.length} videos (background processing)`)
+    console.log(`[Step 3: Recent Videos] Fan-out initiated for ${videosNeedingCategorization.length} videos (background processing)`)
 
     // ========================================================================
     // STEP 8: Update task status to 'completed'
@@ -411,25 +446,79 @@ Deno.serve(async (req) => {
     // ========================================================================
     // STEP 9: Invoke next step in the pipeline (fire-and-forget)
     // ========================================================================
-    console.log('[Step 3: Recent Videos] Invoking Step 4: Trending Videos Fetch')
-    console.log('[Step 3: Recent Videos] Invocation payload:', { channelId, taskId })
+    if (radarUpdate) {
+      // Skip Step 4 (Trending Videos) for radar updates - go directly to Step 5
+      console.log('[Step 3: Recent Videos] Radar update detected - skipping Step 4 (Trending Videos)')
+      console.log('[Step 3: Recent Videos] Marking Step 4 as skipped...')
 
-    // Fire and forget - don't wait for response to avoid timeout
-    supabase.functions.invoke('enrichment-step-4-trending-videos', {
-      body: { channelId, taskId },
-    }).then(({ data, error: invokeError }) => {
-      if (invokeError) {
-        console.error('[Step 3: Recent Videos] Error invoking Step 4:', invokeError)
-        console.error('[Step 3: Recent Videos] Error details:', JSON.stringify(invokeError, null, 2))
-      } else {
-        console.log('[Step 3: Recent Videos] Successfully invoked Step 4')
-        console.log('[Step 3: Recent Videos] Step 4 response:', data)
+      // Mark Step 4 as skipped in the task (synchronously to ensure it's set before Step 5 runs)
+      try {
+        const { error: skipError } = await supabase
+          .from('channel_enrichment_tasks')
+          .update({
+            trending_videos_status: 'skipped',
+            trending_videos_completed_at: new Date().toISOString(),
+            trending_videos_result: {
+              message: 'Skipped for radar update - trending videos already processed in initial enrichment',
+              skipped: true,
+              radarUpdate: true,
+            },
+          })
+          .eq('id', taskId)
+
+        if (skipError) {
+          console.error('[Step 3: Recent Videos] Error marking Step 4 as skipped:', skipError)
+          // Continue anyway - non-blocking
+        } else {
+          console.log('[Step 3: Recent Videos] Step 4 marked as skipped successfully')
+        }
+      } catch (skipError) {
+        console.error('[Step 3: Recent Videos] Exception marking Step 4 as skipped:', skipError)
+        // Continue anyway
       }
-    }).catch((invokeError) => {
-      console.error('[Step 3: Recent Videos] Exception invoking Step 4:', invokeError)
-    })
 
-    console.log('[Step 3: Recent Videos] Step 4 invocation sent (fire-and-forget)')
+      // Invoke Step 5 directly (fire-and-forget)
+      console.log('[Step 3: Recent Videos] Invoking Step 5: Outlier Calculation (skipping Step 4)')
+      console.log('[Step 3: Recent Videos] Invocation payload:', { channelId, taskId, radarUpdate })
+
+      supabase.functions.invoke('enrichment-step-5-outlier-calc', {
+        body: { channelId, taskId, radarUpdate },
+      }).then(({ data, error: invokeError }) => {
+        if (invokeError) {
+          console.error('[Step 3: Recent Videos] Error invoking Step 5:', invokeError)
+          console.error('[Step 3: Recent Videos] Error details:', JSON.stringify(invokeError, null, 2))
+        } else {
+          console.log('[Step 3: Recent Videos] Successfully invoked Step 5 (skipped Step 4)')
+          console.log('[Step 3: Recent Videos] Step 5 response:', data)
+        }
+      }).catch((invokeError) => {
+        console.error('[Step 3: Recent Videos] Exception invoking Step 5:', invokeError)
+      })
+
+      console.log('[Step 3: Recent Videos] Step 5 invocation sent (fire-and-forget, Step 4 skipped)')
+    } else {
+      // Normal flow - invoke Step 4
+      console.log('[Step 3: Recent Videos] Invoking Step 4: Trending Videos Fetch')
+      console.log('[Step 3: Recent Videos] Invocation payload:', { channelId, taskId })
+
+      // Fire and forget - don't wait for response to avoid timeout
+      supabase.functions.invoke('enrichment-step-4-trending-videos', {
+        body: { channelId, taskId, radarUpdate },
+      }).then(({ data, error: invokeError }) => {
+        if (invokeError) {
+          console.error('[Step 3: Recent Videos] Error invoking Step 4:', invokeError)
+          console.error('[Step 3: Recent Videos] Error details:', JSON.stringify(invokeError, null, 2))
+        } else {
+          console.log('[Step 3: Recent Videos] Successfully invoked Step 4')
+          console.log('[Step 3: Recent Videos] Step 4 response:', data)
+        }
+      }).catch((invokeError) => {
+        console.error('[Step 3: Recent Videos] Exception invoking Step 4:', invokeError)
+      })
+
+      console.log('[Step 3: Recent Videos] Step 4 invocation sent (fire-and-forget)')
+    }
+
     console.log('[Step 3: Recent Videos] Completed successfully')
 
     return new Response(

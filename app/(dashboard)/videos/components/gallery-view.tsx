@@ -57,9 +57,20 @@ export function GalleryView({ videos }: GalleryViewProps) {
                 </div>
               )}
 
-              {/* Floating Performance Badge */}
+              {/* Floating Median Badge */}
               <div className="absolute top-2 right-2 shadow-lg">
-                <PerformanceBadge score={video.performanceVsMedianHistorical} />
+                <PerformanceBadge
+                  score={video.performanceVsMedian14d || video.performanceVsMedianHistorical}
+                  isFallback={!video.performanceVsMedian14d}
+                />
+              </div>
+
+              {/* Floating Average Badge (below Median) */}
+              <div className="absolute top-11 right-2 shadow-lg">
+                <PerformanceBadge
+                  score={video.performanceVsAvg14d || video.performanceVsAvgHistorical}
+                  isFallback={!video.performanceVsAvg14d}
+                />
               </div>
             </div>
 

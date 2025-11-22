@@ -110,6 +110,8 @@ export default async function VideosPageNew({
       performanceVsRecent14d: video.performance_vs_recent_14d,
       performanceVsRecent30d: video.performance_vs_recent_30d,
       performanceVsRecent90d: video.performance_vs_recent_90d,
+      performanceVsMedian14d: video.performance_vs_median_14d,
+      performanceVsAvg14d: video.performance_vs_avg_14d,
       isOutlier: video.is_outlier,
       videoAgeDays: video.upload_date
         ? Math.floor((Date.now() - new Date(video.upload_date).getTime()) / (1000 * 60 * 60 * 24))
