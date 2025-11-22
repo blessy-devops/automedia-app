@@ -167,80 +167,80 @@ export function ApiQueueClient({
               </TableRow>
             ) : (
               paginatedJobs.map(job => (
-            <TableRow key={job.id}>
-              <TableCell className="font-mono text-sm">#{job.id}</TableCell>
-              <TableCell>{getProviderBadge(job.provider)}</TableCell>
-              <TableCell className="text-sm text-muted-foreground">{job.model}</TableCell>
-              <TableCell className="max-w-[300px]">
-                <div className="space-y-1">
-                  {job.videoTitle && (
-                    <div className="text-sm truncate">{job.videoTitle}</div>
-                  )}
-                  {job.prompt && (
-                    <div className="text-xs text-muted-foreground truncate">{job.prompt}</div>
-                  )}
-                </div>
-              </TableCell>
-              <TableCell>{getStatusBadge(job.status)}</TableCell>
-              <TableCell className="text-sm">
-                {job.eta ? (
-                  <span className="text-muted-foreground">{job.eta}</span>
-                ) : job.completedAt ? (
-                  <span className="text-green-600 dark:text-green-400">Done</span>
-                ) : (
-                  <span className="text-muted-foreground">-</span>
-                )}
-              </TableCell>
-              <TableCell className="text-xs text-muted-foreground">
-                {new Date(job.createdAt).toLocaleString('pt-BR', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      Actions
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Job Actions</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="gap-2">
-                      <Eye className="w-4 h-4" />
-                      View Logs
-                    </DropdownMenuItem>
-                    {job.status === 'failed' && (
-                      <>
+                <TableRow key={job.id}>
+                  <TableCell className="font-mono text-sm">#{job.id}</TableCell>
+                  <TableCell>{getProviderBadge(job.provider)}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{job.model}</TableCell>
+                  <TableCell className="max-w-[300px]">
+                    <div className="space-y-1">
+                      {job.videoTitle && (
+                        <div className="text-sm truncate">{job.videoTitle}</div>
+                      )}
+                      {job.prompt && (
+                        <div className="text-xs text-muted-foreground truncate">{job.prompt}</div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>{getStatusBadge(job.status)}</TableCell>
+                  <TableCell className="text-sm">
+                    {job.eta ? (
+                      <span className="text-muted-foreground">{job.eta}</span>
+                    ) : job.completedAt ? (
+                      <span className="text-green-600 dark:text-green-400">Done</span>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {new Date(job.createdAt).toLocaleString('pt-BR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          Actions
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Job Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem className="gap-2">
-                          <RotateCcw className="w-4 h-4" />
-                          Retry
+                          <Eye className="w-4 h-4" />
+                          View Logs
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="gap-2">
-                          <Zap className="w-4 h-4" />
-                          Switch Provider
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                    {job.status === 'queued' && (
-                      <DropdownMenuItem className="gap-2 text-destructive">
-                        <X className="w-4 h-4" />
-                        Cancel
-                      </DropdownMenuItem>
-                    )}
-                    {job.status === 'completed' && (
-                      <DropdownMenuItem className="gap-2">
-                        <RotateCcw className="w-4 h-4" />
-                        Reprocess
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
+                        {job.status === 'failed' && (
+                          <>
+                            <DropdownMenuItem className="gap-2">
+                              <RotateCcw className="w-4 h-4" />
+                              Retry
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="gap-2">
+                              <Zap className="w-4 h-4" />
+                              Switch Provider
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                        {job.status === 'queued' && (
+                          <DropdownMenuItem className="gap-2 text-destructive">
+                            <X className="w-4 h-4" />
+                            Cancel
+                          </DropdownMenuItem>
+                        )}
+                        {job.status === 'completed' && (
+                          <DropdownMenuItem className="gap-2">
+                            <RotateCcw className="w-4 h-4" />
+                            Reprocess
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
               ))
             )}
           </TableBody>
@@ -294,14 +294,13 @@ export function ApiQueueClient({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={periodFilter} onValueChange={setPeriodFilter}>
+          <Select value={currentPeriod} onValueChange={handlePeriodChange}>
             <SelectTrigger className="w-[180px]">
               <CalendarDays className="w-4 h-4 mr-2" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="1h">Last 1 Hour</SelectItem>
-              <SelectItem value="6h">Last 6 Hours</SelectItem>
               <SelectItem value="24h">Last 24 Hours</SelectItem>
               <SelectItem value="7d">Last 7 Days</SelectItem>
               <SelectItem value="30d">Last 30 Days</SelectItem>
@@ -369,7 +368,7 @@ export function ApiQueueClient({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="image" className="gap-2">
                 <Zap className="w-4 h-4" />

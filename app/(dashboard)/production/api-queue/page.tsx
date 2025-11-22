@@ -16,7 +16,7 @@ type SearchParams = Promise<{
 export default async function ApiQueuePage({ searchParams }: { searchParams: SearchParams }) {
   const supabase = createGobbiClient()
   const params = await searchParams
-  const period = params.period || '24h'
+  const period = params.period || '7d'
 
   // Calculate date cutoff based on period
   const getCutoffDate = (period: string): string | null => {

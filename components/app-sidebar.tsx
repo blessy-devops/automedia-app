@@ -248,13 +248,13 @@ export function AppSidebar() {
 
   return (
     <>
-      <SidebarHeader className="border-b border-border p-4 group-data-[collapsible=icon]:p-2">
+      <SidebarHeader className="border-b border-border px-4 pb-4 mb-6 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:pb-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link
                 href="/"
-                className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
+                className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
               >
                 <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
                   <Play className="w-4 h-4 text-primary-foreground fill-primary-foreground" />
@@ -269,13 +269,13 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        <nav className="flex flex-col gap-1 py-2">
+        <nav className="flex flex-col gap-1 px-2">
           {/* Dashboard - Standalone Item */}
           <SidebarMenuButton
             asChild
             isActive={pathname === "/dashboard"}
             tooltip="Dashboard"
-            className="px-4 py-2 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
+            className="px-3 py-2.5 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
           >
             <Link href="/dashboard" className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
               <Home className="w-5 h-5 flex-shrink-0" />
@@ -287,7 +287,7 @@ export function AppSidebar() {
           <div className="mt-1">
             <button
               onClick={() => toggleSection("benchmark")}
-              className="flex items-center gap-3 px-4 py-2 rounded-md hover:bg-muted transition-colors w-full text-left group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-muted transition-colors w-full text-left group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
             >
               <Search className="w-5 h-5 flex-shrink-0" />
               <span className="text-sm group-data-[collapsible=icon]:hidden">Benchmark</span>
@@ -295,7 +295,7 @@ export function AppSidebar() {
             </button>
 
             {expandedSection === "benchmark" && (
-              <div className="mt-1 ml-4 border-l border-border pl-2">
+              <div className="space-y-1 mt-1 ml-4 border-l border-border pl-2">
                 {collapsibleSections[0].items?.map((item) => {
                   const ItemIcon = item.icon
                   const isActive = pathname === item.href
@@ -323,7 +323,7 @@ export function AppSidebar() {
           <div className="mt-1">
             <button
               onClick={() => toggleSection("production")}
-              className="flex items-center gap-3 px-4 py-2 rounded-md hover:bg-muted transition-colors w-full text-left group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-muted transition-colors w-full text-left group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
             >
               <Film className="w-5 h-5 flex-shrink-0" />
               <span className="text-sm group-data-[collapsible=icon]:hidden">Production</span>
@@ -331,7 +331,7 @@ export function AppSidebar() {
             </button>
 
             {expandedSection === "production" && (
-              <div className="mt-1 ml-4 border-l border-border pl-2">
+              <div className="space-y-1 mt-1 ml-4 border-l border-border pl-2">
                 {collapsibleSections[1].items?.map((item) => {
                   const ItemIcon = item.icon
                   const isActive = pathname === item.href
@@ -361,7 +361,7 @@ export function AppSidebar() {
               asChild
               isActive={pathname === "/channels"}
               tooltip="My Channels"
-              className="px-4 py-2 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
+              className="px-3 py-2.5 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
             >
               <Link href="/channels" className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
                 <Tv className="w-5 h-5 flex-shrink-0" />
@@ -374,7 +374,7 @@ export function AppSidebar() {
           <div className="mt-1">
             <button
               onClick={() => toggleSection("visual-lab")}
-              className="flex items-center gap-3 px-4 py-2 rounded-md hover:bg-muted transition-colors w-full text-left group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-muted transition-colors w-full text-left group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
             >
               <Sparkles className="w-5 h-5 flex-shrink-0" />
               <span className="text-sm group-data-[collapsible=icon]:hidden">Visual Lab</span>
@@ -382,7 +382,7 @@ export function AppSidebar() {
             </button>
 
             {expandedSection === "visual-lab" && (
-              <div className="mt-1 ml-4 border-l border-border pl-2">
+              <div className="space-y-1 mt-1 ml-4 border-l border-border pl-2">
                 {collapsibleSections[2].items?.map((item) => {
                   const ItemIcon = item.icon
                   const isActive = pathname === item.href
@@ -410,7 +410,7 @@ export function AppSidebar() {
           <div className="mt-1">
             <button
               onClick={() => toggleSection("ai-automation")}
-              className="flex items-center gap-3 px-4 py-2 rounded-md hover:bg-muted transition-colors w-full text-left group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-muted transition-colors w-full text-left group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
             >
               <Bot className="w-5 h-5 flex-shrink-0" />
               <span className="text-sm group-data-[collapsible=icon]:hidden">AI & Automation</span>
@@ -418,7 +418,7 @@ export function AppSidebar() {
             </button>
 
             {expandedSection === "ai-automation" && (
-              <div className="mt-1 ml-4 border-l border-border pl-2">
+              <div className="space-y-1 mt-1 ml-4 border-l border-border pl-2">
                 {collapsibleSections[3].items?.map((item) => {
                   const ItemIcon = item.icon
                   const isActive = pathname === item.href
@@ -448,7 +448,7 @@ export function AppSidebar() {
               asChild
               isActive={pathname === "/analytics"}
               tooltip="Analytics"
-              className="px-4 py-2 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
+              className="px-3 py-2.5 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
             >
               <Link href="/analytics" className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
                 <BarChart3 className="w-5 h-5 flex-shrink-0" />
@@ -461,7 +461,7 @@ export function AppSidebar() {
           <div className="mt-1">
             <button
               onClick={() => toggleSection("settings")}
-              className="flex items-center gap-3 px-4 py-2 rounded-md hover:bg-muted transition-colors w-full text-left group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-muted transition-colors w-full text-left group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
             >
               <Settings className="w-5 h-5 flex-shrink-0" />
               <span className="text-sm group-data-[collapsible=icon]:hidden">Settings</span>
@@ -469,7 +469,7 @@ export function AppSidebar() {
             </button>
 
             {expandedSection === "settings" && (
-              <div className="mt-1 ml-4 border-l border-border pl-2">
+              <div className="space-y-1 mt-1 ml-4 border-l border-border pl-2">
                 {collapsibleSections[4].items?.map((item) => {
                   const ItemIcon = item.icon
                   const isActive = pathname === item.href

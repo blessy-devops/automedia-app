@@ -51,8 +51,17 @@ export function SimpleVideosTable({ data, folders = [], currentFolderId }: Simpl
   // Sort
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
-      const aVal = a[sortField]
-      const bVal = b[sortField]
+      let aVal = a[sortField]
+      let bVal = b[sortField]
+
+      // Apply fallback for new 14d metrics (same as display logic)
+      if (sortField === 'performanceVsMedian14d') {
+        aVal = a.performanceVsMedian14d || a.performanceVsMedianHistorical
+        bVal = b.performanceVsMedian14d || b.performanceVsMedianHistorical
+      } else if (sortField === 'performanceVsAvg14d') {
+        aVal = a.performanceVsAvg14d || a.performanceVsAvgHistorical
+        bVal = b.performanceVsAvg14d || b.performanceVsAvgHistorical
+      }
 
       if (aVal === null || aVal === undefined) return 1
       if (bVal === null || bVal === undefined) return -1
