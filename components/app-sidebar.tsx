@@ -256,8 +256,8 @@ export function AppSidebar() {
                 href="/"
                 className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
               >
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Play className="w-4 h-4 text-primary-foreground fill-primary-foreground" />
+                <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Play className="w-4 h-4 text-white fill-white" />
                 </div>
                 <span className="text-foreground whitespace-nowrap overflow-hidden hidden group-data-[collapsible=icon]:hidden md:inline">
                   Automídia
