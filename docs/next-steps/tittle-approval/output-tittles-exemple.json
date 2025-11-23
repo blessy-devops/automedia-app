@@ -1,0 +1,44 @@
+[
+  {
+    "title": "On Father's Day, My CEO Son Asked, \"Dad, Do You Like The $8000 Marcus Sends You?\"",
+    "alternatives": [
+      {
+        "text": "At My Retirement Party, My VP Son Asked, \"Dad, Who Paid Your $6000 Medical Bills?\""
+      },
+      {
+        "text": "On My 70th Birthday, My Executive Son Said, \"Dad, Wasn't It Nice of Derek to Fix Your Roof?\""
+      },
+      {
+        "text": "At Thanksgiving, My Director Son Asked, \"Dad, Do You Appreciate The $7500 Kevin Gives You?\""
+      },
+      {
+        "text": "On Father's Day, My Manager Son Asked, \"Dad, Aren't You Grateful For What Brian Does?\""
+      },
+      {
+        "text": "At My 65th Birthday, My Corporate Son Asked, \"Dad, Do You Thank Raymond For The $9000?\""
+      },
+      {
+        "text": "On Father's Day, My Wealthy Son Asked, \"Dad, Does Jerome's $8000 Help With The Bills?\""
+      },
+      {
+        "text": "At Christmas, My Executive Son Asked, \"Dad, Do You Like The $5000 Check From Wallace?\""
+      },
+      {
+        "text": "On My Retirement Day, My CEO Son Asked, \"Dad, Did You Thank Preston For The $7000?\""
+      },
+      {
+        "text": "On Father's Day, My VP Son Asked, \"Dad, Wasn't It Generous of Carl to Send $6000?\""
+      },
+      {
+        "text": "At My 68th Birthday, My Director Son Asked, \"Dad, Do You Appreciate Marcus's $8000?\""
+      }
+    ],
+    "analysis": {
+      "emotional": "Shared Outrage",
+      "rationale": "7/7 Fidelity Score"
+    },
+    "original": {
+      "formula": "[Sacred family bond] + [Sacred holiday] + [Specific money] + [Third party revelation]"
+    }
+  }
+]

@@ -37,6 +37,7 @@ import {
   Monitor,
   Layers,
   Webhook,
+  CheckCircle2,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -109,6 +110,11 @@ const collapsibleSections: CollapsibleSection[] = [
         title: "Queue",
         href: "/production-videos",
         icon: FolderKanban,
+      },
+      {
+        title: "Approval Queue",
+        href: "/production/approval-queue",
+        icon: CheckCircle2,
       },
       {
         title: "API Queue",

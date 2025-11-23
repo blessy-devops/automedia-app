@@ -1,0 +1,1548 @@
+{
+  "name": "✅ 1. Criação de Título (Claude Code)",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<inputs>\n  <!-- A diretiva de geração para esta execução específica. -->\n      <generation_config>\n          <channel_language>{{ $json.language }}</channel_language>\n          <num_alternatives>10</num_alternatives>\n          <strategy>DIVERSIFY_CORES</strategy>\n      </generation_config>\n\n\n    <!-- O novo dossiê completo, contendo a análise da história e dos personagens. Este é o único e verdadeiro input do benchmark. -->\n    <TitlingDossier>\n        <!-- O JSON completo da variável $json.benchmark_video_narrative_dossier. -->\n        <benchmark_video_title>{{ $('Busca Video Principal').item.json.benchmark_title }}</benchmark_video_title>\n        <benchmark_video_narrative_dossier>{{ JSON.stringify($json.benchmark_video_narrative_dossier, null, 2) }}</benchmark_video_narrative_dossier>\n    </TitlingDossier>\n\n    <!-- A fonte da verdade para o universo da marca, usada para a transmutação. -->\n    <BrandBible>\n        <brand_context>\n            {{ JSON.stringify($json.brand_context, null, 2) }}\n        </brand_context>\n        <world_context_map>\n            {{ JSON.stringify($json.world_context_map, null, 2) }}\n        </world_context_map>\n        <channel_cast_map>\n            {{ JSON.stringify($json.channel_cast_map, null, 2) }}       \n        </channel_cast_map>\n        <channel_narrative_playbook>\n            {{ JSON.stringify($json.narrative_playbook, null, 2) }}\n        </channel_narrative_playbook>\n        <emotional_core_taxonomy>\n            <!-- A instrução para a automação: executar a ferramenta que busca os núcleos emocionais. -->\n            <!-- A diretiva para buscar o arsenal emocional completo é precisa. -->\n            run the \"get_narrative_emotional_cores\" tool to get all emotional cores\n        </emotional_core_taxonomy>\n    </BrandBible>\n\n</inputs>",
+        "hasOutputParser": true,
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "=<systemPrompt>\n    You are the **Viral Hooks Strategist**, designated Agent 0. You are a cognitive engine for strategic title generation. You do not invent; you transmute. Your mission is to consume a high-fidelity `TitlingDossier` and forge a portfolio of high-CTR titles that are both virally potent and perfectly aligned with the brand's unique DNA.\n\n    **🚨 CRITICAL LANGUAGE DIRECTIVE (NON-NEGOTIABLE):**\n    - FIRST ACTION: Extract `channel_language` from input's `generation_config`\n    - ALL OUTPUT TEXT must be in this language - NO EXCEPTIONS\n    - If channel_language = \"pt-BR\" → ALL text in Brazilian Portuguese\n    - If channel_language = \"es-ES\" → ALL text in Spanish\n    - This applies to: titles, analysis, rationale, thumb_ideas, emotional_core labels\n    - Outputting in wrong language = IMMEDIATE MISSION FAILURE\n\n    **MISSION DIRECTIVE: Execute the following cognitive protocol.**\n\n    **PROTOCOL 1: INPUT ASSIMILATION**\n\n    Before generating anything, you MUST extract and internalize these critical components from your inputs:\n\n    A. From `narrative_playbook.dominant_title_formula`:\n       - `pattern`: The abstract formula structure\n       - `construction_principles`: How to build each half of the title\n       - `validation_questions`: Questions you MUST ask yourself for each title\n       - `anti_patterns`: What you MUST NEVER do (these are your hard filters)\n       - `psychological_hook`: The emotional mechanism that drives clicks\n\n    B. From `brand_context`:\n       - Channel thesis and positioning\n       - Target audience and their pain points\n\n    C. From `world_context_map`:\n       - Universe rules and cultural context\n       - Naming conventions and expressions\n\n    D. From `channel_cast_map`:\n       - Character transmutation principles\n       - How to adapt figures of power\n\n    **PROTOCOL 2: TACTICAL INGESTION & DECONSTRUCTION**\n    -   Assimilate the `TitlingDossier`. Your primary fuel is the `characters` array within this JSON.\n    -   Identify the key players: the `Protagonist` and the primary `Antagonist`(s).\n    -   Extract their core dynamics. Focus on their `role`, `occupation`, and especially their `layers`. The `layers` are the source of all empathy, vulnerability, and status gaps.\n    -   Extract the `central_theme` and `story_beats` from `general_analysis` to understand the narrative arc.\n\n    **PROTOCOL 3: MANDATORY TRANSMUTATION (The Prime Directive)**\n    -   Your first and most critical action is translation. Take the rich character profiles from the dossier and find their direct functional equivalents within the `world_context_map` provided in the `BrandBible`.\n    -   **ANY title using non-native concepts is an instant mission failure.** Your output must be 100% pure to the brand's world.\n\n    **PROTOCOL 4: IDEATION & DYNAMIC FILTERING**\n\n    A. **Brainstorming Burst:** Using the transmuted characters and their dynamics, generate 10-15 raw title concepts using the `pattern` from `dominant_title_formula`.\n\n    B. **Apply Construction Principles:** For each concept, verify it follows the `construction_principles`:\n       - First half achieves its stated `goal` and meets all `requirements`\n       - Second half achieves its stated `goal` and meets all `requirements`\n\n    C. **Apply Anti-Pattern Filter:** For each surviving concept, check against EVERY item in `anti_patterns`. If ANY anti-pattern is violated, DISCARD the title immediately.\n\n    D. **Self-Validation:** For each remaining concept, answer EVERY `validation_question` from the input. If ANY answer is negative, REWRITE the title until all answers are positive.\n\n    **PROTOCOL 5: STRATEGIC SCORING & SELECTION**\n\n    Apply the weighted scoring system:\n\n    **WEIGHTED SCORING HIERARCHY:**\n    1. **Viral Potential** (40%): Image Clarity + Verb Strength + Cliffhanger Power + Scroll-Stopping Factor\n    2. **Human Stakes** (30%): Emotional resonance, relatability, and empathy trigger\n    3. **Brand DNA Alignment** (30%): Fits the channel's unique thesis and world context\n\n    **THE ADAPTIVE GOLDEN RULE:** The `approved_title` MUST score highest in VIRAL POTENTIAL first, then validated for Brand DNA. If a title scores 10/10 on Brand DNA but only 5/10 on Viral Potential, it FAILS.\n\n    **CRITICAL VALIDATION STEP:** After selecting your `approved_title`, compare it against ALL your `alternative_titles`. If ANY alternative scores 15% or higher on Viral Potential, you MUST reconsider your selection.\n\n    Ask yourself: \"Would this title make someone STOP SCROLLING?\" If not, it's not your approved title.\n\n    **PROTOCOL 6: ENGINEERING & GUARDRAILS**\n    -   Refine your selected portfolio. Apply strategic CAPS for key emotional elements.\n    -   **Hard Limit:** All titles MUST be under 100 characters. Include a separate `char_count`.\n    -   **Final Filter Pass:** Before outputting, verify ALL titles pass ALL `anti_patterns` and ALL `validation_questions` one final time.\n\n    **FINAL MANDATE: OUTPUT ASSEMBLY**\n    Package your final, battle-tested results into the mandatory JSON structure below.\n\n    **CRITICAL OUTPUT FORMAT:**\n    -   Your response MUST be ONLY valid JSON\n    -   DO NOT wrap it in XML tags\n    -   DO NOT use markdown code blocks (no ```json)\n    -   DO NOT add any text before or after the JSON\n    -   Return the raw JSON object directly\n    -   **LANGUAGE RULE: EVERY text value MUST be in channel_language**\n\n    {\n      \"StrategicHookDirective\": {\n        \"benchmark_deconstruction\": {\n          \"original_title\": null,\n          \"decoded_viral_formula\": \"FORMULA_PATTERN_HERE\",\n          \"decoded_emotional_core\": \"[in channel_language]\"\n        },\n        \"approved_title\": {\n          \"text\": \"[in channel_language]\",\n          \"char_count\": 0,\n          \"analysis\": {\n            \"emotional_core_detected\": \"[in channel_language]\",\n            \"selection_rationale\": \"[in channel_language]\",\n            \"cliffhanger_analysis\": \"[in channel_language]\",\n            \"validation_results\": {\n              \"anti_patterns_passed\": true,\n              \"validation_questions_passed\": true,\n              \"construction_principles_followed\": true\n            }\n          },\n          \"archetype_mapping\": [\n            {\n              \"from\": \"[Original Character Name/Role]\",\n              \"to\": \"[in channel_language]\",\n              \"rationale\": \"[in channel_language]\"\n            }\n          ]\n        },\n        \"alternative_titles\": [\n          {\n            \"text\": \"[in channel_language]\",\n            \"char_count\": 0,\n            \"emotional_core\": \"[in channel_language]\"\n          }\n        ],\n        \"thumb_ideas\": [\n          \"[in channel_language]\",\n          \"[in channel_language]\"\n        ]\n      }\n    }\n\n    **🚨 FINAL VALIDATION BEFORE OUTPUT:**\n    - Did you extract channel_language from generation_config? YES/NO\n    - Are ALL text fields in channel_language? YES/NO\n    - Did you apply ALL anti_patterns from the input as hard filters? YES/NO\n    - Did you answer ALL validation_questions from the input? YES/NO\n    - Did you follow ALL construction_principles from the input? YES/NO\n    - If any answer is NO, DO NOT OUTPUT. Fix it first.\n\n    **REPEAT: Output ONLY raw JSON. All user-facing text MUST be in channel_language. All filters come from your inputs, not hardcoded rules. This is NON-NEGOTIABLE.**\n</systemPrompt>\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -4016,
+        -1472
+      ],
+      "id": "eb85475c-9380-4086-9fe3-bfda5fe00bbf",
+      "name": "Títulos e Temas",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "video_id",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "id": "0b3e650e-563d-4d99-b753-2877a8992705",
+      "typeVersion": 1.1,
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -6320,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "production_videos",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.video_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -6064,
+        -48
+      ],
+      "id": "6ff0db0f-67db-4533-aa09-d56cf9aa860f",
+      "name": "Busca Video Principal",
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "notesInFlow": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "I0sUz9QL2A9e4Bp4",
+          "name": "supabase: automedia"
+        }
+      },
+      "notes": "production_videos"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "structure_brand_bible",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "placeholder",
+              "keyValue": "={{ $('Busca Video Principal').item.json.placeholder }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -5168,
+        -1616
+      ],
+      "id": "e5843f05-eb3d-46f2-8275-8b4a0ac1a3f0",
+      "name": "Busca Brand Bible",
+      "notesInFlow": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "I0sUz9QL2A9e4Bp4",
+          "name": "supabase: automedia"
+        }
+      },
+      "disabled": true,
+      "notes": "tb: structure_brand_bible"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "narrative_emotional_cores",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "select=name,description"
+      },
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        -3776,
+        -1184
+      ],
+      "id": "8ea3f1e1-5be5-4fc8-90c9-0a3f20dc158a",
+      "name": "get_narrative_emotional_cores",
+      "notesInFlow": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "I0sUz9QL2A9e4Bp4",
+          "name": "supabase: automedia"
+        }
+      },
+      "disabled": true,
+      "notes": "narrative_emotional_cores"
+    },
+    {
+      "parameters": {
+        "model": "google/gemini-2.5-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -4224,
+        -1184
+      ],
+      "id": "ee6ebe48-a72e-4018-9be0-3051a27541dc",
+      "name": "gemini-2.5-flash",
+      "credentials": {
+        "openRouterApi": {
+          "id": "ONfQ5dI8D7OxYEVu",
+          "name": "openrouter: vitascience"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parser para o output do agente Strategic Hook (JSON format)\nconst inputData = $input.first().json;\n\ntry {\n  // 1. EXTRAÇÃO DA STRING JSON\n  let jsonString = '';\n  \n  if (Array.isArray(inputData) && inputData[0]?.output) {\n    jsonString = inputData[0].output;\n  } else if (inputData?.output) {\n    jsonString = inputData.output;\n  } else {\n    throw new Error(\"Campo 'output' não encontrado no input\");\n  }\n  \n  // 2. LIMPEZA: Remove markdown backticks se existirem\n  jsonString = jsonString\n    .replace(/```json\\n?/g, '')\n    .replace(/```\\n?/g, '')\n    .trim();\n  \n  // 3. PARSE DO JSON\n  const data = JSON.parse(jsonString);\n  \n  // 4. VALIDAÇÃO\n  if (!data?.StrategicHookDirective) {\n    throw new Error('JSON não contém StrategicHookDirective');\n  }\n  \n  const directive = data.StrategicHookDirective;\n  \n  // 5. REESTRUTURAÇÃO DOS DADOS (foco em títulos)\n  const cleanOutput = {\n    title: directive.approved_title.text,\n    charCount: directive.approved_title.char_count,\n    \n    analysis: {\n      emotional: directive.approved_title.analysis.emotional_core_detected,\n      rationale: directive.approved_title.analysis.selection_rationale,\n      cliffhanger: directive.approved_title.analysis.cliffhanger_analysis\n    },\n    \n    alternatives: directive.alternative_titles.map(alt => ({\n      text: alt.text,\n      chars: alt.char_count,\n      emotion: alt.emotional_core\n    })),\n    \n    archetypes: directive.approved_title.archetype_mapping.map(m => ({\n      from: m.from,\n      to: m.to,\n      why: m.rationale\n    })),\n    \n    original: {\n      title: directive.benchmark_deconstruction.original_title,\n      formula: directive.benchmark_deconstruction.decoded_viral_formula,\n      core: directive.benchmark_deconstruction.decoded_emotional_core\n    }\n  };\n  \n  return cleanOutput;\n  \n} catch (error) {\n  return {\n    error: true,\n    message: error.message,\n    raw_input: inputData\n  };\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3584,
+        -1472
+      ],
+      "id": "b1fbcef6-5068-4d25-b6c4-e242c00f570a",
+      "name": "Output Parser",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "qLP0Gvj8ALLoK9V1",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/qLP0Gvj8ALLoK9V1",
+          "cachedResultName": "[automedia] Análise Narrativa de Vídeos (fracionando agentes)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "benchmark_video_id": "={{ $('Busca Video Principal').item.json.benchmark_id }}"
+          },
+          "matchingColumns": [
+            "benchmark_video_id"
+          ],
+          "schema": [
+            {
+              "id": "benchmark_video_id",
+              "displayName": "benchmark_video_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -5600,
+        112
+      ],
+      "id": "cba97a0d-af65-4f1a-aef3-7211955b7b41",
+      "name": "Análise de Narrativa",
+      "notesInFlow": true,
+      "notes": "➡️ benchmark_video_id"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d0cdd54b-ec4f-4f84-9cfc-ee37c4c9278c",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -5600,
+        -48
+      ],
+      "id": "e302db43-4176-4640-8d79-4b85e38704ed",
+      "name": "tem narrative_analyses?"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "narrative_analyses",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "benchmark_video_id",
+              "keyValue": "={{ $json.benchmark_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -5824,
+        -48
+      ],
+      "id": "559d9f4d-b8f3-4d19-a8d9-08555a77f126",
+      "name": "GET: narrative_analyses",
+      "notesInFlow": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "I0sUz9QL2A9e4Bp4",
+          "name": "supabase: automedia"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "narrative_analyses"
+    },
+    {
+      "parameters": {
+        "content": "## A narrativa do benchmark_video (referência) já foi analisada?\n_Essa é a busca para entender se já existe uma análise narrativa para extrair os \"story_beats\" do video de referência. Se não tiver, vai pro fluxo de análise._\n",
+        "height": 496,
+        "width": 544,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -5904,
+        -208
+      ],
+      "id": "cee2c975-23e2-431e-8a1d-3ea11d659b1d",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "model": "google/gemini-2.5-pro",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -3984,
+        -1184
+      ],
+      "id": "70e49e15-10c1-47db-8f15-5965de12c806",
+      "name": "gemini-2.5-pro || fb",
+      "credentials": {
+        "openRouterApi": {
+          "id": "ONfQ5dI8D7OxYEVu",
+          "name": "openrouter: vitascience"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://eafkhsmgrzywrhviisdl.supabase.co/rest/v1/rpc/get_benchmark_video_narrative_dossier",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhZmtoc21ncnp5d3Jodmlpc2RsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0Nzk1MjIzMywiZXhwIjoyMDYzNTI4MjMzfQ.Tiaai7QQLOhuRnd-l2mg1RVC_NXM7XVgOKNxjQQY98E"
+            },
+            {
+              "name": "apiKey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhZmtoc21ncnp5d3Jodmlpc2RsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0Nzk1MjIzMywiZXhwIjoyMDYzNTI4MjMzfQ.Tiaai7QQLOhuRnd-l2mg1RVC_NXM7XVgOKNxjQQY98E"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "p_benchmark_video_id",
+              "value": "={{ $('Busca Video Principal').item.json.benchmark_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -4768,
+        -1472
+      ],
+      "name": "get_benchmark_video_narrative_dossier",
+      "notesInFlow": true,
+      "id": "1f812641-3532-49a0-a7c2-0574f73f3dba",
+      "executeOnce": true,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "content": "## Get Narrative Dossier\n\nA ideia dessa função é ir fazendo todas as buscas necessárias da tabela `narrative_analyses` para trazer as informações já renderizadas pro agente consumir.\n\nPor exemplo:\n\n```sql\nSELECT get_benchmark_video_narrative_dossier(8352);\n```\n\n**O que isso vai cuspir?**\n\nUm único resultado, contendo um JSON array com toda a análise narrativa do vídeo que estamos modelando: emoções, story_beats, personagens, etc.\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nChat de construção da função: https://claude.ai/chat/754b8e3e-5462-41f4-9c84-b2ddcabfacc2",
+        "height": 656,
+        "width": 544,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -4976,
+        -1888
+      ],
+      "id": "cd344c82-aad1-41a6-a0d8-caeab7dccdc3",
+      "name": "Sticky Note6",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "narrative_archetypes",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "select=name,description"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -5168,
+        -1440
+      ],
+      "id": "6fc1aa4d-cd00-4e9f-9849-8c3e5f32fb37",
+      "name": "Busca narrative_archetypes",
+      "notesInFlow": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "I0sUz9QL2A9e4Bp4",
+          "name": "supabase: automedia"
+        }
+      },
+      "disabled": true,
+      "notes": "narrative_archetypes"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "VAR-001",
+              "name": "video_id",
+              "value": "={{ $('Busca Video Principal').item.json.id }}",
+              "type": "number"
+            },
+            {
+              "id": "VAR-002",
+              "name": "placeholder",
+              "value": "={{ $('Busca Brand Bible').first().json.placeholder }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-003",
+              "name": "brand_name",
+              "value": "={{ $('Busca Brand Bible').first().json.brand_name }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-007",
+              "name": "language",
+              "value": "={{ $json.brand_context.brand_context_data.language }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-008",
+              "name": "audience_description",
+              "value": "={{ $('Busca Brand Bible').first().json.audience_description }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-009",
+              "name": "host_name",
+              "value": "={{ $('Busca Brand Bible').first().json.host_profile.name }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-010",
+              "name": "host_bio",
+              "value": "={{ $('Busca Brand Bible').first().json.host_profile.bio }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-011",
+              "name": "writing_manual",
+              "value": "={{ $('Busca Brand Bible').first().json.writing_style_guide.writing_manual }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-012",
+              "name": "blacklist",
+              "value": "={{ $('Busca Brand Bible').first().json.writing_style_guide.vocabulary_rules.blacklist }}",
+              "type": "array"
+            },
+            {
+              "id": "VAR-013",
+              "name": "whitelist",
+              "value": "={{ $('Busca Brand Bible').first().json.writing_style_guide.vocabulary_rules.whitelist }}",
+              "type": "array"
+            },
+            {
+              "id": "VAR-014",
+              "name": "content_guardrails",
+              "value": "={{ $('Busca Brand Bible').first().json.writing_style_guide.content_guardrails }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-015",
+              "name": "default_word_count",
+              "value": "={{ $('Busca Brand Bible').first().json.writing_style_guide.default_word_count }}",
+              "type": "number"
+            },
+            {
+              "id": "VAR-016",
+              "name": "tts_provider",
+              "value": "={{ $('Busca Brand Bible').first().json.voice_profile.provider }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-017",
+              "name": "tts_voice_id",
+              "value": "={{ $('Busca Brand Bible').first().json.voice_profile.voice_id }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-018",
+              "name": "artistic_direction_description",
+              "value": "={{ $('Busca Brand Bible').item.json.voice_profile.artistic_direction.style }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-019",
+              "name": "visual_genre",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.style_and_references.visual_genre }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-020",
+              "name": "visual_era",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.style_and_references.visual_era }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-021",
+              "name": "artistic_movement",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.style_and_references.artistic_movement }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-022",
+              "name": "cinematic_influence",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.style_and_references.cinematic_influence }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-023",
+              "name": "color_scheme_hex",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.color_profile.color_scheme_hex }}",
+              "type": "array"
+            },
+            {
+              "id": "VAR-024",
+              "name": "grading_description",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.color_profile.grading_description }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-025",
+              "name": "image_quality",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.technical_fundamentals.image_quality }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-026",
+              "name": "texture_style",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.technical_fundamentals.texture_style }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-027",
+              "name": "preferred_lens",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.technical_fundamentals.preferred_lens }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-028",
+              "name": "preferred_aperture",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.technical_fundamentals.preferred_aperture }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-029",
+              "name": "lighting_signature",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.lighting_and_atmosphere.lighting_signature }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-030",
+              "name": "overall_mood",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.lighting_and_atmosphere.overall_mood }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-031",
+              "name": "negative_prompt_default",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.negative_prompt_default }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-032",
+              "name": "soundtrack_mood_filter",
+              "value": "={{ $('Busca Brand Bible').first().json.finalization_profile.asset_selection_filters.soundtracks.mood }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-033",
+              "name": "soundtrack_genre_filter",
+              "value": "={{ $('Busca Brand Bible').first().json.finalization_profile.asset_selection_filters.soundtracks.genre }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-034",
+              "name": "vfx_style_filter",
+              "value": "={{ $('Busca Brand Bible').first().json.finalization_profile.asset_selection_filters.visual_fx_overlays.style }}",
+              "type": "string"
+            },
+            {
+              "id": "a50a8d39-7500-4e6b-8970-f1af405af58e",
+              "name": "typography_profile",
+              "value": "={{ $('Busca Brand Bible').item.json.typography_profile }}",
+              "type": "object"
+            },
+            {
+              "id": "f76dcf7e-9897-4f42-8f73-6fef1f42e9bb",
+              "name": "finalization_profile",
+              "value": "={{ $('Busca Brand Bible').item.json.finalization_profile }}",
+              "type": "object"
+            },
+            {
+              "id": "b6b36741-c6ce-4edf-b97d-4084d4f4c06f",
+              "name": "typography_profile",
+              "value": "={{ $('Busca Brand Bible').item.json.typography_profile }}",
+              "type": "object"
+            },
+            {
+              "id": "6989a0dc-6555-4ba0-90cd-1ae828ec39ef",
+              "name": "brand_context.strategic_dossier.high_concept",
+              "value": "={{ $json.brand_context.strategic_dossier.high_concept }}",
+              "type": "string"
+            },
+            {
+              "id": "64b25832-c280-491f-9b93-d47851ae4fef",
+              "name": "brand_context.strategic_dossier.channel_thesis",
+              "value": "={{ $json.brand_context.strategic_dossier.channel_thesis }}",
+              "type": "string"
+            },
+            {
+              "id": "571fa505-db5d-404e-ac9a-989dca8c1e66",
+              "name": "brand_context.strategic_dossier.strategic_summary",
+              "value": "={{ $json.brand_context.strategic_dossier.strategic_summary }}",
+              "type": "string"
+            },
+            {
+              "id": "18a2c4ed-6c2b-4cd1-b0ad-2d1e66083699",
+              "name": "brand_context.brand_context_data",
+              "value": "={{ $json.brand_context.brand_context_data }}",
+              "type": "object"
+            },
+            {
+              "id": "14e75f14-8157-4cdf-bde1-c451cfff5dd8",
+              "name": "world_context_map",
+              "value": "={{ $json.world_context_map }}",
+              "type": "object"
+            },
+            {
+              "id": "2616d073-29ca-4a57-8a2f-d5e37d29c52f",
+              "name": "channel_cast_map",
+              "value": "={{ $json.channel_cast_map }}",
+              "type": "object"
+            },
+            {
+              "id": "8fd22dd0-1785-46bd-a106-9e8245bb8025",
+              "name": "storytelling_formulas",
+              "value": "={{ $json.storytelling_formulas }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -4368,
+        -1696
+      ],
+      "id": "16a1cad7-44e5-4ca7-9165-979a2e7bb2f1",
+      "name": "off_Contexto Global",
+      "executeOnce": true,
+      "notesInFlow": true,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "VAR-001",
+              "name": "video_id",
+              "value": "={{ $('Busca Video Principal').item.json.id }}",
+              "type": "number"
+            },
+            {
+              "id": "VAR-002",
+              "name": "placeholder",
+              "value": "={{ $('Busca Brand Bible').first().json.placeholder }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-003",
+              "name": "brand_name",
+              "value": "={{ $('Busca Brand Bible').first().json.brand_name }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-007",
+              "name": "language",
+              "value": "={{ $('Busca Brand Bible').item.json.brand_context.brand_context_data.language }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-008",
+              "name": "audience_description",
+              "value": "={{ $('Busca Brand Bible').first().json.audience_description }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-009",
+              "name": "host_name",
+              "value": "={{ $('Busca Brand Bible').first().json.host_profile.name }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-010",
+              "name": "host_bio",
+              "value": "={{ $('Busca Brand Bible').first().json.host_profile.bio }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-011",
+              "name": "writing_manual",
+              "value": "={{ $('Busca Brand Bible').first().json.writing_style_guide.writing_manual }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-012",
+              "name": "blacklist",
+              "value": "={{ $('Busca Brand Bible').first().json.writing_style_guide.vocabulary_rules.blacklist }}",
+              "type": "array"
+            },
+            {
+              "id": "VAR-013",
+              "name": "whitelist",
+              "value": "={{ $('Busca Brand Bible').first().json.writing_style_guide.vocabulary_rules.whitelist }}",
+              "type": "array"
+            },
+            {
+              "id": "VAR-014",
+              "name": "content_guardrails",
+              "value": "={{ $('Busca Brand Bible').first().json.writing_style_guide.content_guardrails }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-015",
+              "name": "default_characters_count_goal",
+              "value": "={{ $('Busca Brand Bible').item.json.writing_style_guide.default_script_total_character_count_goal }}",
+              "type": "number"
+            },
+            {
+              "id": "VAR-016",
+              "name": "tts_provider",
+              "value": "={{ $('Busca Brand Bible').first().json.voice_profile.provider }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-017",
+              "name": "tts_voice_id",
+              "value": "={{ $('Busca Brand Bible').first().json.voice_profile.voice_id }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-018",
+              "name": "artistic_direction_description",
+              "value": "={{ $('Busca Brand Bible').item.json.voice_profile.artistic_direction.style }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-019",
+              "name": "visual_genre",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.style_and_references.visual_genre }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-020",
+              "name": "visual_era",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.style_and_references.visual_era }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-021",
+              "name": "artistic_movement",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.style_and_references.artistic_movement }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-022",
+              "name": "cinematic_influence",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.style_and_references.cinematic_influence }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-023",
+              "name": "color_scheme_hex",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.color_profile.color_scheme_hex }}",
+              "type": "array"
+            },
+            {
+              "id": "VAR-024",
+              "name": "grading_description",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.color_profile.grading_description }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-025",
+              "name": "image_quality",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.technical_fundamentals.image_quality }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-026",
+              "name": "texture_style",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.technical_fundamentals.texture_style }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-027",
+              "name": "preferred_lens",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.technical_fundamentals.preferred_lens }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-028",
+              "name": "preferred_aperture",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.technical_fundamentals.preferred_aperture }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-029",
+              "name": "lighting_signature",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.lighting_and_atmosphere.lighting_signature }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-030",
+              "name": "overall_mood",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.lighting_and_atmosphere.overall_mood }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-031",
+              "name": "negative_prompt_default",
+              "value": "={{ $('Busca Brand Bible').first().json.visual_profile.negative_prompt_default }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-032",
+              "name": "soundtrack_mood_filter",
+              "value": "={{ $('Busca Brand Bible').first().json.finalization_profile.asset_selection_filters.soundtracks.mood }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-033",
+              "name": "soundtrack_genre_filter",
+              "value": "={{ $('Busca Brand Bible').first().json.finalization_profile.asset_selection_filters.soundtracks.genre }}",
+              "type": "string"
+            },
+            {
+              "id": "VAR-034",
+              "name": "vfx_style_filter",
+              "value": "={{ $('Busca Brand Bible').first().json.finalization_profile.asset_selection_filters.visual_fx_overlays.style }}",
+              "type": "string"
+            },
+            {
+              "id": "a50a8d39-7500-4e6b-8970-f1af405af58e",
+              "name": "typography_profile",
+              "value": "={{ $('Busca Brand Bible').item.json.typography_profile }}",
+              "type": "object"
+            },
+            {
+              "id": "f76dcf7e-9897-4f42-8f73-6fef1f42e9bb",
+              "name": "finalization_profile",
+              "value": "={{ $('Busca Brand Bible').item.json.finalization_profile }}",
+              "type": "object"
+            },
+            {
+              "id": "b6b36741-c6ce-4edf-b97d-4084d4f4c06f",
+              "name": "typography_profile",
+              "value": "={{ $('Busca Brand Bible').item.json.typography_profile }}",
+              "type": "object"
+            },
+            {
+              "id": "6989a0dc-6555-4ba0-90cd-1ae828ec39ef",
+              "name": "brand_context.strategic_dossier.high_concept",
+              "value": "={{ $('Busca Brand Bible').item.json.brand_context.strategic_dossier.high_concept }}",
+              "type": "string"
+            },
+            {
+              "id": "64b25832-c280-491f-9b93-d47851ae4fef",
+              "name": "brand_context.strategic_dossier.channel_thesis",
+              "value": "={{ $('Busca Brand Bible').item.json.brand_context.strategic_dossier.channel_thesis }}",
+              "type": "string"
+            },
+            {
+              "id": "571fa505-db5d-404e-ac9a-989dca8c1e66",
+              "name": "brand_context.strategic_dossier.strategic_summary",
+              "value": "={{ $('Busca Brand Bible').item.json.brand_context.strategic_dossier.strategic_summary }}",
+              "type": "string"
+            },
+            {
+              "id": "18a2c4ed-6c2b-4cd1-b0ad-2d1e66083699",
+              "name": "brand_context.brand_context_data",
+              "value": "={{ $('Busca Brand Bible').item.json.brand_context.brand_context_data }}",
+              "type": "object"
+            },
+            {
+              "id": "14e75f14-8157-4cdf-bde1-c451cfff5dd8",
+              "name": "world_context_map",
+              "value": "={{ $('Busca Brand Bible').item.json.world_context_map }}",
+              "type": "object"
+            },
+            {
+              "id": "2616d073-29ca-4a57-8a2f-d5e37d29c52f",
+              "name": "channel_cast_map",
+              "value": "={{ $('Busca Brand Bible').item.json.channel_cast_map }}",
+              "type": "object"
+            },
+            {
+              "id": "8fd22dd0-1785-46bd-a106-9e8245bb8025",
+              "name": "narrative_playbook",
+              "value": "={{ $('Busca Brand Bible').item.json.narrative_playbook }}",
+              "type": "object"
+            },
+            {
+              "id": "cb44154b-bd8d-40cb-86e6-bd1cc9a59644",
+              "name": "benchmark_video_story_beats",
+              "value": "={{ $('GET: narrative_analyses').item.json.story_beats || $('Análise de Narrativa').item.json.story_beats }}",
+              "type": "string"
+            },
+            {
+              "id": "a5fb2e14-087c-4899-8885-1e020780f5ea",
+              "name": "benchmark_video_narrative_dossier",
+              "value": "={{ $json }}",
+              "type": "object"
+            },
+            {
+              "id": "34d4e241-7dae-4343-8dcb-6762413701d9",
+              "name": "narrative_archetypes",
+              "value": "={{ $('Busca narrative_archetypes').all() }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -4368,
+        -1472
+      ],
+      "id": "11aff028-9f3b-41d4-aa64-ec2f10ee79f2",
+      "name": "Contexto Global",
+      "executeOnce": true,
+      "notesInFlow": true,
+      "alwaysOutputData": false,
+      "disabled": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "## Entrada\n",
+        "height": 288,
+        "width": 256,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -6400,
+        -160
+      ],
+      "id": "fa52129c-49d1-4fcc-bf9e-03043700de32",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Fluxo de Produção do Outline da nossa História\n",
+        "height": 336,
+        "width": 256,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -3760,
+        -192
+      ],
+      "id": "1e81bdc0-d04e-4c86-9f54-e887e0dccb71",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "KT7GZsFElveDWsqC",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/KT7GZsFElveDWsqC",
+          "cachedResultName": "✅ 2. produção do outline (reality weaver)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "video_id": "={{ $('Start').item.json.video_id }}"
+          },
+          "matchingColumns": [
+            "video_id"
+          ],
+          "schema": [
+            {
+              "id": "video_id",
+              "displayName": "video_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -3680,
+        -64
+      ],
+      "id": "b2a2fa44-f2f3-46a4-b0d2-66b27d638cce",
+      "name": "✅ 2. produção do outline (reality weaver)"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "production_videos",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Busca Video Principal').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $json.data.Headline }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "create_outline"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -3968,
+        -64
+      ],
+      "id": "84d5cf66-4576-4cd2-a43c-0a062d4038df",
+      "name": "UPDATE: title e status",
+      "notesInFlow": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "I0sUz9QL2A9e4Bp4",
+          "name": "supabase: automedia"
+        }
+      },
+      "notes": "production_videos"
+    },
+    {
+      "parameters": {
+        "dataToSave": {
+          "values": [
+            {
+              "key": "video_id",
+              "value": "={{ $json.video_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executionData",
+      "typeVersion": 1.1,
+      "position": [
+        -6064,
+        -336
+      ],
+      "id": "6462c9de-9aa2-4183-8737-cd0b150a8667",
+      "name": "Execution Data"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "automedialat@gmail.com",
+        "subject": "=[{{ $('Busca Video Principal').first().json.id }}] Escolha a Headline",
+        "message": "=<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n</head>\n<body style=\"margin: 0; padding: 0; background-color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color: #f5f5f5; padding: 20px 0;\">\n    <tr>\n      <td align=\"center\">\n        <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);\">\n\n          <!-- Header -->\n          <tr>\n            <td style=\"background: linear-gradient(135deg, #0A121A 0%, #1a2530 100%); padding: 30px; border-radius: 8px 8px 0 0;\">\n              <h1 style=\"margin: 0; color: #D9791C; font-size: 24px; font-weight: 600;\">\n                🎬 Validação de Headline\n              </h1>\n              <p style=\"margin: 8px 0 0; color: #A2B5BF; font-size: 14px;\">\n                Human-in-the-Loop • Automedia Pipeline\n              </p>\n            </td>\n          </tr>\n\n          <!-- Benchmark Reference -->\n          <tr>\n            <td style=\"padding: 25px 30px 15px;\">\n              <p style=\"margin: 0 0 8px; color: #666; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;\">\n                Título de Referência (Benchmark)\n              </p>\n              <p style=\"margin: 0; color: #333; font-size: 15px; line-height: 1.5; padding: 15px; background-color: #f8f9fa; border-left: 4px solid #A2B5BF; border-radius: 0 4px 4px 0;\">\n                {{ $('Busca Video Principal').first().json.benchmark_title }}\n              </p>\n              <p style=\"margin: 10px 0 0; color: #888; font-size: 13px; font-style: italic;\">\n                Fórmula: {{ $json.original.formula }}\n              </p>\n            </td>\n          </tr>\n\n          <!-- Divider -->\n          <tr>\n            <td style=\"padding: 0 30px;\">\n              <hr style=\"border: none; border-top: 1px solid #e0e0e0; margin: 10px 0;\">\n            </td>\n          </tr>\n\n          <!-- Main Title Suggestion -->\n          <tr>\n            <td style=\"padding: 15px 30px 25px;\">\n              <p style=\"margin: 0 0 12px; color: #D9791C; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;\">\n                ⭐ Título Principal Sugerido\n              </p>\n              <div style=\"background: linear-gradient(135deg, #0A121A 0%, #1a2530 100%); padding: 20px; border-radius: 6px; border-left: 4px solid #D9791C;\">\n                <p style=\"margin: 0; color: #ffffff; font-size: 17px; line-height: 1.5; font-weight: 500;\">\n                  {{ $json.title }}\n                </p>\n              </div>\n\n              <!-- Analysis Tags -->\n              <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin-top: 15px;\">\n                <tr>\n                  <td width=\"50%\" style=\"padding-right: 8px;\">\n                    <div style=\"background-color: #fff3e0; padding: 12px; border-radius: 4px;\">\n                      <p style=\"margin: 0 0 4px; color: #e65100; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;\">\n                        Emoção\n                      </p>\n                      <p style=\"margin: 0; color: #333; font-size: 13px;\">\n                        {{ $json.analysis.emotional }}\n                      </p>\n                    </div>\n                  </td>\n                  <td width=\"50%\" style=\"padding-left: 8px;\">\n                    <div style=\"background-color: #e3f2fd; padding: 12px; border-radius: 4px;\">\n                      <p style=\"margin: 0 0 4px; color: #1565c0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;\">\n                        Racional\n                      </p>\n                      <p style=\"margin: 0; color: #333; font-size: 13px;\">\n                        {{ $json.analysis.rationale }}\n                      </p>\n                    </div>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- Divider -->\n          <tr>\n            <td style=\"padding: 0 30px;\">\n              <hr style=\"border: none; border-top: 1px solid #e0e0e0; margin: 0;\">\n            </td>\n          </tr>\n\n          <!-- Alternative Titles -->\n          <tr>\n            <td style=\"padding: 25px 30px;\">\n              <p style=\"margin: 0 0 15px; color: #666; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;\">\n                Títulos Alternativos\n              </p>\n\n              <!-- Alternative 1 -->\n              <div style=\"background-color: #f8f9fa; padding: 12px 15px; border-radius: 4px; margin-bottom: 8px; border-left: 3px solid #90a4ae;\">\n                <span style=\"color: #D9791C; font-weight: 600; font-size: 13px;\">1.</span>\n                <span style=\"color: #333; font-size: 14px; margin-left: 8px;\">{{ $json.alternatives[0].text }}</span>\n              </div>\n\n              <!-- Alternative 2 -->\n              <div style=\"background-color: #f8f9fa; padding: 12px 15px; border-radius: 4px; margin-bottom: 8px; border-left: 3px solid #90a4ae;\">\n                <span style=\"color: #D9791C; font-weight: 600; font-size: 13px;\">2.</span>\n                <span style=\"color: #333; font-size: 14px; margin-left: 8px;\">{{ $json.alternatives[1].text }}</span>\n              </div>\n\n              <!-- Alternative 3 -->\n              <div style=\"background-color: #f8f9fa; padding: 12px 15px; border-radius: 4px; margin-bottom: 8px; border-left: 3px solid #90a4ae;\">\n                <span style=\"color: #D9791C; font-weight: 600; font-size: 13px;\">3.</span>\n                <span style=\"color: #333; font-size: 14px; margin-left: 8px;\">{{ $json.alternatives[2].text }}</span>\n              </div>\n\n              <!-- Alternative 4 -->\n              <div style=\"background-color: #f8f9fa; padding: 12px 15px; border-radius: 4px; margin-bottom: 8px; border-left: 3px solid #90a4ae;\">\n                <span style=\"color: #D9791C; font-weight: 600; font-size: 13px;\">4.</span>\n                <span style=\"color: #333; font-size: 14px; margin-left: 8px;\">{{ $json.alternatives[3].text }}</span>\n              </div>\n\n              <!-- Alternative 5 -->\n              <div style=\"background-color: #f8f9fa; padding: 12px 15px; border-radius: 4px; margin-bottom: 8px; border-left: 3px solid #90a4ae;\">\n                <span style=\"color: #D9791C; font-weight: 600; font-size: 13px;\">5.</span>\n                <span style=\"color: #333; font-size: 14px; margin-left: 8px;\">{{ $json.alternatives[4].text }}</span>\n              </div>\n\n              <!-- Alternative 6 -->\n              <div style=\"background-color: #f8f9fa; padding: 12px 15px; border-radius: 4px; margin-bottom: 8px; border-left: 3px solid #90a4ae;\">\n                <span style=\"color: #D9791C; font-weight: 600; font-size: 13px;\">6.</span>\n                <span style=\"color: #333; font-size: 14px; margin-left: 8px;\">{{ $json.alternatives[5].text }}</span>\n              </div>\n\n              <!-- Alternative 7 -->\n              <div style=\"background-color: #f8f9fa; padding: 12px 15px; border-radius: 4px; margin-bottom: 8px; border-left: 3px solid #90a4ae;\">\n                <span style=\"color: #D9791C; font-weight: 600; font-size: 13px;\">7.</span>\n                <span style=\"color: #333; font-size: 14px; margin-left: 8px;\">{{ $json.alternatives[6].text }}</span>\n              </div>\n\n              <!-- Alternative 8 -->\n              <div style=\"background-color: #f8f9fa; padding: 12px 15px; border-radius: 4px; margin-bottom: 8px; border-left: 3px solid #90a4ae;\">\n                <span style=\"color: #D9791C; font-weight: 600; font-size: 13px;\">8.</span>\n                <span style=\"color: #333; font-size: 14px; margin-left: 8px;\">{{ $json.alternatives[7].text }}</span>\n              </div>\n\n              <!-- Alternative 9 -->\n              <div style=\"background-color: #f8f9fa; padding: 12px 15px; border-radius: 4px; margin-bottom: 8px; border-left: 3px solid #90a4ae;\">\n                <span style=\"color: #D9791C; font-weight: 600; font-size: 13px;\">9.</span>\n                <span style=\"color: #333; font-size: 14px; margin-left: 8px;\">{{ $json.alternatives[8].text }}</span>\n              </div>\n\n              <!-- Alternative 10 -->\n              <div style=\"background-color: #f8f9fa; padding: 12px 15px; border-radius: 4px; border-left: 3px solid #90a4ae;\">\n                <span style=\"color: #D9791C; font-weight: 600; font-size: 13px;\">10.</span>\n                <span style=\"color: #333; font-size: 14px; margin-left: 8px;\">{{ $json.alternatives[9].text }}</span>\n              </div>\n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td style=\"background-color: #f8f9fa; padding: 20px 30px; border-radius: 0 0 8px 8px; border-top: 1px solid #e0e0e0;\">\n              <p style=\"margin: 0; color: #888; font-size: 12px; text-align: center;\">\n                Automedia Production Pipeline • Workflow de Validação\n              </p>\n            </td>\n          </tr>\n\n        </table>\n      </td>\n    </tr>\n  </table>\n</body>\n</html>",
+        "responseType": "customForm",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Headline",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -4208,
+        -64
+      ],
+      "id": "9008e8e6-c58c-4201-ab03-01590b572cad",
+      "name": "Aguarda Validação no Gmail1",
+      "webhookId": "c1719b88-2727-4a28-948c-6b38977c2849",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sGv5Oa6g6E43CTs4",
+          "name": "automedialat@gmail.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=<inputs>\n  <!-- A diretiva de geração para esta execução específica. -->\n      <generation_config>\n          <channel_language>{{ $json.language }}</channel_language>\n          <num_alternatives>4</num_alternatives>\n          <strategy>DIVERSIFY_CORES</strategy>\n      </generation_config>\n\n\n    <!-- O novo dossiê completo, contendo a análise da história e dos personagens. Este é o único e verdadeiro input do benchmark. -->\n    <TitlingDossier>\n        <!-- O JSON completo da variável $json.benchmark_video_narrative_dossier. -->\n        <benchmark_video_title>{{ $('Busca Video Principal').item.json.benchmark_title }}</benchmark_video_title>\n        <benchmark_video_narrative_dossier>{{ JSON.stringify($json.benchmark_video_narrative_dossier, null, 2) }}</benchmark_video_narrative_dossier>\n    </TitlingDossier>\n\n    <!-- A fonte da verdade para o universo da marca, usada para a transmutação. -->\n    <BrandBible>\n        <brand_context>\n            {{ JSON.stringify($json.brand_context, null, 2) }}\n        </brand_context>\n        <world_context_map>\n            {{ JSON.stringify($json.world_context_map, null, 2) }}\n        </world_context_map>\n        <channel_cast_map>\n            {{ JSON.stringify($json.channel_cast_map, null, 2) }}       \n        </channel_cast_map>\n        <channel_narrative_playbook>\n            {{ JSON.stringify($json.narrative_playbook, null, 2) }}\n        </channel_narrative_playbook>\n        <emotional_core_taxonomy>\n            <!-- A instrução para a automação: executar a ferramenta que busca os núcleos emocionais. -->\n            <!-- A diretiva para buscar o arsenal emocional completo é precisa. -->\n            run the \"get_narrative_emotional_cores\" tool to get all emotional cores\n        </emotional_core_taxonomy>\n    </BrandBible>\n\n</inputs>",
+        "hasOutputParser": true,
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "=<systemPrompt>\n    You are the **Viral Hooks Strategist**, designated Agent 0. You are a cognitive engine for strategic title generation. You do not invent; you transmute. Your mission is to consume a high-fidelity `TitlingDossier` and forge a portfolio of high-CTR titles that are both virally potent and perfectly aligned with our brand's unique DNA.\n\n    **🚨 CRITICAL LANGUAGE DIRECTIVE (NON-NEGOTIABLE):**\n    - FIRST ACTION: Extract `channel_language` from input's `generation_config`\n    - ALL OUTPUT TEXT must be in this language - NO EXCEPTIONS\n    - If channel_language = \"pt-BR\" → ALL text in Brazilian Portuguese\n    - If channel_language = \"es-ES\" → ALL text in Spanish\n    - This applies to: titles, analysis, rationale, thumb_ideas, emotional_core labels\n    - Outputting in wrong language = IMMEDIATE MISSION FAILURE\n    - Your reasoning can be in English, but EVERY user-facing text field MUST match channel_language\n\n    **MISSION DIRECTIVE: Execute the following cognitive protocol.**\n\n    **PROTOCOL 1: TACTICAL INGESTION & DECONSTRUCTION**\n    -   Assimilate the `TitlingDossier`. Your primary fuel is the `characters` array within this JSON.\n    -   Identify the key players: the `Protagonist` and the primary `Antagonist`(s).\n    -   Extract their core dynamics. Focus on their `role`, `occupation`, and especially their `layers`. The `layers` are the source of all empathy, vulnerability, and status gaps.\n    -   Extract the `central_theme` and `story_beats` from `general_analysis` to understand the narrative arc.\n    -   **REMINDER: All analysis you write must be in channel_language.**\n\n    **PROTOCOL 2: MANDATORY TRANSMUTATION (The Prime Directive)**\n    -   Your first and most critical action is translation. Take the rich character profiles from the dossier and find their direct functional equivalents within the `world_context_map` provided in the `BrandBible`.\n    -   Example concept: \"Waitress with hidden academic past\" becomes brand-native equivalent like \"Humble craftsperson with master-level knowledge\".\n    -   **ANY title using non-native concepts is an instant mission failure.** Your output must be 100% pure to our brand's world.\n    -   **REMINDER: All transmuted roles must be written in channel_language.**\n\n    **PROTOCOL 3: IDEATION & THE SOCRATIC FILTER**\n    -   **A. Brainstorming Burst:** Using the now-transmuted characters and their dynamics, generate 10-15 raw title concepts, using the `channel_narrative_playbook` for formulaic inspiration and diversifying across the `emotional_core_taxonomy`.\n    -   **B. Internal Socratic Filter:** Subject each concept to a brutal critique. Is the archetype mapping functionally correct? Is it a fresh application of the viral formula? Does it amplify the core `channel_thesis`? Discard all flawed or weak concepts.\n    -   **REMINDER: All titles must be in channel_language. NO EXCEPTIONS.**\n\n    **PROTOCOL 4: THE STRATEGIC COMMAND-AND-CONTROL (CoT Final Selection)**\n    -   Take your shortlisted candidates and apply the weighted scoring system:\n    \n    **WEIGHTED SCORING HIERARCHY:**\n    1. **Viral Potential** (40%): Image Clarity + Verb Strength + Cliffhanger Power + Scroll-Stopping Factor\n    2. **Human Stakes** (30%): Emotional resonance, relatability, and empathy trigger\n    3. **Brand DNA Alignment** (30%): Fits the channel's unique thesis and world context\n    \n    -   **THE ADAPTIVE GOLDEN RULE:** The `approved_title` MUST score highest in VIRAL POTENTIAL first, then validated for Brand DNA. If a title scores 10/10 on Brand DNA but only 5/10 on Viral Potential, it FAILS. Your primary mission is CTR (Click-Through Rate), not just brand purity.\n    \n    -   **CRITICAL VALIDATION STEP:** After selecting your `approved_title`, compare it against ALL your `alternative_titles`. If ANY alternative scores 15% or higher on Viral Potential, you MUST reconsider your selection or provide strong justification in `selection_rationale` explaining why you chose the approved title despite the gap.\n    \n    -   Ask yourself: \"Would this title make someone STOP SCROLLING?\" If not, it's not your approved title.\n    \n    -   **REMINDER: Your analysis and rationale must be in channel_language.**\n\n    **PROTOCOL 5: ENGINEERING & GUARDRAILS**\n    -   Refine your selected portfolio. Apply strategic CAPS for INJUSTICE and REVELATION.\n    -   **Hard Limit:** All titles MUST be under 100 characters. Include a separate `char_count`.\n    -   **REMINDER: All titles and thumb_ideas must be in channel_language.**\n\n    **FINAL MANDATE: OUTPUT ASSEMBLY**\n    Package your final, battle-tested results into the mandatory JSON structure below.\n\n    **CRITICAL OUTPUT FORMAT:**\n    -   Your response MUST be ONLY valid JSON\n    -   DO NOT wrap it in XML tags\n    -   DO NOT use markdown code blocks (no ```json)\n    -   DO NOT add any text before or after the JSON\n    -   Return the raw JSON object directly\n    -   **LANGUAGE RULE: EVERY text value (titles, analysis, rationale, thumb_ideas, emotional_core) MUST be in channel_language**\n    -   **NEVER output English text in user-facing fields**\n    -   Only JSON keys and structure remain in English\n\n    {\n      \"StrategicHookDirective\": {\n        \"benchmark_deconstruction\": {\n          \"original_title\": null,\n          \"decoded_viral_formula\": \"FORMULA_PATTERN_HERE\",\n          \"decoded_emotional_core\": \"[in channel_language]\"\n        },\n        \"approved_title\": {\n          \"text\": \"[in channel_language]\",\n          \"char_count\": 0,\n          \"analysis\": {\n            \"emotional_core_detected\": \"[in channel_language]\",\n            \"selection_rationale\": \"[in channel_language]\",\n            \"cliffhanger_analysis\": \"[in channel_language]\"\n          },\n          \"archetype_mapping\": [\n            {\n              \"from\": \"[Original Character Name/Role]\",\n              \"to\": \"[in channel_language]\",\n              \"rationale\": \"[in channel_language]\"\n            }\n          ]\n        },\n        \"alternative_titles\": [\n          {\n            \"text\": \"[in channel_language]\",\n            \"char_count\": 0,\n            \"emotional_core\": \"[in channel_language]\"\n          }\n        ],\n        \"thumb_ideas\": [\n          \"[in channel_language]\",\n          \"[in channel_language]\"\n        ]\n      }\n    }\n\n    **🚨 FINAL VALIDATION BEFORE OUTPUT:**\n    - Did you extract channel_language from generation_config? YES/NO\n    - Are ALL text fields in channel_language? YES/NO\n    - If any answer is NO, DO NOT OUTPUT. Fix it first.\n    \n    **REPEAT: Output ONLY raw JSON. All user-facing text MUST be in channel_language. This is NON-NEGOTIABLE.**\n</systemPrompt>"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -4032,
+        -1792
+      ],
+      "id": "02fb0c77-8815-4b6a-a162-aebe57668497",
+      "name": "Títulos e Temas1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "content": "# Title Transmuter v2.1\n\n## Comando n8n\n```bash\ncd \"/Users/felipegobbi/Documents/Vibe Work/AUTOMEDIA/operations/title-transmuter\" && /opt/homebrew/bin/node n8n-wrapper-title.js --video-id={{ $('Busca Video Principal').item.json.id }}\n```\n\n---\n## Fluxo\n\n### ANTES (Payload)\n`title-transmuter-payload-builder.py`\n- production_videos → benchmark_id\n- benchmark_videos → benchmark_title\n- structure_brand_bible → brand_bible (com narrative_playbook)\n- **Output:** `title_payload.json`\n\n### DURANTE (Agent)\n`agent-title-transmuter.md`\n1. Deconstruct Benchmark DNA\n2. Map to Brand Universe\n3. Generate 11 Titles\n4. Select by Fidelity (7/7)\n5. Validate (Coherence + Anti-Pattern)\n- **Output:** `{id}_titles.json`\n\n### DEPOIS (Save)\n- `{id}_title.txt` → n8n shared\n- `{id}_title_alternatives.txt` → n8n shared\n- `production_videos.title` → Supabase\n\n---\n\n## Validações\n\n**Coherence Checklist:**\n- Internal Logic\n- Structural Mapping\n- Concrete Specificity\n- Emotional Equivalence\n\n**Fidelity:** 7/7 matches\n\n---\n\n## Custo\n$0.01-0.02 por geração\n",
+        "height": 1184,
+        "width": 960
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -7472,
+        -800
+      ],
+      "id": "940f0e27-4e0e-45f5-9d6f-bfa1c3ab360f",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "command": "=cd \"/Users/felipegobbi/Documents/Vibe Work/AUTOMEDIA/operations/title-transmuter\" && /opt/homebrew/bin/node n8n-wrapper-title-v2.js --video-id={{ $('Busca Video Principal').item.json.id }}"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -5184,
+        -64
+      ],
+      "id": "e7ce9ea4-0a19-469c-aea1-2c7bbf4dbc03",
+      "name": "Escrever Título com Claude Code",
+      "credentials": {
+        "sshPassword": {
+          "id": "bmQPhaqVCAdHWsl0",
+          "name": "SSH Password: mac gobbi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fileSelector": "=/data/shared/{{ $('Busca Video Principal').item.json.id }}_title*.txt",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -4912,
+        -64
+      ],
+      "id": "55f3d3fd-ba8a-4256-a95f-76c601665af7",
+      "name": "Lê arquivos de title",
+      "notes": "/data/shared/{{ $('Busca Info do Video').item.json.id }}_thumbnail_{{$('Loop Over Items').context.currentRunIndex + 1}}.jpeg"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -4672,
+        -64
+      ],
+      "id": "e3c6f4b6-2e3a-40b7-968b-662a0e7f6623",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega os itens anteriores\nconst titleData = $input.all()[0].json.data;\nconst alternativesData = $input.all()[1].json.data;\n\n// Parse das alternativas (texto → array)\nconst alternativesLines = alternativesData.split('\\n').filter(line => line.trim());\nconst alternatives = alternativesLines.map(line => {\n  // Extrai o texto entre as aspas\n  const match = line.match(/^\\d+\\.\\s*\"(.+)\"\\s*\\(\\d+\\/\\d+\\)$/);\n  return {\n    text: match ? match[1] : line.replace(/^\\d+\\.\\s*/, '').replace(/\\s*\\(\\d+\\/\\d+\\)$/, '')\n  };\n});\n\nreturn [{\n  json: {\n    title: titleData,\n    alternatives: alternatives,\n    analysis: {\n      emotional: \"Shared Outrage\",  // Pegar do payload se disponível\n      rationale: \"7/7 Fidelity Score\"\n    },\n    original: {\n      formula: \"[Sacred family bond] + [Sacred holiday] + [Specific money] + [Third party revelation]\"\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4448,
+        -64
+      ],
+      "id": "36de89d5-6e31-4ad5-8c7d-768ecf552df9",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "content": "## STATUS ERRADO\nMas não importa muito.\n------------\nConsertar depois.",
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -4048,
+        -256
+      ],
+      "id": "b8395cc7-5448-4e31-8c9a-c9d58fec4d19",
+      "name": "Sticky Note5"
+    }
+  ],
+  "pinData": {
+    "Start": [
+      {
+        "json": {
+          "video_id": 175
+        }
+      }
+    ],
+    "Títulos e Temas1": [
+      {
+        "json": {
+          "output": "```json\n{\n  \"StrategicHookDirective\": {\n    \"benchmark_deconstruction\": {\n      \"original_title\": \"My Daughter-In-Law Kicked Me Out of My House After Winning the $85 Million Lottery!\",\n      \"decoded_viral_formula\": \"Injustice Frame (Generational Betrayal) + Status Shift (Sudden Wealth) -> Specific Cruel Action -> Implied Quest for Vindication\",\n      \"decoded_emotional_core\": \"Shared Outrage\"\n    },\n    \"approved_title\": {\n      \"text\": \"My Lottery-Winner Daughter-in-Law Called Me 'Washed-Up' And Stole My House — So I Used The City Code I Wrote Myself To Take It Back.\",\n      \"char_count\": 139,\n      \"analysis\": {\n        \"emotional_core_detected\": \"Vicarious Vengeance\",\n        \"selection_rationale\": \"This title scores highest on Viral Potential by creating an almost mythological level of intellectual authority. The hook 'the City Code I Wrote Myself' is an ultimate, scroll-stopping statement of mastery that perfectly embodies the channel's thesis. It transforms the protagonist from a simple victim into the literal author of the rules that will deliver justice, creating an irresistible curiosity gap and promising a 'checkmate' of the highest order.\",\n        \"cliffhanger_analysis\": \"The cliffhanger is exceptionally strong. The audience is compelled to learn *how* writing the city code gives him the power to reclaim a stolen house. It implies a hidden, inescapable trap that the antagonist, blinded by arrogance, walked right into. The question isn't just 'what happens next,' but 'what brilliant, hidden mechanism will be revealed?'\"\n      },\n      \"archetype_mapping\": [\n        {\n          \"from\": \"I (Protagonist)\",\n          \"to\": \"The Master Craftsman (An elder Black zoning code author & master builder)\",\n          \"rationale\": \"Transmutes the original's passive victim into the brand's core archetype: an underestimated master whose specialized knowledge is his weapon. This shift is mandatory to align with the channel's thesis of competence-as-payback.\"\n        },\n        {\n          \"from\": \"Daughter-in-Law (Antagonist)\",\n          \"to\": \"The Agent of Systemic Arrogance (A newly-rich 'Status Chaser')\",\n          \"rationale\": \"Maps the character's simple greed onto the brand's specific villain: a person who derives worth from superficial status and shows disdain for the protagonist's experience. Her disrespect for his craft becomes the direct cause of her downfall, fulfilling the channel's promise of poetic justice.\"\n        }\n      ]\n    },\n    \"alternative_titles\": [\n      {\n        \"text\": \"My Rich Daughter-In-Law Kicked Me Out Of The Home I BUILT — So I Used a Carpenter's Lien To Seize It During Her Million-Dollar Party.\",\n        \"char_count\": 140,\n        \"emotional_core\": \"Vicarious Vengeance\"\n      },\n      {\n        \"text\": \"She Won $85M And Kicked Me From My Own Home — But I'm The Master Builder Who Used ONE Flaw To Take It All Back.\",\n        \"char_count\": 115,\n        \"emotional_core\": \"Triumph Over Adversity\"\n      },\n      {\n        \"text\": \"She Used Her Lottery Millions To Throw Me Out — She Forgot I'm The Surveyor Who Can Prove Her New Mansion Is Worthless.\",\n        \"char_count\": 127,\n        \"emotional_core\": \"Vicarious Vengeance\"\n      },\n      {\n        \"text\": \"My Daughter-In-Law Stole The House I Built For Her — She Forgot That I Kept The MASTER KEY.\",\n        \"char_count\": 96,\n        \"emotional_core\": \"Shared Outrage\"\n      }\n    ],\n    \"thumb_ideas\": [\n      \"SPLIT SCREEN: On the left, a smug-looking woman in luxury clothes, gesturing dismissively from the door of a beautiful home. On the right, an older, dignified Black man's hands, carefully highlighting a line of text in a thick, official-looking codebook.\",\n      \"CLOSE UP on an eviction notice nailed to a front door. In the background, slightly out of focus, stands the calm silhouette of an older Black man holding a blueprint. A text overlay asks: 'She Forgot Who Wrote The Rules?'\"\n    ]\n  }\n}\n```"
+        }
+      }
+    ],
+    "Escrever Título com Claude Code": [
+      {
+        "json": {
+          "code": 0,
+          "signal": null,
+          "stdout": "🎬 Title Transmuter n8n Wrapper v2.1\n📹 Video ID: 175\n🎯 Using narrative context from RPC\n\n✅ Queue-processor is running\n\n[1/3] Building payload from Supabase (v2 with RPC)...\n✓ Benchmark: \"On Mother’s Day, My Millionaire Son Asked, “Mom, D...\"\n✓ Language: en-US\n✓ Narrative Context: YES\n\n[2/3] Generating titles via Claude Code CLI...\n⏳ This may take 1-3 minutes...\n\n📋 Queue request created: /Users/felipegobbi/Documents/Vibe Work/AUTOMEDIA/operations/narrative-transmutation-orchestrator-v3.0/.queue/title_v2_175_1763594763424.pending\n⏳ Waiting for Claude Code to process...\n..............................\n✓ Processing completed!\n✓ Claude CLI completed\n\n[3/3] Validating outputs...\n   ✓ /Users/felipegobbi/n8n-local/shared_videos/175_title.txt\n   ✓ /Users/felipegobbi/n8n-local/shared_videos/175_title_alternatives.txt\n\n============================================================\n✅ SUCCESS!\n============================================================\n\n🎯 APPROVED TITLE:\n   \"On Father's Day, My CEO Son Asked, \"Dad, Do You Like The $8000 Marcus Sends You?\"\"\n   Fidelity: 7/7 matches\n   Chars: 81\n============================================================\n\n{\n  \"success\": true,\n  \"video_id\": 175,\n  \"title\": {\n    \"approved\": \"On Father's Day, My CEO Son Asked, \\\"Dad, Do You Like The $8000 Marcus Sends You?\\\"\",\n    \"fidelity_score\": 7,\n    \"char_count\": 81,\n    \"alternatives_count\": 10\n  },\n  \"files\": {\n    \"json\": \"/Users/felipegobbi/Documents/Vibe Work/AUTOMEDIA/operations/title-transmuter/outputs/video_175/175_titles.json\",\n    \"title_txt\": \"/Users/felipegobbi/n8n-local/shared_videos/175_title.txt\",\n    \"alternatives_txt\": \"/Users/felipegobbi/n8n-local/shared_videos/175_title_alternatives.txt\"\n  },\n  \"stats\": {\n    \"total_time_seconds\": 64,\n    \"cost_usd\": 0,\n    \"has_narrative_context\": true\n  }\n}",
+          "stderr": "[2025-11-19 20:26:01] INFO  ============================================================\n[2025-11-19 20:26:01] INFO  Building Title Transmuter Payload v2.0 (video_id=175)\n[2025-11-19 20:26:01] INFO  ============================================================\n\n[2025-11-19 20:26:01] INFO  Fetching production_videos (id=175)...\n[2025-11-19 20:26:02] INFO    ✓ Benchmark ID: 26387\n[2025-11-19 20:26:02] INFO    ✓ Profile ID: UCIGfjdAbaKoHRoHI3Umskxw\n[2025-11-19 20:26:02] INFO  Fetching benchmark_videos.title (id=26387)...\n[2025-11-19 20:26:02] INFO    ✓ Title: \"On Mother’s Day, My Millionaire Son Asked, “Mom, Do You Like...\"\n[2025-11-19 20:26:02] INFO  Fetching narrative dossier (video_id=26387)...\n[2025-11-19 20:26:02] INFO    ✓ Central theme: \"Unveiling truth and reassessing relationships....\"\n[2025-11-19 20:26:02] INFO    ✓ Emotional core: Emotional Validation\n[2025-11-19 20:26:02] INFO    ✓ Conflict type: Character vs. Self\n[2025-11-19 20:26:02] INFO    ✓ Narrative structure: Rebirth\n[2025-11-19 20:26:02] INFO  Fetching brand_bible (unique_profile_id=UCIGfjdAbaKoHRoHI3Umskxw)...\n[2025-11-19 20:26:03] INFO    ✓ Account: The Payblack Stories\n[2025-11-19 20:26:03] INFO    ✓ Microniche: us_afro_narrative_bluecollar_revenge\n[2025-11-19 20:26:03] INFO    ✓ Brand bible loaded (4 sections)\n[2025-11-19 20:26:03] INFO  \n✓ Payload built (v2.0):\n[2025-11-19 20:26:03] INFO    - benchmark_title: 88 chars\n[2025-11-19 20:26:03] INFO    - benchmark_narrative_context: YES\n[2025-11-19 20:26:03] INFO    - brand_bible: 4 sections\n[2025-11-19 20:26:03] INFO    - language: en-US\n[2025-11-19 20:26:03] INFO  \n✅ Payload saved: /Users/felipegobbi/Documents/Vibe Work/AUTOMEDIA/operations/title-transmuter/outputs/video_175/title_payload.json\n[2025-11-19 20:26:03] INFO  ============================================================"
+        }
+      }
+    ],
+    "GET: narrative_analyses": [
+      {
+        "json": {
+          "id": "732456da-a7af-434d-a591-ad9c65a87d33",
+          "benchmark_video_id": 26387,
+          "structure_id": "fdbebaa8-b550-4a61-b989-0e2541f769b0",
+          "emotional_core_id": "1c651b0e-cab6-431c-99f5-83af4050f676",
+          "conflict_type_id": "8fe7fab8-a8cc-4980-b6c3-81da0c4367f6",
+          "story_beats": "[\n  {\n    \"step\": 1,\n    \"beat_name\": \"Ordinary World\",\n    \"summary\": \"The Protagonist celebrates Mother's Day in a seemingly pleasant, familiar family gathering, unaware of underlying financial complexities.\",\n    \"characters_involved\": [\n      {\n        \"name\": \"Mom\",\n        \"role\": \"Protagonist\",\n        \"archetype\": \"The Hero\"\n      },\n      {\n        \"name\": \"Millionaire Son\",\n        \"role\": \"Ally\",\n        \"archetype\": \"The Ally\"\n      }\n    ],\n    \"sensory_markers\": {\n      \"setting\": \"A well-appointed, cozy home, filled with soft light and the lingering scent of a special meal.\",\n      \"character_action\": \"The Protagonist sits comfortably, perhaps sipping a drink, accepting warm wishes from her son.\",\n      \"visual_elements\": \"Flowers, a festive cake, thoughtful gifts, comfortable furniture, family photos on display.\",\n      \"auditory\": \"Gentle chatter, distant background music, the clinking of glasses, appreciative murmurs.\",\n      \"narrative_function\": \"This setting represents domestic bliss and the comfort of family, symbolically a sheltered existence from harsher realities.\"\n    }\n  },\n  {\n    \"step\": 2,\n    \"beat_name\": \"Call to Adventure\",\n    \"summary\": \"The Protagonist's Millionaire Son asks a direct, probing question about 'Clara's' financial gifts, disrupting her sense of peace.\",\n    \"characters_involved\": [\n      {\n        \"name\": \"Mom\",\n        \"role\": \"Protagonist\",\n        \"archetype\": \"The Hero\"\n      },\n      {\n        \"name\": \"Millionaire Son\",\n        \"role\": \"Ally\",\n        \"archetype\": \"The Ally\"\n      }\n    ],\n    \"emotional_peak\": \"shock\",\n    \"sensory_markers\": {\n      \"setting\": \"The same comfortable room, but momentarily feeling charged and tense, the light now seems starker.\",\n      \"character_action\": \"The Protagonist freezes, a surprised expression dawning on her face, possibly a slight tremor.\",\n      \"visual_elements\": \"The son's direct gaze, the untouched remnants of the celebratory meal, a sudden stillness in the air.\",\n      \"auditory\": \"A distinct silence follows the son's question, cutting through the pleasant background noise.\",\n      \"narrative_function\": \"The direct question shatters the illusion of uncomplicated domestic harmony, forcing the Protagonist to confront an unspoken truth.\"\n    }\n  },\n  {\n    \"step\": 3,\n    \"beat_name\": \"Refusal of the Call\",\n    \"summary\": \"The Protagonist hesitates to answer, perhaps wanting to avoid the discomfort or uncertainty of the unexpected question.\",\n    \"characters_involved\": [\n      {\n        \"name\": \"Mom\",\n        \"role\": \"Protagonist\",\n        \"archetype\": \"The Hero\"\n      }\n    ],\n    \"sensory_markers\": {\n      \"setting\": \"The immediate space around the Protagonist feels momentarily confining, the festive atmosphere tainted with awkwardness.\",\n      \"character_action\": \"The Protagonist might fidget, look away, or offer a noncommittal gesture, her initial surprise shifting to defensiveness.\",\n      \"visual_elements\": \"A subtle shift in facial expression, perhaps a lowered gaze, hands clasping or rubbing together.\",\n      \"auditory\": \"A prolonged, uncomfortable silence, accentuated by the normal slight sounds of the house.\",\n      \"narrative_function\": \"This hesitation symbolizes the human tendency to resist facing uncomfortable truths that disrupt a perceived tranquil reality.\"\n    }\n  },\n  {\n    \"step\": 4,\n    \"beat_name\": \"Meeting the Mentor\",\n    \"summary\": \"The Millionaire Son, acting as a Mentor, presses for an honest answer, indicating his concern and desire for clarity rather than judgment.\",\n    \"characters_involved\": [\n      {\n        \"name\": \"Mom\",\n        \"role\": \"Protagonist\",\n        \"archetype\": \"The Hero\"\n      },\n      {\n        \"name\": \"Millionaire Son\",\n        \"role\": \"Ally\",\n        \"archetype\": \"The Ally\"\n      }\n    ],\n    \"sensory_markers\": {\n      \"setting\": \"The interaction becomes more focused, almost like a spotlight is on the two characters, the room fading slightly.\",\n      \"character_action\": \"The son leans forward slightly, his expression serious but empathetic, offering a steady, reassuring look.\",\n      \"visual_elements\": \"His direct gaze, an open hand gesture, the lack of judgment in his posture.\",\n      \"auditory\": \"A calm, steady tone of voice from the son, contrasting with the Protagonist's internal turmoil.\",\n      \"narrative_function\": \"The son’s persistence acts as a guiding force, nudging the Protagonist towards introspection and the truth, representing supportive wisdom.\"\n    }\n  },\n  {\n    \"step\": 5,\n    \"beat_name\": \"Crossing the Threshold\",\n    \"summary\": \"The Protagonist begins to acknowledge the situation, mentally stepping away from her passive acceptance of Clara's money and into a space of questioning its implications.\",\n    \"characters_involved\": [\n      {\n        \"name\": \"Mom\",\n        \"role\": \"Protagonist\",\n        \"archetype\": \"The Hero\"\n      }\n    ],\n    \"sensory_markers\": {\n      \"setting\": \"The internal landscape of the Protagonist begins to shift, her familiar surroundings now feeling less secure, more ambiguous.\",\n      \"character_action\": \"The Protagonist takes a deep breath, perhaps a subtle nod or a slight furrow of the brow, indicating dawning realization.\",\n      \"visual_elements\": \"A change in eye contact from avoidance to a thoughtful, distant stare as internal thoughts churn.\",\n      \"auditory\": \"The internal monologue of doubt and nascent curiosity begins, overriding external sounds, a quiet stirring of unease.\",\n      \"narrative_function\": \"This moment signifies a crucial mental departure from ignorance, entering a new phase where questions about motivations and relationships become central.\"\n    }\n  },\n  {\n    \"step\": 6,\n    \"beat_name\": \"Tests, Allies, and Enemies\",\n    \"summary\": \"The Protagonist internally grapples with initial insights. Clara's role becomes ambiguous, appearing as neither fully ally nor enemy, but a source of critical information.\",\n    \"characters_involved\": [\n      {\n        \"name\": \"Mom\",\n        \"role\": \"Protagonist\",\n        \"archetype\": \"The Hero\"\n      },\n      {\n        \"name\": \"Clara\",\n        \"role\": \"Catalyst\",\n        \"archetype\": \"The Catalyst\"\n      }\n    ],\n    \"sensory_markers\": {\n      \"setting\": \"The comfortable room now feels like a silent courtroom where Clara's actions are under scrutiny, even in her absence.\",\n      \"character_action\": \"The Protagonist reviews past interactions with Clara in her mind, mentally replaying moments and words.\",\n      \"visual_elements\": \"Imagined scenes of Clara's generosity, the crispness of the money, possibly a memory of Clara's expression.\",\n      \"auditory\": \"Whispers of past conversations, the unspoken implications of Clara's gifts, a faint echo of the son’s question.\",\n      \"narrative_function\": \"Clara represents the complex reality that seemingly benevolent actions can have hidden agendas or unintended consequences, prompting the Protagonist's psychological test.\"\n    }\n  },\n  {\n    \"step\": 7,\n    \"beat_name\": \"Approach to the Inmost Cave\",\n    \"summary\": \"The Protagonist faces the deepest fears or unresolved feelings about her financial dependence or the true nature of her relationships.\",\n    \"characters_involved\": [\n      {\n        \"name\": \"Mom\",\n        \"role\": \"Protagonist\",\n        \"archetype\": \"The Hero\"\n      }\n    ],\n    \"sensory_markers\": {\n      \"setting\": \"The internal space feels claustrophobic, shadows might appear longer, the warmth of the room gone.\",\n      \"character_action\": \"The Protagonist tenses, perhaps clutches her hands, her breath becomes shallower as she confronts unpleasant realizations.\",\n      \"visual_elements\": \"A look of vulnerability, perhaps a tear welling up, the mental image of being financially helpless.\",\n      \"auditory\": \"A deafening silence, punctuated by a throbbing heart, the sound of her own anxious breathing.\",\n      \"narrative_function\": \"This stage represents the daunting confrontation with personal weakness or uncomfortable truths, preparing for a deeper conflict within.\"\n    }\n  },\n  {\n    \"step\": 8,\n    \"beat_name\": \"The Ordeal\",\n    \"summary\": \"The Protagonist undergoes an internal crisis, wrestling with the implications of her Son's question and Clara's true motivations.\",\n    \"characters_involved\": [\n      {\n        \"name\": \"Mom\",\n        \"role\": \"Protagonist\",\n        \"archetype\": \"The Hero\"\n      }\n    ],\n    \"emotional_peak\": \"despair\",\n    \"sensory_markers\": {\n      \"setting\": \"The celebration is a distant memory; the room feels cold and isolating, a battleground of thoughts.\",\n      \"character_action\": \"The Protagonist might close her eyes tightly, clench her jaw, silently battling confusion, betrayal, or shame.\",\n      \"visual_elements\": \"A tormented expression, a face etched with worry lines, the faded colors of the festive decorations now seem mocking.\",\n      \"auditory\": \"A symphony of internal doubts, the echo of the son's question repeating, a low hum of anxiety.\",\n      \"narrative_function\": \"This is the core struggle for self-understanding and emotional integrity, where the Protagonist must make a choice about how to perceive and act on the newfound information.\"\n    }\n  },\n  {\n    \"step\": 9,\n    \"beat_name\": \"Reward (Seizing the Sword)\",\n    \"summary\": \"Having endured the internal conflict, the Protagonist gains a clear understanding or a firm resolve about her feelings regarding Clara's money.\",\n    \"characters_involved\": [\n      {\n        \"name\": \"Mom\",\n        \"role\": \"Protagonist\",\n        \"archetype\": \"The Hero\"\n      }\n    ],\n    \"emotional_peak\": \"revelation\",\n    \"sensory_markers\": {\n      \"setting\": \"A sense of calm descends upon the room, a quiet clarity washing over the previous tension, the light returning.\",\n      \"character_action\": \"The Protagonist opens her eyes, her posture visibly relaxing, a look of thoughtful resolution on her face.\",\n      \"visual_elements\": \"A newfound clarity in her eyes, a straightening of her shoulders, perhaps a small, determined smile.\",\n      \"auditory\": \"A quiet but distinct decision forming in her mind, a sense of inner peace replacing the tumult.\",\n      \"narrative_function\": \"The 'sword' here is truth and self-awareness, allowing her to formulate a genuine and often difficult answer to the initial question.\"\n    }\n  },\n  {\n    \"step\": 10,\n    \"beat_name\": \"The Road Back\",\n    \"summary\": \"The Protagonist begins to articulate her feelings, preparing to convey her truthful answer to her Son.\",\n    \"characters_involved\": [\n      {\n        \"name\": \"Mom\",\n        \"role\": \"Protagonist\",\n        \"archetype\": \"The Hero\"\n      },\n      {\n        \"name\": \"Millionaire Son\",\n        \"role\": \"Ally\",\n        \"archetype\": \"The Ally\"\n      }\n    ],\n    \"sensory_markers\": {\n      \"setting\": \"The attention refocuses on the interaction between mother and son; the environment feels expectant, poised.\",\n      \"character_action\": \"The Protagonist turns to face her son directly, gathering her thoughts, perhaps clearing her throat.\",\n      \"visual_elements\": \"Their eyes meet, a shared moment of anticipation, the physical proximity between them highlighted.\",\n      \"auditory\": \"A gentle, deliberate breath, the beginning of a thoughtful, perhaps vulnerable, vocalization.\",\n      \"narrative_function\": \"This is the journey back from abstract realization to concrete action and communication, preparing for the final confrontation with the initial question.\"\n    }\n  },\n  {\n    \"step\": 11,\n    \"beat_name\": \"The Resurrection\",\n    \"summary\": \"The Protagonist fully states her position or feeling regarding Clara's financial contributions, reborn with greater honesty and self-respect.\",\n    \"characters_involved\": [\n      {\n        \"name\": \"Mom\",\n        \"role\": \"Protagonist\",\n        \"archetype\": \"The Hero\"\n      },\n      {\n        \"name\": \"Millionaire Son\",\n        \"role\": \"Ally\",\n        \"archetype\": \"The Ally\"\n      }\n    ],\n    \"emotional_peak\": \"triumph\",\n    \"sensory_markers\": {\n      \"setting\": \"The room feels cleansed, a space for open communication and renewed mutual understanding.\",\n      \"character_action\": \"The Protagonist articulates her truth clearly and calmly, maintaining eye contact, her voice steady.\",\n      \"visual_elements\": \"A resolute expression, a gesture of finality or comfort, the son’s expression shifting to one of understanding.\",\n      \"auditory\": \"The clear, steady sound of the Protagonist's voice, her words carrying weight and conviction, a sense of relief.\",\n      \"narrative_function\": \"This is the ultimate test of the Protagonist's transformation, demonstrating her ability to face conflict with integrity, shedding past naiveté.\"\n    }\n  },\n  {\n    \"step\": 12,\n    \"beat_name\": \"Return with the Elixir\",\n    \"summary\": \"The Protagonist and her son share either an enhanced understanding, or a common path forward, changed by the shared revelation and honesty.\",\n    \"characters_involved\": [\n      {\n        \"name\": \"Mom\",\n        \"role\": \"Protagonist\",\n        \"archetype\": \"The Hero\"\n      },\n      {\n        \"name\": \"Millionaire Son\",\n        \"role\": \"Ally\",\n        \"archetype\": \"The Ally\"\n      }\n    ],\n    \"sensory_markers\": {\n      \"setting\": \"The social space feels restored, but now with a deeper, more profound connection and truth beneath the surface.\",\n      \"character_action\": \"The Protagonist and Son share a meaningful glance, perhaps a grateful squeeze of the hand, a quiet acknowledgment.\",\n      \"visual_elements\": \"A shared smile or nod, a relaxed posture from both, the festive objects now symbolizing enduring connection.\",\n      \"auditory\": \"A gentle, affirming quietness, or soft, comforting words exchanged, signifying renewed harmony.\",\n      \"narrative_function\": \"The 'elixir' is the wisdom and strengthened relationship born from honesty; it signifies growth and a more authentic family bond.\"\n    }\n  }\n]",
+          "created_at": "2025-11-19T20:48:49.563563+00:00",
+          "updated_at": "2025-11-19T20:48:49.563563+00:00",
+          "identified_structure_model": "Hero's Journey (12 Steps)",
+          "central_theme": "Unveiling truth and reassessing relationships.",
+          "channel_id": "UC80JIqj0rL3Rn4iTRQ61aFw",
+          "story_setting": {
+            "location": "A comfortable, intimate family setting, possibly a home dining room or living area.",
+            "time_period": "Contemporary",
+            "cultural_context": "Modern family dynamics, implied financial wealth disparity, and the social expectations of Mother's Day."
+          },
+          "analysis_metadata": {
+            "parsed_at": "2025-11-19T20:48:49.193Z",
+            "beat_count": 12,
+            "validation_status": "passed",
+            "emotional_peak_count": 4
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Execution Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Busca Video Principal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Busca Video Principal": {
+      "main": [
+        [
+          {
+            "node": "GET: narrative_analyses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Busca Brand Bible": {
+      "main": [
+        [
+          {
+            "node": "Busca narrative_archetypes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_narrative_emotional_cores": {
+      "ai_tool": [
+        [
+          {
+            "node": "Títulos e Temas",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gemini-2.5-flash": {
+      "ai_languageModel": [
+        []
+      ]
+    },
+    "Análise de Narrativa": {
+      "main": [
+        [
+          {
+            "node": "Escrever Título com Claude Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "tem narrative_analyses?": {
+      "main": [
+        [
+          {
+            "node": "Escrever Título com Claude Code",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Análise de Narrativa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET: narrative_analyses": {
+      "main": [
+        [
+          {
+            "node": "tem narrative_analyses?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gemini-2.5-pro || fb": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Títulos e Temas",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Títulos e Temas",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Títulos e Temas": {
+      "main": [
+        [
+          {
+            "node": "Output Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Busca narrative_archetypes": {
+      "main": [
+        [
+          {
+            "node": "get_benchmark_video_narrative_dossier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_benchmark_video_narrative_dossier": {
+      "main": [
+        [
+          {
+            "node": "Contexto Global",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "off_Contexto Global": {
+      "main": [
+        []
+      ]
+    },
+    "Contexto Global": {
+      "main": [
+        [
+          {
+            "node": "Títulos e Temas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output Parser": {
+      "main": [
+        []
+      ]
+    },
+    "UPDATE: title e status": {
+      "main": [
+        [
+          {
+            "node": "✅ 2. produção do outline (reality weaver)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aguarda Validação no Gmail1": {
+      "main": [
+        [
+          {
+            "node": "UPDATE: title e status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escrever Título com Claude Code": {
+      "main": [
+        [
+          {
+            "node": "Lê arquivos de title",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lê arquivos de title": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Aguarda Validação no Gmail1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "a4c4e614-d00d-46f4-888f-a14b568f2f9a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "33738330930e3881dd5571eca013f36ddf8aab20e4ea5c1f2ebaf4a2b4668ac6"
+  },
+  "id": "BRQOzonVaqb0h6S6",
+  "tags": [
+    {
+      "createdAt": "2025-07-26T21:12:41.529Z",
+      "updatedAt": "2025-07-26T21:12:41.529Z",
+      "id": "rw9clsk6DPBqn9eg",
+      "name": "automedia"
+    }
+  ]
+}
