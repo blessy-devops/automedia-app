@@ -487,7 +487,7 @@ export async function rejectThumbnail(
       }
     }
 
-    // 3. Marcar como rejeitado (por enquanto fake, sem regerar)
+    // 3. Marcar como rejeitado e mudar status para regenerar
     const now = new Date().toISOString()
 
     const { error: updateError } = await supabase
@@ -496,6 +496,7 @@ export async function rejectThumbnail(
         thumbnail_approval_status: 'rejected',
         thumbnail_approved_at: now,
         // thumbnail_approved_by: 'user_email',
+        status: 'regenerate_thumbnail',
         updated_at: now
       })
       .eq('id', videoId)
@@ -507,7 +508,7 @@ export async function rejectThumbnail(
 
     revalidatePath('/production/approval-queue')
 
-    console.log(`❌ Thumbnail rejected for video ${videoId} - Regeneration needed (not implemented yet)`)
+    console.log(`❌ Thumbnail rejected for video ${videoId} - Status changed to 'regenerate_thumbnail'`)
 
     return { success: true, videoId }
 
