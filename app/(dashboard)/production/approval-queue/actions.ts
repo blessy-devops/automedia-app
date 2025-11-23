@@ -163,6 +163,7 @@ export async function getPendingTitleApprovals(): Promise<PendingApproval[]> {
       .from('production_videos')
       .select(`
         id,
+        placeholder,
         title_approval_data,
         title_approval_status,
         created_at,
@@ -187,6 +188,7 @@ export async function getPendingTitleApprovals(): Promise<PendingApproval[]> {
         .from('production_videos')
         .select(`
           id,
+          placeholder,
           title_approval_data,
           title_approval_status,
           created_at,

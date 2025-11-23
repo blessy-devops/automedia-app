@@ -54,6 +54,7 @@ interface TitleApprovalData {
  */
 interface PendingTitle {
   id: number
+  placeholder?: string | null
   title_approval_data: TitleApprovalData
   title_approval_status: string | null
   created_at: string
@@ -428,7 +429,7 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
           {/* SIDEBAR ESQUERDA - Lista de Items */}
           {/* ================================================================= */}
           {viewMode === 'pending' && (
-            <div className="w-96 border-r border-border bg-card flex flex-col overflow-hidden">
+            <div className="w-[410px] border-r border-border bg-card flex flex-col overflow-hidden">
               {/* Tabs no topo */}
               <div className="p-4 border-b border-border flex-shrink-0">
                 <Tabs
@@ -500,15 +501,28 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
                               : 'bg-muted/30 hover:bg-muted/50 border-2 border-transparent'
                           }`}
                         >
-                          <div className="flex items-center gap-2 mb-2">
+                          {/* Row 1: Canal + ID + Time (3 badges) */}
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            {item.placeholder && (
+                              <Badge className="bg-primary/10 text-primary border-primary/30 text-xs">
+                                {item.placeholder}
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className="text-xs">
+                              ID: {item.id}
+                            </Badge>
                             <Badge variant="outline" className="text-xs gap-1">
                               <Clock className="w-3 h-3" />
                               {formatTimeAgo(item.created_at)}
                             </Badge>
                           </div>
+
+                          {/* Row 3: Reference Title */}
                           <p className="text-xs text-muted-foreground mb-1 line-clamp-2">
                             {item.benchmark_videos?.title || 'No reference title'}
                           </p>
+
+                          {/* Row 4: Suggested Title */}
                           <p className="text-xs font-medium line-clamp-2">
                             {item.title_approval_data.title}
                           </p>
@@ -661,9 +675,17 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
 
                           {/* 3. TEXTO - Ocupa espaço restante */}
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm text-foreground leading-relaxed">
-                              {option.text}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm text-foreground leading-relaxed">
+                                {option.text}
+                              </p>
+                              {option.isMain && (
+                                <Badge className="flex-shrink-0 bg-yellow-500/10 text-yellow-700 dark:text-yellow-500 border-yellow-500/30 gap-1 text-xs">
+                                  <Sparkles className="w-3 h-3" />
+                                  Sugerido
+                                </Badge>
+                              )}
+                            </div>
                             {option.score && (
                               <p className="text-xs text-muted-foreground mt-1">
                                 Score: {option.score}
