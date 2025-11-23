@@ -673,9 +673,11 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
                     <TabsTrigger value="thumbnails" className="gap-2">
                       <ImageIcon className="w-4 h-4" />
                       Thumbnails
-                      <Badge variant="outline" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
-                        Soon
-                      </Badge>
+                      {pendingThumbnailsCount > 0 && (
+                        <Badge variant="default" className="ml-1 h-5 min-w-5 px-1.5">
+                          {pendingThumbnailsCount}
+                        </Badge>
+                      )}
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>
@@ -749,12 +751,62 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
                 )}
 
                 {activeTab === 'thumbnails' && (
-                  <div className="py-12 text-center px-4">
-                    <ImageIcon className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-                    <p className="text-sm font-medium text-foreground mb-1">Coming Soon</p>
-                    <p className="text-xs text-muted-foreground">
-                      Thumbnail approval will be available soon
-                    </p>
+                  <div className="flex-1 overflow-y-auto">
+                    {filteredThumbnails.length === 0 ? (
+                      <div className="py-12 text-center px-4">
+                        <ImageIcon className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+                        <p className="text-sm font-medium text-foreground mb-1">
+                          {searchQuery ? 'No thumbnails match your search' : 'No pending thumbnails'}
+                        </p>
+                      </div>
+                    ) : (
+                      filteredThumbnails.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => handleSelectItem(item.id)}
+                          className={`w-full text-left p-3 rounded-lg mb-2 transition-all ${
+                            selectedItemId === item.id
+                              ? 'bg-accent border-2 border-primary'
+                              : 'bg-muted/30 hover:bg-muted/50 border-2 border-transparent'
+                          }`}
+                        >
+                          {/* Thumbnail preview image */}
+                          <div className="aspect-video rounded mb-2 overflow-hidden border border-border">
+                            <img
+                              src={item.referenceThumbnail}
+                              alt={item.videoTitle}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+
+                          {/* Row 1: Canal + ID + Time (3 badges) */}
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            <Badge
+                              className="text-xs"
+                              style={{
+                                backgroundColor: `${item.channelColor}15`,
+                                color: item.channelColor,
+                                borderColor: `${item.channelColor}30`
+                              }}
+                            >
+                              {item.channelName}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              ID: {item.videoId}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs gap-1">
+                              <Clock className="w-3 h-3" />
+                              {formatTimeAgo(item.createdAt)}
+                            </Badge>
+                          </div>
+
+                          {/* Video Title */}
+                          <p className="text-xs font-medium line-clamp-2">
+                            {item.videoTitle}
+                          </p>
+                        </button>
+                      ))
+                    )}
                   </div>
                 )}
               </div>
@@ -768,7 +820,7 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
             <div className="flex-1 flex flex-col bg-background overflow-hidden">
               {/* Content Area - Scrollable */}
               <div className="flex-1 overflow-y-auto p-6">
-                {!selectedTitle ? (
+                {!selectedTitle && !selectedThumbnailItem ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
                       <AlertCircle className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
@@ -778,7 +830,12 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
                       </p>
                     </div>
                   </div>
-                ) : (
+                ) : null}
+
+                {/* =============================================== */}
+                {/* TÍTULOS - Conteúdo de Aprovação de Título */}
+                {/* =============================================== */}
+                {activeTab === 'titles' && selectedTitle && (
                   <div className="max-w-4xl mx-auto space-y-4">
                     {/* Reference Section */}
                     <div className="bg-muted/50 border border-border p-4 rounded-lg">
@@ -913,10 +970,74 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
                     </div>
                   </div>
                 )}
+
+                {/* =============================================== */}
+                {/* THUMBNAILS - Comparação Lado-a-Lado */}
+                {/* =============================================== */}
+                {activeTab === 'thumbnails' && selectedThumbnailItem && (
+                  <div className="max-w-4xl mx-auto space-y-6">
+                    {/* Seção 1: Grid de Comparação 2 Colunas */}
+                    <div className="grid grid-cols-2 gap-6">
+                      {/* Coluna 1: Thumbnail de Referência (Original) */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <p className="text-xs uppercase tracking-wide font-medium text-muted-foreground">
+                            Referência (Original)
+                          </p>
+                        </div>
+                        <div className="aspect-video rounded-lg border-2 border-border overflow-hidden bg-muted/20">
+                          <img
+                            src={selectedThumbnailItem.referenceThumbnail}
+                            alt="Reference Thumbnail"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Coluna 2: Thumbnail Gerada pelo Claude */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Sparkles className="w-4 h-4 text-yellow-600 dark:text-yellow-500" />
+                          <p className="text-xs uppercase tracking-wide font-medium text-yellow-700 dark:text-yellow-500">
+                            Gerada pelo Claude
+                          </p>
+                        </div>
+                        <div className="aspect-video rounded-lg border-2 border-primary overflow-hidden bg-muted/20 relative group cursor-pointer">
+                          <img
+                            src={selectedThumbnailItem.generatedThumbnail}
+                            alt="Generated Thumbnail"
+                            className="w-full h-full object-cover"
+                          />
+                          {/* Overlay com botão de preview ao hover */}
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center">
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handlePreviewThumbnail(selectedThumbnailItem.generatedThumbnail)}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity gap-2"
+                            >
+                              <Maximize2 className="w-4 h-4" />
+                              Visualizar Ampliado
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Seção 2: Dica Informativa */}
+                    <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg">
+                      <p className="text-xs text-blue-700 dark:text-blue-400">
+                        <span className="font-medium">Dica:</span> Se a thumbnail gerada não atender às expectativas,
+                        clique em "Reprovar e Regerar" para gerar uma nova versão.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Action Bar - Fixed at bottom */}
-              {selectedTitle && (
+              {/* Action Bar para Títulos */}
+              {activeTab === 'titles' && selectedTitle && (
                 <div className="border-t border-border bg-card p-4 flex-shrink-0">
                   <div className="max-w-4xl mx-auto flex items-center justify-between">
                     <div className="text-sm text-muted-foreground">
@@ -957,6 +1078,31 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
                   </div>
                 </div>
               )}
+
+              {/* Action Bar para Thumbnails */}
+              {activeTab === 'thumbnails' && selectedThumbnailItem && (
+                <div className="border-t border-border bg-card p-4 flex-shrink-0">
+                  <div className="max-w-4xl mx-auto flex items-center justify-between">
+                    <div className="text-sm text-muted-foreground">
+                      <span>Ready to approve or regenerate</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={handleRejectAndRegenerateThumbnail}
+                        className="gap-2"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Reprovar e Regerar
+                      </Button>
+                      <Button onClick={handleApproveThumbnail} className="gap-2">
+                        <CheckCircle2 className="w-4 h-4" />
+                        Aprovar & Next
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -976,6 +1122,30 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
           )}
         </div>
       </div>
+
+      {/* ================================================================= */}
+      {/* MODAL DE PREVIEW AMPLIADO DA THUMBNAIL */}
+      {/* ================================================================= */}
+      <Dialog open={!!previewThumbnailUrl} onOpenChange={() => setPreviewThumbnailUrl(null)}>
+        <DialogContent className="w-[90vw] max-w-7xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Maximize2 className="w-5 h-5" />
+              Thumbnail Preview
+            </DialogTitle>
+            <DialogDescription>Full-size preview of the thumbnail.</DialogDescription>
+          </DialogHeader>
+          <div className="w-full aspect-video rounded-lg border overflow-hidden bg-black">
+            {previewThumbnailUrl && (
+              <img
+                src={previewThumbnailUrl}
+                alt="Full preview"
+                className="w-full h-full object-contain"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
