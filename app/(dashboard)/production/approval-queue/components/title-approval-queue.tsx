@@ -12,7 +12,8 @@ import {
   Target,
   Filter,
   History as HistoryIcon,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Maximize2
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -22,6 +23,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { createClient } from '@supabase/supabase-js'
 import { approveTitle } from '../actions'
 import { toast } from 'sonner'
@@ -83,11 +85,88 @@ interface ApprovalHistoryTitle {
 }
 
 /**
+ * Thumbnail pendente de aprovação
+ */
+interface PendingThumbnail {
+  id: number
+  videoId: number
+  channelName: string
+  channelColor: string
+  videoTitle: string
+  referenceThumbnail: string
+  generatedThumbnail: string
+  createdAt: string
+  status: 'pending' | 'approved' | 'rejected'
+  author: string
+}
+
+/**
+ * Histórico de aprovação de thumbnail
+ */
+interface ApprovalHistoryThumbnail {
+  id: number
+  itemId: number
+  videoId: number
+  channelName: string
+  channelColor: string
+  videoTitle: string
+  referenceThumbnail: string
+  selectedThumbnailUrl: string
+  status: 'approved' | 'rejected'
+  approvedAt: string
+  approvedBy: string
+  autoApproved: boolean
+}
+
+/**
  * Props do componente
  */
 interface TitleApprovalQueueProps {
   initialPendingTitles: PendingTitle[]
 }
+
+// ============================================================================
+// MOCK DATA - THUMBNAILS
+// ============================================================================
+
+const mockPendingThumbnails: PendingThumbnail[] = [
+  {
+    id: 1,
+    videoId: 103,
+    channelName: 'DramatizeMe',
+    channelColor: '#DC2626',
+    videoTitle: "On Father's Day, My CEO Son Asked, \"Dad, Do You Like The $8000 Marcus Sends You?\"",
+    referenceThumbnail: 'https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=800&h=450&fit=crop',
+    generatedThumbnail: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&h=450&fit=crop',
+    createdAt: '2025-11-23T12:00:00',
+    status: 'pending',
+    author: 'AI Agent'
+  },
+  {
+    id: 2,
+    videoId: 104,
+    channelName: 'DramatizeMe',
+    channelColor: '#DC2626',
+    videoTitle: 'Homeless Girl Shares Her Bread With Mean Vendor, What Happens Next Will Shock You',
+    referenceThumbnail: 'https://images.unsplash.com/photo-1509099836639-18ba1795216d?w=800&h=450&fit=crop',
+    generatedThumbnail: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=800&h=450&fit=crop',
+    createdAt: '2025-11-23T11:30:00',
+    status: 'pending',
+    author: 'AI Agent'
+  },
+  {
+    id: 3,
+    videoId: 105,
+    channelName: 'DramatizeMe',
+    channelColor: '#DC2626',
+    videoTitle: 'Rich Mother-in-Law Humiliates Poor Girl at Fancy Restaurant, Instant Karma Strikes',
+    referenceThumbnail: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&h=450&fit=crop',
+    generatedThumbnail: 'https://images.unsplash.com/photo-1511578314322-379afb476865?w=800&h=450&fit=crop',
+    createdAt: '2025-11-23T11:00:00',
+    status: 'pending',
+    author: 'AI Agent'
+  }
+]
 
 // ============================================================================
 // COMPONENTE PRINCIPAL
@@ -129,6 +208,22 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
 
   // Histórico de aprovações (TODO: buscar do backend)
   const [titleHistory, setTitleHistory] = useState<ApprovalHistoryTitle[]>([])
+
+  // ============================================================================
+  // ESTADOS - THUMBNAILS
+  // ============================================================================
+
+  // Preview de thumbnail ampliado
+  const [previewThumbnailUrl, setPreviewThumbnailUrl] = useState<string | null>(null)
+
+  // Thumbnails removidos localmente (optimistic update)
+  const [removedThumbnailIds, setRemovedThumbnailIds] = useState<Set<number>>(new Set())
+
+  // Histórico de aprovações de thumbnails
+  const [thumbnailHistory, setThumbnailHistory] = useState<ApprovalHistoryThumbnail[]>([])
+
+  // Auto-approval para thumbnails
+  const [autoApprovalThumbnails, setAutoApprovalThumbnails] = useState(false)
 
   // ============================================================================
   // REALTIME SUBSCRIPTION
@@ -257,6 +352,31 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
   const pendingCount = visiblePendingTitles.length
 
   // ============================================================================
+  // COMPUTED VALUES - THUMBNAILS
+  // ============================================================================
+
+  // Filtrar thumbnails removidos localmente
+  const visiblePendingThumbnails = mockPendingThumbnails.filter((t) => !removedThumbnailIds.has(t.id))
+
+  // Filtrar por busca
+  const filteredThumbnails = visiblePendingThumbnails.filter((t) => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    return (
+      t.videoTitle.toLowerCase().includes(query) ||
+      t.channelName.toLowerCase().includes(query)
+    )
+  })
+
+  // Item de thumbnail selecionado atual
+  const selectedThumbnailItem = activeTab === 'thumbnails'
+    ? filteredThumbnails.find((t) => t.id === selectedItemId)
+    : null
+
+  // Contadores de thumbnails
+  const pendingThumbnailsCount = visiblePendingThumbnails.length
+
+  // ============================================================================
   // HANDLERS
   // ============================================================================
 
@@ -344,6 +464,102 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
   const handleSelectItem = (id: number) => {
     setSelectedItemId(id)
     setSelectedTitleIndex(undefined) // Reset selection
+  }
+
+  // ============================================================================
+  // HANDLERS - THUMBNAILS
+  // ============================================================================
+
+  /**
+   * Aprovar thumbnail e avançar para próximo
+   */
+  const handleApproveThumbnail = () => {
+    if (!selectedThumbnailItem) {
+      toast.error('Nenhuma thumbnail selecionada')
+      return
+    }
+
+    // Adiciona ao histórico
+    const historyEntry: ApprovalHistoryThumbnail = {
+      id: Date.now(),
+      itemId: selectedThumbnailItem.id,
+      videoId: selectedThumbnailItem.videoId,
+      channelName: selectedThumbnailItem.channelName,
+      channelColor: selectedThumbnailItem.channelColor,
+      videoTitle: selectedThumbnailItem.videoTitle,
+      referenceThumbnail: selectedThumbnailItem.referenceThumbnail,
+      selectedThumbnailUrl: selectedThumbnailItem.generatedThumbnail,
+      status: 'approved',
+      approvedAt: new Date().toISOString(),
+      approvedBy: 'You',
+      autoApproved: autoApprovalThumbnails
+    }
+    setThumbnailHistory((prev) => [historyEntry, ...prev])
+
+    toast.success('Thumbnail aprovada com sucesso!')
+
+    // Remove da lista
+    setRemovedThumbnailIds((prev) => new Set(prev).add(selectedThumbnailItem.id))
+
+    // Move para próximo item
+    const currentIndex = filteredThumbnails.findIndex((t) => t.id === selectedItemId)
+    if (currentIndex < filteredThumbnails.length - 1) {
+      setSelectedItemId(filteredThumbnails[currentIndex + 1].id)
+    } else if (currentIndex > 0) {
+      setSelectedItemId(filteredThumbnails[currentIndex - 1].id)
+    } else {
+      setSelectedItemId(null)
+    }
+  }
+
+  /**
+   * Reprovar thumbnail e solicitar regeneração
+   */
+  const handleRejectAndRegenerateThumbnail = () => {
+    if (!selectedThumbnailItem) {
+      toast.error('Nenhuma thumbnail selecionada')
+      return
+    }
+
+    // Adiciona ao histórico com selectedThumbnailUrl vazio (rejeitado)
+    const historyEntry: ApprovalHistoryThumbnail = {
+      id: Date.now(),
+      itemId: selectedThumbnailItem.id,
+      videoId: selectedThumbnailItem.videoId,
+      channelName: selectedThumbnailItem.channelName,
+      channelColor: selectedThumbnailItem.channelColor,
+      videoTitle: selectedThumbnailItem.videoTitle,
+      referenceThumbnail: selectedThumbnailItem.referenceThumbnail,
+      selectedThumbnailUrl: '', // Vazio = rejeitado
+      status: 'rejected',
+      approvedAt: new Date().toISOString(),
+      approvedBy: 'You',
+      autoApproved: false
+    }
+    setThumbnailHistory((prev) => [historyEntry, ...prev])
+
+    toast.info('Thumbnail reprovada. Sistema irá gerar uma nova versão...')
+    console.log(`🔄 Rejected thumbnail for item ${selectedItemId} - Regenerating...`)
+
+    // Remove da lista (API regenerará automaticamente)
+    setRemovedThumbnailIds((prev) => new Set(prev).add(selectedThumbnailItem.id))
+
+    // Move para próximo item
+    const currentIndex = filteredThumbnails.findIndex((t) => t.id === selectedItemId)
+    if (currentIndex < filteredThumbnails.length - 1) {
+      setSelectedItemId(filteredThumbnails[currentIndex + 1].id)
+    } else if (currentIndex > 0) {
+      setSelectedItemId(filteredThumbnails[currentIndex - 1].id)
+    } else {
+      setSelectedItemId(null)
+    }
+  }
+
+  /**
+   * Abrir preview ampliado de thumbnail
+   */
+  const handlePreviewThumbnail = (url: string) => {
+    setPreviewThumbnailUrl(url)
   }
 
   // ============================================================================
