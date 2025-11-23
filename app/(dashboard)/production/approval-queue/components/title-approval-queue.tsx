@@ -90,8 +90,10 @@ interface ApprovalHistoryTitle {
 interface PendingThumbnail {
   id: number
   title: string | null
-  thumbnail_url: string
-  thumbnail_approval_data: any | null
+  thumbnail_url: string | null // Thumbnail final aprovada (vazia durante aprovação)
+  thumbnail_approval_data: {
+    thumbnail_url: string // URL da thumbnail gerada pelo N8N (temporária)
+  } | null
   thumbnail_approval_status: string | null
   created_at: string
   benchmark_id: number | null
@@ -955,7 +957,7 @@ export function TitleApprovalQueue({ initialPendingTitles, initialPendingThumbna
                         </div>
                         <div className="aspect-video rounded-lg border-2 border-primary overflow-hidden bg-muted/20 relative group cursor-pointer">
                           <img
-                            src={selectedThumbnailItem.thumbnail_url}
+                            src={selectedThumbnailItem.thumbnail_approval_data?.thumbnail_url || '/placeholder-thumbnail.jpg'}
                             alt="Generated Thumbnail"
                             className="w-full h-full object-cover"
                           />
@@ -964,7 +966,7 @@ export function TitleApprovalQueue({ initialPendingTitles, initialPendingThumbna
                             <Button
                               size="sm"
                               variant="secondary"
-                              onClick={() => handlePreviewThumbnail(selectedThumbnailItem.thumbnail_url)}
+                              onClick={() => handlePreviewThumbnail(selectedThumbnailItem.thumbnail_approval_data?.thumbnail_url || '/placeholder-thumbnail.jpg')}
                               className="opacity-0 group-hover:opacity-100 transition-opacity gap-2"
                             >
                               <Maximize2 className="w-4 h-4" />

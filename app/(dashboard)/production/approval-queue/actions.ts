@@ -326,8 +326,8 @@ interface ThumbnailApprovalData {
 interface PendingThumbnail {
   id: number
   title: string | null
-  thumbnail_url: string
-  thumbnail_approval_data: ThumbnailApprovalData | null
+  thumbnail_url: string | null // Thumbnail final aprovada (pode estar vazia durante aprovação)
+  thumbnail_approval_data: ThumbnailApprovalData | null // JSONB com thumbnail gerada aguardando aprovação
   thumbnail_approval_status: string | null
   created_at: string
   benchmark_id: number | null
@@ -355,10 +355,10 @@ interface ApproveThumbnailResult {
  *
  * Fluxo:
  * 1. Valida se o vídeo está na etapa 'create_thumbnail' e status 'pending'
- * 2. Atualiza thumbnail_approval_status para 'approved' com timestamp
- * 3. Avança o status do vídeo para 'create_audio_segments' (próxima etapa)
- *
- * IMPORTANTE: A thumbnail_url já está preenchida pelo N8N, não precisa atualizar
+ * 2. Extrai thumbnail_url de dentro do JSONB thumbnail_approval_data
+ * 3. Copia thumbnail_url extraído para a coluna thumbnail_url (thumbnail final aprovada)
+ * 4. Atualiza thumbnail_approval_status para 'approved' com timestamp
+ * 5. Avança o status do vídeo para 'create_audio_segments' (próxima etapa)
  *
  * @param videoId - ID do vídeo na tabela production_videos
  * @returns Resultado da operação com success/error
@@ -376,7 +376,7 @@ export async function approveThumbnail(
     // 1. Buscar vídeo atual para validações
     const { data: video, error: fetchError } = await supabase
       .from('production_videos')
-      .select('id, status, thumbnail_approval_status, thumbnail_url')
+      .select('id, status, thumbnail_approval_status, thumbnail_approval_data')
       .eq('id', videoId)
       .single()
 
@@ -400,19 +400,23 @@ export async function approveThumbnail(
       }
     }
 
-    if (!video.thumbnail_url) {
+    if (!video.thumbnail_approval_data?.thumbnail_url) {
       return {
         success: false,
         error: 'Thumbnail ainda não foi gerada pelo sistema'
       }
     }
 
-    // 3. Atualizar vídeo com aprovação e avançar status
+    // 3. Extrair thumbnail_url do JSONB
+    const thumbnailUrl = video.thumbnail_approval_data.thumbnail_url
+
+    // 4. Atualizar vídeo: copiar URL para coluna final + aprovar + avançar status
     const now = new Date().toISOString()
 
     const { error: updateError } = await supabase
       .from('production_videos')
       .update({
+        thumbnail_url: thumbnailUrl, // ⚡ COPIA URL DO JSONB PARA COLUNA FINAL
         thumbnail_approval_status: 'approved',
         thumbnail_approved_at: now,
         // thumbnail_approved_by: 'user_email', // TODO: Integrar com sistema de autenticação
@@ -426,10 +430,10 @@ export async function approveThumbnail(
       return { success: false, error: 'Erro ao atualizar vídeo no banco de dados' }
     }
 
-    // 4. Revalidar página para atualizar UI
+    // 5. Revalidar página para atualizar UI
     revalidatePath('/production/approval-queue')
 
-    console.log(`✅ Thumbnail approved for video ${videoId}`)
+    console.log(`✅ Thumbnail approved for video ${videoId}: ${thumbnailUrl}`)
 
     return { success: true, videoId }
 
@@ -524,7 +528,7 @@ export async function rejectThumbnail(
  * Critérios:
  * - status = 'create_thumbnail' (etapa de criação de thumbnail)
  * - thumbnail_approval_status = 'pending' (aguardando aprovação)
- * - thumbnail_url IS NOT NULL (thumbnail já foi gerada)
+ * - thumbnail_approval_data->>'thumbnail_url' IS NOT NULL (thumbnail já foi gerada pelo N8N)
  *
  * Retorna ordenado por created_at (mais antigos primeiro).
  * Inclui dados do vídeo de benchmark para exibir thumbnail de referência.
@@ -563,7 +567,7 @@ export async function getPendingThumbnailApprovals(): Promise<PendingThumbnail[]
       `)
       .eq('thumbnail_approval_status', 'pending')
       .eq('status', 'create_thumbnail')
-      .not('thumbnail_url', 'is', null)
+      .not('thumbnail_approval_data->thumbnail_url', 'is', null)
       .order('created_at', { ascending: true })
       .limit(50)
 
