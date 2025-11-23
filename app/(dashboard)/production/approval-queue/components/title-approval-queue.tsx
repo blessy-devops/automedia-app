@@ -25,7 +25,7 @@ import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { createClient } from '@supabase/supabase-js'
-import { approveTitle } from '../actions'
+import { approveTitle, approveThumbnail, rejectThumbnail } from '../actions'
 import { toast } from 'sonner'
 
 // ============================================================================
@@ -85,19 +85,23 @@ interface ApprovalHistoryTitle {
 }
 
 /**
- * Thumbnail pendente de aprovação
+ * Thumbnail pendente de aprovação (alinhada com dados reais do banco)
  */
 interface PendingThumbnail {
   id: number
-  videoId: number
-  channelName: string
-  channelColor: string
-  videoTitle: string
-  referenceThumbnail: string
-  generatedThumbnail: string
-  createdAt: string
-  status: 'pending' | 'approved' | 'rejected'
-  author: string
+  title: string | null
+  thumbnail_url: string
+  thumbnail_approval_data: any | null
+  thumbnail_approval_status: string | null
+  created_at: string
+  benchmark_id: number | null
+  placeholder: string | null
+  status: string
+  benchmark_videos?: {
+    id: number
+    title: string
+    thumbnail_url: string | null
+  } | null
 }
 
 /**
@@ -105,11 +109,9 @@ interface PendingThumbnail {
  */
 interface ApprovalHistoryThumbnail {
   id: number
-  itemId: number
   videoId: number
-  channelName: string
-  channelColor: string
   videoTitle: string
+  channelName: string
   referenceThumbnail: string
   selectedThumbnailUrl: string
   status: 'approved' | 'rejected'
@@ -123,56 +125,14 @@ interface ApprovalHistoryThumbnail {
  */
 interface TitleApprovalQueueProps {
   initialPendingTitles: PendingTitle[]
+  initialPendingThumbnails: PendingThumbnail[]
 }
-
-// ============================================================================
-// MOCK DATA - THUMBNAILS
-// ============================================================================
-
-const mockPendingThumbnails: PendingThumbnail[] = [
-  {
-    id: 1,
-    videoId: 103,
-    channelName: 'DramatizeMe',
-    channelColor: '#DC2626',
-    videoTitle: "On Father's Day, My CEO Son Asked, \"Dad, Do You Like The $8000 Marcus Sends You?\"",
-    referenceThumbnail: 'https://images.unsplash.com/photo-1484480974693-6ca0a78fb36b?w=800&h=450&fit=crop',
-    generatedThumbnail: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&h=450&fit=crop',
-    createdAt: '2025-11-23T12:00:00',
-    status: 'pending',
-    author: 'AI Agent'
-  },
-  {
-    id: 2,
-    videoId: 104,
-    channelName: 'DramatizeMe',
-    channelColor: '#DC2626',
-    videoTitle: 'Homeless Girl Shares Her Bread With Mean Vendor, What Happens Next Will Shock You',
-    referenceThumbnail: 'https://images.unsplash.com/photo-1509099836639-18ba1795216d?w=800&h=450&fit=crop',
-    generatedThumbnail: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=800&h=450&fit=crop',
-    createdAt: '2025-11-23T11:30:00',
-    status: 'pending',
-    author: 'AI Agent'
-  },
-  {
-    id: 3,
-    videoId: 105,
-    channelName: 'DramatizeMe',
-    channelColor: '#DC2626',
-    videoTitle: 'Rich Mother-in-Law Humiliates Poor Girl at Fancy Restaurant, Instant Karma Strikes',
-    referenceThumbnail: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&h=450&fit=crop',
-    generatedThumbnail: 'https://images.unsplash.com/photo-1511578314322-379afb476865?w=800&h=450&fit=crop',
-    createdAt: '2025-11-23T11:00:00',
-    status: 'pending',
-    author: 'AI Agent'
-  }
-]
 
 // ============================================================================
 // COMPONENTE PRINCIPAL
 // ============================================================================
 
-export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueProps) {
+export function TitleApprovalQueue({ initialPendingTitles, initialPendingThumbnails }: TitleApprovalQueueProps) {
   // ============================================================================
   // ESTADOS
   // ============================================================================
@@ -212,6 +172,9 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
   // ============================================================================
   // ESTADOS - THUMBNAILS
   // ============================================================================
+
+  // Lista de thumbnails pendentes (com Realtime)
+  const [pendingThumbnails, setPendingThumbnails] = useState<PendingThumbnail[]>(initialPendingThumbnails)
 
   // Preview de thumbnail ampliado
   const [previewThumbnailUrl, setPreviewThumbnailUrl] = useState<string | null>(null)
@@ -356,15 +319,15 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
   // ============================================================================
 
   // Filtrar thumbnails removidos localmente
-  const visiblePendingThumbnails = mockPendingThumbnails.filter((t) => !removedThumbnailIds.has(t.id))
+  const visiblePendingThumbnails = pendingThumbnails.filter((t) => !removedThumbnailIds.has(t.id))
 
   // Filtrar por busca
   const filteredThumbnails = visiblePendingThumbnails.filter((t) => {
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()
     return (
-      t.videoTitle.toLowerCase().includes(query) ||
-      t.channelName.toLowerCase().includes(query)
+      (t.title?.toLowerCase().includes(query) || false) ||
+      (t.placeholder?.toLowerCase().includes(query) || false)
     )
   })
 
@@ -473,85 +436,78 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
   /**
    * Aprovar thumbnail e avançar para próximo
    */
-  const handleApproveThumbnail = () => {
+  const handleApproveThumbnail = async () => {
     if (!selectedThumbnailItem) {
       toast.error('Nenhuma thumbnail selecionada')
       return
     }
 
-    // Adiciona ao histórico
-    const historyEntry: ApprovalHistoryThumbnail = {
-      id: Date.now(),
-      itemId: selectedThumbnailItem.id,
-      videoId: selectedThumbnailItem.videoId,
-      channelName: selectedThumbnailItem.channelName,
-      channelColor: selectedThumbnailItem.channelColor,
-      videoTitle: selectedThumbnailItem.videoTitle,
-      referenceThumbnail: selectedThumbnailItem.referenceThumbnail,
-      selectedThumbnailUrl: selectedThumbnailItem.generatedThumbnail,
-      status: 'approved',
-      approvedAt: new Date().toISOString(),
-      approvedBy: 'You',
-      autoApproved: autoApprovalThumbnails
-    }
-    setThumbnailHistory((prev) => [historyEntry, ...prev])
+    setIsApproving(true)
 
-    toast.success('Thumbnail aprovada com sucesso!')
+    try {
+      // Chamar Server Action
+      const result = await approveThumbnail(selectedThumbnailItem.id)
 
-    // Remove da lista
-    setRemovedThumbnailIds((prev) => new Set(prev).add(selectedThumbnailItem.id))
+      if (result.success) {
+        toast.success('Thumbnail aprovada com sucesso!')
 
-    // Move para próximo item
-    const currentIndex = filteredThumbnails.findIndex((t) => t.id === selectedItemId)
-    if (currentIndex < filteredThumbnails.length - 1) {
-      setSelectedItemId(filteredThumbnails[currentIndex + 1].id)
-    } else if (currentIndex > 0) {
-      setSelectedItemId(filteredThumbnails[currentIndex - 1].id)
-    } else {
-      setSelectedItemId(null)
+        // Optimistic update - remover da lista
+        setRemovedThumbnailIds((prev) => new Set(prev).add(selectedThumbnailItem.id))
+
+        // Mover para próximo item
+        const currentIndex = filteredThumbnails.findIndex((t) => t.id === selectedItemId)
+        const nextItem = filteredThumbnails[currentIndex + 1] || filteredThumbnails[currentIndex - 1]
+
+        if (nextItem) {
+          setSelectedItemId(nextItem.id)
+        } else {
+          setSelectedItemId(null)
+        }
+      } else {
+        toast.error(result.error || 'Erro ao aprovar thumbnail')
+      }
+    } catch (error) {
+      console.error('Error approving thumbnail:', error)
+      toast.error('Erro ao aprovar thumbnail')
+    } finally {
+      setIsApproving(false)
     }
   }
 
   /**
-   * Reprovar thumbnail e solicitar regeneração
+   * Reprovar thumbnail e solicitar regeneração (por enquanto só marca como rejeitado)
    */
-  const handleRejectAndRegenerateThumbnail = () => {
+  const handleRejectAndRegenerateThumbnail = async () => {
     if (!selectedThumbnailItem) {
       toast.error('Nenhuma thumbnail selecionada')
       return
     }
 
-    // Adiciona ao histórico com selectedThumbnailUrl vazio (rejeitado)
-    const historyEntry: ApprovalHistoryThumbnail = {
-      id: Date.now(),
-      itemId: selectedThumbnailItem.id,
-      videoId: selectedThumbnailItem.videoId,
-      channelName: selectedThumbnailItem.channelName,
-      channelColor: selectedThumbnailItem.channelColor,
-      videoTitle: selectedThumbnailItem.videoTitle,
-      referenceThumbnail: selectedThumbnailItem.referenceThumbnail,
-      selectedThumbnailUrl: '', // Vazio = rejeitado
-      status: 'rejected',
-      approvedAt: new Date().toISOString(),
-      approvedBy: 'You',
-      autoApproved: false
-    }
-    setThumbnailHistory((prev) => [historyEntry, ...prev])
+    try {
+      // Chamar Server Action
+      const result = await rejectThumbnail(selectedThumbnailItem.id)
 
-    toast.info('Thumbnail reprovada. Sistema irá gerar uma nova versão...')
-    console.log(`🔄 Rejected thumbnail for item ${selectedItemId} - Regenerating...`)
+      if (result.success) {
+        toast.info('Thumbnail reprovada. Por enquanto, não será regerada automaticamente.')
 
-    // Remove da lista (API regenerará automaticamente)
-    setRemovedThumbnailIds((prev) => new Set(prev).add(selectedThumbnailItem.id))
+        // Optimistic update - remover da lista
+        setRemovedThumbnailIds((prev) => new Set(prev).add(selectedThumbnailItem.id))
 
-    // Move para próximo item
-    const currentIndex = filteredThumbnails.findIndex((t) => t.id === selectedItemId)
-    if (currentIndex < filteredThumbnails.length - 1) {
-      setSelectedItemId(filteredThumbnails[currentIndex + 1].id)
-    } else if (currentIndex > 0) {
-      setSelectedItemId(filteredThumbnails[currentIndex - 1].id)
-    } else {
-      setSelectedItemId(null)
+        // Mover para próximo item
+        const currentIndex = filteredThumbnails.findIndex((t) => t.id === selectedItemId)
+        const nextItem = filteredThumbnails[currentIndex + 1] || filteredThumbnails[currentIndex - 1]
+
+        if (nextItem) {
+          setSelectedItemId(nextItem.id)
+        } else {
+          setSelectedItemId(null)
+        }
+      } else {
+        toast.error(result.error || 'Erro ao reprovar thumbnail')
+      }
+    } catch (error) {
+      console.error('Error rejecting thumbnail:', error)
+      toast.error('Erro ao reprovar thumbnail')
     }
   }
 
@@ -751,7 +707,7 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
                 )}
 
                 {activeTab === 'thumbnails' && (
-                  <div className="flex-1 overflow-y-auto">
+                  <div className="p-2">
                     {filteredThumbnails.length === 0 ? (
                       <div className="py-12 text-center px-4">
                         <ImageIcon className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
@@ -773,36 +729,31 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
                           {/* Thumbnail preview image */}
                           <div className="aspect-video rounded mb-2 overflow-hidden border border-border">
                             <img
-                              src={item.referenceThumbnail}
-                              alt={item.videoTitle}
+                              src={item.benchmark_videos?.thumbnail_url || '/placeholder-thumbnail.jpg'}
+                              alt={item.title || 'Thumbnail'}
                               className="w-full h-full object-cover"
                             />
                           </div>
 
                           {/* Row 1: Canal + ID + Time (3 badges) */}
                           <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            <Badge
-                              className="text-xs"
-                              style={{
-                                backgroundColor: `${item.channelColor}15`,
-                                color: item.channelColor,
-                                borderColor: `${item.channelColor}30`
-                              }}
-                            >
-                              {item.channelName}
-                            </Badge>
+                            {item.placeholder && (
+                              <Badge className="bg-primary/10 text-primary border-primary/30 text-xs">
+                                {item.placeholder}
+                              </Badge>
+                            )}
                             <Badge variant="outline" className="text-xs">
-                              ID: {item.videoId}
+                              ID: {item.id}
                             </Badge>
                             <Badge variant="outline" className="text-xs gap-1">
                               <Clock className="w-3 h-3" />
-                              {formatTimeAgo(item.createdAt)}
+                              {formatTimeAgo(item.created_at)}
                             </Badge>
                           </div>
 
                           {/* Video Title */}
                           <p className="text-xs font-medium line-clamp-2">
-                            {item.videoTitle}
+                            {item.title || 'Sem título'}
                           </p>
                         </button>
                       ))
@@ -987,7 +938,7 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
                         </div>
                         <div className="aspect-video rounded-lg border-2 border-border overflow-hidden bg-muted/20">
                           <img
-                            src={selectedThumbnailItem.referenceThumbnail}
+                            src={selectedThumbnailItem.benchmark_videos?.thumbnail_url || '/placeholder-thumbnail.jpg'}
                             alt="Reference Thumbnail"
                             className="w-full h-full object-cover"
                           />
@@ -1004,7 +955,7 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
                         </div>
                         <div className="aspect-video rounded-lg border-2 border-primary overflow-hidden bg-muted/20 relative group cursor-pointer">
                           <img
-                            src={selectedThumbnailItem.generatedThumbnail}
+                            src={selectedThumbnailItem.thumbnail_url}
                             alt="Generated Thumbnail"
                             className="w-full h-full object-cover"
                           />
@@ -1013,7 +964,7 @@ export function TitleApprovalQueue({ initialPendingTitles }: TitleApprovalQueueP
                             <Button
                               size="sm"
                               variant="secondary"
-                              onClick={() => handlePreviewThumbnail(selectedThumbnailItem.generatedThumbnail)}
+                              onClick={() => handlePreviewThumbnail(selectedThumbnailItem.thumbnail_url)}
                               className="opacity-0 group-hover:opacity-100 transition-opacity gap-2"
                             >
                               <Maximize2 className="w-4 h-4" />
