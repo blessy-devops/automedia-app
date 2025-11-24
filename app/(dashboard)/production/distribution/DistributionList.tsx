@@ -65,6 +65,10 @@ interface VideoWithChannels {
   video_transcript: string | null
   youtube_video_id: string
   youtube_url: string
+  performance_vs_median_14d: number | null
+  performance_vs_avg_14d: number | null
+  median_metric_source?: '14d' | 'historical'
+  avg_metric_source?: '14d' | 'historical'
   benchmark_channels?: {
     channel_title: string
     channel_handle: string
@@ -111,6 +115,34 @@ interface DistributionListProps {
   initialDistributedVideos: DistributedVideo[]
   initialDistributedTotalCount: number
   initialDistributedHasMore: boolean
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Get badge variant and label based on performance score
+ * @param score - Performance ratio (e.g., 2.5 = 2.5x performance)
+ * @returns Object with variant and label
+ */
+function getPerformanceBadge(score: number | null): {
+  variant: 'destructive' | 'default' | 'secondary' | 'outline'
+  label: string
+} {
+  if (score === null) {
+    return { variant: 'outline', label: 'N/A' }
+  }
+
+  if (score >= 5) {
+    return { variant: 'destructive', label: 'VIRAL' }
+  } else if (score >= 2) {
+    return { variant: 'default', label: 'HIGH' }
+  } else if (score >= 1) {
+    return { variant: 'secondary', label: 'GOOD' }
+  } else {
+    return { variant: 'outline', label: 'LOW' }
+  }
 }
 
 // ============================================================================
@@ -525,6 +557,9 @@ export function DistributionList({
                   Category
                 </th>
                 <th className="px-4 py-3 text-left text-sm text-muted-foreground">
+                  Performance
+                </th>
+                <th className="px-4 py-3 text-left text-sm text-muted-foreground">
                   Eligible
                 </th>
                 <th className="px-4 py-3 text-right text-sm text-muted-foreground">
@@ -609,7 +644,50 @@ export function DistributionList({
                       </div>
                     </td>
 
-                    {/* Column 5: Eligible Channels Status */}
+                    {/* Column 5: Performance (Outlier Scores) */}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-1.5">
+                        {/* Median (14d or historical) */}
+                        {video.performance_vs_median_14d !== null && (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                              Median ({video.median_metric_source || '14d'})
+                            </span>
+                            <Badge
+                              variant={getPerformanceBadge(video.performance_vs_median_14d).variant}
+                              className="text-xs font-semibold w-fit"
+                            >
+                              {video.performance_vs_median_14d.toFixed(1)}x{' '}
+                              {getPerformanceBadge(video.performance_vs_median_14d).label}
+                            </Badge>
+                          </div>
+                        )}
+                        {/* Average (14d or historical) */}
+                        {video.performance_vs_avg_14d !== null && (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                              Average ({video.avg_metric_source || '14d'})
+                            </span>
+                            <Badge
+                              variant={getPerformanceBadge(video.performance_vs_avg_14d).variant}
+                              className="text-xs font-semibold w-fit"
+                            >
+                              {video.performance_vs_avg_14d.toFixed(1)}x{' '}
+                              {getPerformanceBadge(video.performance_vs_avg_14d).label}
+                            </Badge>
+                          </div>
+                        )}
+                        {/* No data available */}
+                        {video.performance_vs_median_14d === null &&
+                          video.performance_vs_avg_14d === null && (
+                            <span className="text-xs text-muted-foreground">
+                              No performance data
+                            </span>
+                          )}
+                      </div>
+                    </td>
+
+                    {/* Column 6: Eligible Channels Status */}
                     <td className="px-4 py-3">
                       {channelCount > 0 ? (
                         <div className="flex items-center gap-2">

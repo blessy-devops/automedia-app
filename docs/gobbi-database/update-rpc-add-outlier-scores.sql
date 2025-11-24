@@ -1,40 +1,20 @@
 -- ============================================================================
--- Migration: Distribution Flow for Gobbi's Database
--- Date: 2025-11-16
--- Description: Adds distribution tracking columns and RPC function
+-- UPDATE RPC: Add Outlier Scores to get_videos_awaiting_distribution
+-- Date: 2025-11-24
 -- ============================================================================
-
--- ============================================================================
--- Part 1: Add tracking columns to production_videos (if not exist)
--- ============================================================================
-
-ALTER TABLE production_videos
-ADD COLUMN IF NOT EXISTS distributed_by TEXT,
-ADD COLUMN IF NOT EXISTS distributed_at TIMESTAMPTZ,
-ADD COLUMN IF NOT EXISTS distribution_mode TEXT DEFAULT 'manual';
-
-COMMENT ON COLUMN production_videos.distributed_by IS 'User/system that distributed this video';
-COMMENT ON COLUMN production_videos.distributed_at IS 'When the video was distributed';
-COMMENT ON COLUMN production_videos.distribution_mode IS 'manual or automatic';
-
--- ============================================================================
--- Part 2: Performance indexes
--- ============================================================================
-
--- Index for matching channels by niche AND subniche
-CREATE INDEX IF NOT EXISTS idx_structure_accounts_niche_subniche
-ON structure_accounts(niche, subniche);
-
--- Index for benchmark_videos by status (for queue control)
-CREATE INDEX IF NOT EXISTS idx_benchmark_videos_status
-ON benchmark_videos(status);
-
--- Index for production_videos by status (for monitoring)
-CREATE INDEX IF NOT EXISTS idx_production_videos_status
-ON production_videos(status);
-
--- ============================================================================
--- Part 3: RPC Function - Get Videos Awaiting Distribution
+--
+-- OBJETIVO:
+-- Atualizar a RPC function get_videos_awaiting_distribution para incluir
+-- os campos de performance (outlier scores) na resposta.
+--
+-- Novos campos:
+-- - performance_vs_median_14d: Ratio do vídeo vs mediana do canal (14 dias)
+-- - performance_vs_avg_14d: Ratio do vídeo vs média do canal (14 dias)
+--
+-- USO:
+-- Copie e cole este SQL no SQL Editor do Supabase do GOBBI
+--
+-- ⚠️ IMPORTANTE: Rode este SQL no banco do GOBBI, não no seu banco local!
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION get_videos_awaiting_distribution()
@@ -58,11 +38,15 @@ BEGIN
       bv.channel_id,
       bv.status,
       bv.created_at,
-      bv.performance_vs_median_14d,
-      bv.performance_vs_avg_14d,
+      -- Performance scores with fallback to historical
+      COALESCE(bv.performance_vs_median_14d, bv.performance_vs_median_historical) as performance_vs_median_14d,
+      COALESCE(bv.performance_vs_avg_14d, bv.performance_vs_avg_historical) as performance_vs_avg_14d,
+      -- Indicators for which metric is being used
+      CASE WHEN bv.performance_vs_median_14d IS NOT NULL THEN '14d' ELSE 'historical' END as median_metric_source,
+      CASE WHEN bv.performance_vs_avg_14d IS NOT NULL THEN '14d' ELSE 'historical' END as avg_metric_source,
       -- Get source channel info
-      bc.channel_title,
-      bc.channel_handle,
+      bc.channel_name AS benchmark_channel_title,
+      '' AS benchmark_channel_handle,
       -- Get eligible destination channels (matching niche AND subniche)
       (
         SELECT json_agg(
@@ -76,22 +60,19 @@ BEGIN
               WHEN sbb.id IS NOT NULL THEN
                 json_build_object(
                   'brand_name', sbb.brand_name,
-                  'production_workflow_id', sbb.production_workflow_id,
-                  'brand_context', sbb.brand_context,
-                  'visual_profile', sbb.visual_profile
+                  'production_workflow_id', sbb.production_workflow_id
                 )
               ELSE NULL
             END
-          )
+          ) ORDER BY sa.placeholder ASC
         )
         FROM structure_accounts sa
-        LEFT JOIN structure_brand_bible sbb ON sbb.placeholder = sa.unique_profile_id
+        LEFT JOIN structure_brand_bible sbb ON sbb.id = sa.brand_id
         WHERE sa.niche = (bv.categorization->>'niche')
           AND sa.subniche = (bv.categorization->>'subniche')
-        ORDER BY sa.placeholder ASC
       ) AS eligible_channels
     FROM benchmark_videos bv
-    LEFT JOIN benchmark_channels bc ON bc.id::text = bv.channel_id::text
+    LEFT JOIN benchmark_channels bc ON bc.channel_id = bv.channel_id
     WHERE bv.status = 'pending_distribution'
     ORDER BY bv.created_at ASC
   )
@@ -109,11 +90,13 @@ BEGIN
         'created_at', vd.created_at,
         'performance_vs_median_14d', vd.performance_vs_median_14d,
         'performance_vs_avg_14d', vd.performance_vs_avg_14d,
+        'median_metric_source', vd.median_metric_source,
+        'avg_metric_source', vd.avg_metric_source,
         'benchmark_channels', CASE
-          WHEN vd.channel_title IS NOT NULL THEN
+          WHEN vd.benchmark_channel_title IS NOT NULL THEN
             json_build_object(
-              'channel_title', vd.channel_title,
-              'channel_handle', vd.channel_handle
+              'channel_title', vd.benchmark_channel_title,
+              'channel_handle', vd.benchmark_channel_handle
             )
           ELSE NULL
         END,
@@ -134,9 +117,33 @@ EXCEPTION
 END;
 $$;
 
+-- ============================================================================
+-- Comentário e Permissões
+-- ============================================================================
+
 COMMENT ON FUNCTION get_videos_awaiting_distribution() IS
-'Returns all videos in pending_distribution status with their eligible destination channels';
+'Returns all videos in pending_distribution status with their eligible destination channels and outlier scores (performance_vs_median_14d, performance_vs_avg_14d)';
 
 -- Grant execute permission to authenticated users
 GRANT EXECUTE ON FUNCTION get_videos_awaiting_distribution() TO authenticated;
 GRANT EXECUTE ON FUNCTION get_videos_awaiting_distribution() TO service_role;
+
+-- ============================================================================
+-- Verificação (Execute após rodar o SQL acima)
+-- ============================================================================
+
+-- Teste a função:
+-- SELECT * FROM get_videos_awaiting_distribution();
+
+-- Verifique se os campos de performance estão sendo retornados:
+-- SELECT
+--   (video->>'id')::int as id,
+--   video->>'title' as title,
+--   (video->>'performance_vs_median_14d')::numeric as median_score,
+--   (video->>'performance_vs_avg_14d')::numeric as avg_score
+-- FROM (
+--   SELECT jsonb_array_elements(
+--     (get_videos_awaiting_distribution()->>'videos')::jsonb
+--   ) as video
+-- ) t
+-- LIMIT 5;

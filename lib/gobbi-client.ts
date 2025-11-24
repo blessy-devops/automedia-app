@@ -17,6 +17,11 @@ export const gobbiClient = createClient(GOBBI_URL, GOBBI_KEY, {
     autoRefreshToken: false,
     persistSession: false,
   },
+  realtime: {
+    params: {
+      eventsPerSecond: 0, // Disable Realtime (not used in Gobbi client)
+    },
+  },
 })
 
 /**

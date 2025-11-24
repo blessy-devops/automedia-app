@@ -17,6 +17,10 @@ interface BenchmarkVideo {
   youtube_url: string
   status: string
   created_at: string
+  performance_vs_median_14d: number | null
+  performance_vs_avg_14d: number | null
+  median_metric_source?: '14d' | 'historical'
+  avg_metric_source?: '14d' | 'historical'
   benchmark_channels?: {
     channel_title: string
     channel_handle: string

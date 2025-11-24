@@ -507,13 +507,16 @@ export function AppSidebar() {
             <SidebarMenuButton
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               tooltip={theme === "dark" ? "Light Mode" : "Dark Mode"}
+              suppressHydrationWarning
             >
               {theme === "dark" ? (
                 <Sun className="w-5 h-5" />
               ) : (
                 <Moon className="w-5 h-5" />
               )}
-              <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+              <span suppressHydrationWarning>
+                {theme === "dark" ? "Light Mode" : "Dark Mode"}
+              </span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
