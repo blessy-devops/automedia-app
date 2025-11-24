@@ -214,9 +214,6 @@ export function TitleApprovalQueue({
   // Thumbnails removidos localmente (optimistic update)
   const [removedThumbnailIds, setRemovedThumbnailIds] = useState<Set<number>>(new Set())
 
-  // Histórico de aprovações de thumbnails
-  const [thumbnailHistory, setThumbnailHistory] = useState<ApprovalHistoryThumbnail[]>([])
-
   // Auto-approval para thumbnails
   const [autoApprovalThumbnails, setAutoApprovalThumbnails] = useState(false)
 
