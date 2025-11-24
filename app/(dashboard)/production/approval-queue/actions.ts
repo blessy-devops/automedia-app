@@ -589,3 +589,139 @@ export async function getPendingThumbnailApprovals(): Promise<PendingThumbnail[]
     return []
   }
 }
+
+// ============================================================================
+// HISTORY INTERFACES
+// ============================================================================
+
+interface ApprovalHistoryTitle {
+  id: number
+  title: string | null
+  title_approval_status: string
+  title_approved_at: string | null
+  title_approved_by: string | null
+  created_at: string
+  placeholder: string | null
+  benchmark_videos?: {
+    id: number
+    title: string
+  } | null
+}
+
+interface ApprovalHistoryThumbnail {
+  id: number
+  title: string | null
+  thumbnail_url: string | null
+  thumbnail_approval_status: string
+  thumbnail_approved_at: string | null
+  thumbnail_approved_by: string | null
+  created_at: string
+  placeholder: string | null
+  benchmark_videos?: {
+    id: number
+    title: string
+    thumbnail_url: string | null
+  } | null
+}
+
+// ============================================================================
+// SERVER ACTIONS - HISTORY
+// ============================================================================
+
+/**
+ * Busca histórico de aprovações/rejeições de títulos.
+ *
+ * Retorna vídeos onde title_approval_status = 'approved' OR 'rejected'
+ * Ordenado por title_approved_at (mais recente primeiro)
+ */
+export async function getTitleApprovalHistory(): Promise<ApprovalHistoryTitle[]> {
+  try {
+    const supabase = createGobbiClient()
+
+    if (!supabase) {
+      console.error('❌ [getTitleApprovalHistory] Gobbi client not configured')
+      return []
+    }
+
+    const { data, error } = await supabase
+      .from('production_videos')
+      .select(`
+        id,
+        title,
+        title_approval_status,
+        title_approved_at,
+        title_approved_by,
+        created_at,
+        placeholder,
+        benchmark_videos (
+          id,
+          title
+        )
+      `)
+      .in('title_approval_status', ['approved', 'rejected'])
+      .not('title_approved_at', 'is', null)
+      .order('title_approved_at', { ascending: false })
+      .limit(100)
+
+    if (error) {
+      console.error('❌ [getTitleApprovalHistory] Error:', error)
+      return []
+    }
+
+    return data || []
+
+  } catch (error) {
+    console.error('❌ [getTitleApprovalHistory] Unexpected error:', error)
+    return []
+  }
+}
+
+/**
+ * Busca histórico de aprovações/rejeições de thumbnails.
+ *
+ * Retorna vídeos onde thumbnail_approval_status = 'approved' OR 'rejected'
+ * Ordenado por thumbnail_approved_at (mais recente primeiro)
+ */
+export async function getThumbnailApprovalHistory(): Promise<ApprovalHistoryThumbnail[]> {
+  try {
+    const supabase = createGobbiClient()
+
+    if (!supabase) {
+      console.error('❌ [getThumbnailApprovalHistory] Gobbi client not configured')
+      return []
+    }
+
+    const { data, error } = await supabase
+      .from('production_videos')
+      .select(`
+        id,
+        title,
+        thumbnail_url,
+        thumbnail_approval_status,
+        thumbnail_approved_at,
+        thumbnail_approved_by,
+        created_at,
+        placeholder,
+        benchmark_videos (
+          id,
+          title,
+          thumbnail_url
+        )
+      `)
+      .in('thumbnail_approval_status', ['approved', 'rejected'])
+      .not('thumbnail_approved_at', 'is', null)
+      .order('thumbnail_approved_at', { ascending: false })
+      .limit(100)
+
+    if (error) {
+      console.error('❌ [getThumbnailApprovalHistory] Error:', error)
+      return []
+    }
+
+    return data || []
+
+  } catch (error) {
+    console.error('❌ [getThumbnailApprovalHistory] Unexpected error:', error)
+    return []
+  }
+}
