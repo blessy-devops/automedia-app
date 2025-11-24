@@ -107,19 +107,39 @@ interface PendingThumbnail {
 }
 
 /**
- * Histórico de aprovação de thumbnail
+ * Histórico de aprovação de título (alinhado com dados reais do banco)
+ */
+interface ApprovalHistoryTitle {
+  id: number
+  title: string | null
+  title_approval_status: string
+  title_approved_at: string | null
+  title_approved_by: string | null
+  created_at: string
+  placeholder: string | null
+  benchmark_videos?: {
+    id: number
+    title: string
+  } | null
+}
+
+/**
+ * Histórico de aprovação de thumbnail (alinhado com dados reais do banco)
  */
 interface ApprovalHistoryThumbnail {
   id: number
-  videoId: number
-  videoTitle: string
-  channelName: string
-  referenceThumbnail: string
-  selectedThumbnailUrl: string
-  status: 'approved' | 'rejected'
-  approvedAt: string
-  approvedBy: string
-  autoApproved: boolean
+  title: string | null
+  thumbnail_url: string | null
+  thumbnail_approval_status: string
+  thumbnail_approved_at: string | null
+  thumbnail_approved_by: string | null
+  created_at: string
+  placeholder: string | null
+  benchmark_videos?: {
+    id: number
+    title: string
+    thumbnail_url: string | null
+  } | null
 }
 
 /**
@@ -128,13 +148,20 @@ interface ApprovalHistoryThumbnail {
 interface TitleApprovalQueueProps {
   initialPendingTitles: PendingTitle[]
   initialPendingThumbnails: PendingThumbnail[]
+  initialTitleHistory: ApprovalHistoryTitle[]
+  initialThumbnailHistory: ApprovalHistoryThumbnail[]
 }
 
 // ============================================================================
 // COMPONENTE PRINCIPAL
 // ============================================================================
 
-export function TitleApprovalQueue({ initialPendingTitles, initialPendingThumbnails }: TitleApprovalQueueProps) {
+export function TitleApprovalQueue({
+  initialPendingTitles,
+  initialPendingThumbnails,
+  initialTitleHistory,
+  initialThumbnailHistory
+}: TitleApprovalQueueProps) {
   // ============================================================================
   // ESTADOS
   // ============================================================================
@@ -168,8 +195,8 @@ export function TitleApprovalQueue({ initialPendingTitles, initialPendingThumbna
   // Items removidos localmente (optimistic update)
   const [removedTitleIds, setRemovedTitleIds] = useState<Set<number>>(new Set())
 
-  // Histórico de aprovações (TODO: buscar do backend)
-  const [titleHistory, setTitleHistory] = useState<ApprovalHistoryTitle[]>([])
+  // Histórico de aprovações de títulos
+  const [titleHistory, setTitleHistory] = useState<ApprovalHistoryTitle[]>(initialTitleHistory)
 
   // ============================================================================
   // ESTADOS - THUMBNAILS
@@ -177,6 +204,9 @@ export function TitleApprovalQueue({ initialPendingTitles, initialPendingThumbna
 
   // Lista de thumbnails pendentes (com Realtime)
   const [pendingThumbnails, setPendingThumbnails] = useState<PendingThumbnail[]>(initialPendingThumbnails)
+
+  // Histórico de aprovações de thumbnails
+  const [thumbnailHistory, setThumbnailHistory] = useState<ApprovalHistoryThumbnail[]>(initialThumbnailHistory)
 
   // Preview de thumbnail ampliado
   const [previewThumbnailUrl, setPreviewThumbnailUrl] = useState<string | null>(null)
@@ -527,7 +557,7 @@ export function TitleApprovalQueue({ initialPendingTitles, initialPendingThumbna
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Layout Split-Screen */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col h-screen">
         {/* ================================================================= */}
         {/* HEADER */}
         {/* ================================================================= */}
@@ -1063,13 +1093,176 @@ export function TitleApprovalQueue({ initialPendingTitles, initialPendingThumbna
           {/* HISTORY MODE */}
           {/* ================================================================= */}
           {viewMode === 'history' && (
-            <div className="flex-1 flex items-center justify-center bg-background">
-              <div className="text-center">
-                <HistoryIcon className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <p className="text-lg font-medium text-foreground mb-2">History View</p>
-                <p className="text-sm text-muted-foreground">
-                  History functionality will be implemented soon
-                </p>
+            <div className="flex-1 overflow-y-auto p-6 bg-background">
+              <div className="max-w-4xl mx-auto space-y-4">
+                {/* Títulos History */}
+                {activeTab === 'titles' && titleHistory.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <HistoryIcon className="w-16 h-16 mb-4 text-muted-foreground opacity-50" />
+                    <p className="text-lg font-medium text-foreground mb-2">No Title History</p>
+                    <p className="text-sm text-muted-foreground">
+                      Approved/rejected titles will appear here
+                    </p>
+                  </div>
+                )}
+
+                {activeTab === 'titles' && titleHistory.map((item) => (
+                  <Card key={item.id} className="border-l-4" style={{
+                    borderLeftColor: item.title_approval_status === 'approved' ? '#22c55e' : '#ef4444'
+                  }}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        {/* Status Icon */}
+                        <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
+                          item.title_approval_status === 'approved'
+                            ? 'bg-green-100 dark:bg-green-950'
+                            : 'bg-red-100 dark:bg-red-950'
+                        }`}>
+                          {item.title_approval_status === 'approved' ? (
+                            <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-500" />
+                          ) : (
+                            <XCircle className="w-5 h-5 text-red-600 dark:text-red-500" />
+                          )}
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          {/* Header with badges */}
+                          <div className="flex items-center gap-2 flex-wrap mb-2">
+                            {item.placeholder && (
+                              <Badge className="bg-primary/10 text-primary border-primary/30 text-xs">
+                                {item.placeholder}
+                              </Badge>
+                            )}
+                            <Badge
+                              variant={item.title_approval_status === 'approved' ? 'default' : 'destructive'}
+                              className="text-xs"
+                            >
+                              {item.title_approval_status === 'approved' ? 'Approved' : 'Rejected'}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground ml-auto">
+                              {item.title_approved_at && formatTimeAgo(item.title_approved_at)}
+                            </span>
+                          </div>
+
+                          {/* Reference Title */}
+                          <div className="mb-2">
+                            <p className="text-xs text-muted-foreground">Reference:</p>
+                            <p className="text-sm text-muted-foreground">
+                              {item.benchmark_videos?.title || 'No reference title'}
+                            </p>
+                          </div>
+
+                          {/* Selected Title - Only for approved */}
+                          {item.title_approval_status === 'approved' && item.title && (
+                            <div className="bg-yellow-500/10 border border-yellow-500/20 p-3 rounded-lg mb-2">
+                              <p className="text-xs text-yellow-700 dark:text-yellow-500 mb-1">Selected:</p>
+                              <p className="text-sm font-medium">{item.title}</p>
+                            </div>
+                          )}
+
+                          {/* Footer */}
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <User className="w-3 h-3" />
+                            <span>{item.title_approved_by || 'Unknown'}</span>
+                            <span>•</span>
+                            <span>ID: {item.id}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+
+                {/* Thumbnails History */}
+                {activeTab === 'thumbnails' && thumbnailHistory.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <HistoryIcon className="w-16 h-16 mb-4 text-muted-foreground opacity-50" />
+                    <p className="text-lg font-medium text-foreground mb-2">No Thumbnail History</p>
+                    <p className="text-sm text-muted-foreground">
+                      Approved/rejected thumbnails will appear here
+                    </p>
+                  </div>
+                )}
+
+                {activeTab === 'thumbnails' && thumbnailHistory.map((item) => (
+                  <Card key={item.id} className="border-l-4" style={{
+                    borderLeftColor: item.thumbnail_approval_status === 'approved' ? '#22c55e' : '#ef4444'
+                  }}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        {/* Status Icon */}
+                        <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
+                          item.thumbnail_approval_status === 'approved'
+                            ? 'bg-green-100 dark:bg-green-950'
+                            : 'bg-red-100 dark:bg-red-950'
+                        }`}>
+                          {item.thumbnail_approval_status === 'approved' ? (
+                            <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-500" />
+                          ) : (
+                            <XCircle className="w-5 h-5 text-red-600 dark:text-red-500" />
+                          )}
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          {/* Header with badges */}
+                          <div className="flex items-center gap-2 flex-wrap mb-2">
+                            {item.placeholder && (
+                              <Badge className="bg-primary/10 text-primary border-primary/30 text-xs">
+                                {item.placeholder}
+                              </Badge>
+                            )}
+                            <Badge
+                              variant={item.thumbnail_approval_status === 'approved' ? 'default' : 'destructive'}
+                              className="text-xs"
+                            >
+                              {item.thumbnail_approval_status === 'approved' ? 'Approved' : 'Rejected'}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground ml-auto">
+                              {item.thumbnail_approved_at && formatTimeAgo(item.thumbnail_approved_at)}
+                            </span>
+                          </div>
+
+                          {/* Video Title */}
+                          <p className="text-sm font-medium mb-3">{item.title || 'Untitled video'}</p>
+
+                          {/* Thumbnail Comparison - Only for approved */}
+                          {item.thumbnail_approval_status === 'approved' && (
+                            <div className="grid grid-cols-2 gap-3">
+                              {/* Reference */}
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Reference</p>
+                                <img
+                                  src={item.benchmark_videos?.thumbnail_url || '/placeholder-thumbnail.jpg'}
+                                  alt="Reference"
+                                  className="w-full aspect-video object-cover rounded border border-border"
+                                />
+                              </div>
+                              {/* Selected */}
+                              <div>
+                                <p className="text-xs text-green-700 dark:text-green-500 font-medium mb-1">Selected</p>
+                                <img
+                                  src={item.thumbnail_url || '/placeholder-thumbnail.jpg'}
+                                  alt="Selected"
+                                  className="w-full aspect-video object-cover rounded border-2 border-green-500"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Footer */}
+                          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                            <User className="w-3 h-3" />
+                            <span>{item.thumbnail_approved_by || 'Unknown'}</span>
+                            <span>•</span>
+                            <span>ID: {item.id}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             </div>
           )}
