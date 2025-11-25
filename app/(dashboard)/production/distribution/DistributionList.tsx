@@ -38,6 +38,7 @@ import {
   undoDistribution,
   restoreVideoToQueue,
   getDistributedVideos,
+  getVideosAwaitingDistribution,
 } from './actions'
 import { useRouter } from 'next/navigation'
 import {
@@ -112,6 +113,7 @@ interface DistributedVideo {
 
 interface DistributionListProps {
   initialVideos: VideoWithChannels[]
+  initialPendingTotalCount: number
   initialDistributedVideos: DistributedVideo[]
   initialDistributedTotalCount: number
   initialDistributedHasMore: boolean
@@ -151,6 +153,7 @@ function getPerformanceBadge(score: number | null): {
 
 export function DistributionList({
   initialVideos,
+  initialPendingTotalCount,
   initialDistributedVideos,
   initialDistributedTotalCount,
   initialDistributedHasMore,
@@ -166,6 +169,11 @@ export function DistributionList({
   const [isDistributing, setIsDistributing] = useState(false)
   const [showAllChannels, setShowAllChannels] = useState(false)
   const [videos, setVideos] = useState(initialVideos)
+
+  // Pending Videos State (with pagination)
+  const [pendingTotalCount, setPendingTotalCount] = useState(initialPendingTotalCount)
+  const [pendingHasMore, setPendingHasMore] = useState(initialVideos.length < initialPendingTotalCount)
+  const [isLoadingMorePending, setIsLoadingMorePending] = useState(false)
 
   // Distributed Videos State (with pagination)
   const [distributedVideos, setDistributedVideos] = useState<DistributedVideo[]>(
@@ -183,10 +191,18 @@ export function DistributionList({
   // Sync local state when server data changes (after router.refresh())
   useEffect(() => {
     setVideos(initialVideos)
+    setPendingTotalCount(initialPendingTotalCount)
+    setPendingHasMore(initialVideos.length < initialPendingTotalCount)
     setDistributedVideos(initialDistributedVideos)
     setDistributedTotalCount(initialDistributedTotalCount)
     setDistributedHasMore(initialDistributedHasMore)
-  }, [initialVideos, initialDistributedVideos, initialDistributedTotalCount, initialDistributedHasMore])
+  }, [
+    initialVideos,
+    initialPendingTotalCount,
+    initialDistributedVideos,
+    initialDistributedTotalCount,
+    initialDistributedHasMore,
+  ])
 
   // Filter videos by search term
   const filteredVideos = videos.filter(
@@ -449,6 +465,33 @@ export function DistributionList({
     }
 
     setIsDistributing(false)
+  }
+
+  const handleLoadMorePending = async () => {
+    if (isLoadingMorePending || !pendingHasMore) return
+
+    setIsLoadingMorePending(true)
+
+    try {
+      const result = await getVideosAwaitingDistribution({
+        offset: videos.length,
+        limit: 50,
+      })
+
+      if (result.error) {
+        toast.error('Failed to load more videos', {
+          description: result.error,
+        })
+      } else {
+        setVideos((prev) => [...prev, ...result.videos])
+        setPendingHasMore(videos.length + result.videos.length < result.totalCount)
+        // totalCount stays the same
+      }
+    } catch (error) {
+      toast.error('Failed to load more videos')
+    } finally {
+      setIsLoadingMorePending(false)
+    }
   }
 
   const handleLoadMoreDistributed = async () => {
@@ -728,6 +771,27 @@ export function DistributionList({
           ) : (
             <div className="text-center py-12 text-muted-foreground">
               {searchTerm ? 'No videos found matching your search' : 'No videos awaiting distribution'}
+            </div>
+          )}
+
+          {/* Load More Button for Pending Videos */}
+          {!searchTerm && pendingHasMore && (
+            <div className="flex justify-center mt-6">
+              <Button
+                variant="outline"
+                onClick={handleLoadMorePending}
+                disabled={isLoadingMorePending}
+                className="min-w-[140px]"
+              >
+                {isLoadingMorePending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  `Load More Videos (${videos.length}/${pendingTotalCount})`
+                )}
+              </Button>
             </div>
           )}
         </TabsContent>
@@ -1072,23 +1136,26 @@ export function DistributionList({
               {/* Sheet Footer */}
               <SheetFooter className="px-6 py-4 border-t border-border mt-auto">
                 <div className="flex items-center justify-between w-full">
-                  <p className="text-sm text-muted-foreground">
-                    {selectedChannels.length > 0
-                      ? `${selectedChannels.length} job${selectedChannels.length !== 1 ? 's' : ''} will be created`
-                      : 'No channels selected'}
-                  </p>
                   <div className="flex gap-2">
-                    {eligibleChannels.length === 0 && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={handleRemoveFromQueue}
-                        disabled={isDistributing}
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Remove
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoveFromQueue}
+                      disabled={isDistributing}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Remove from Queue
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <p className="text-sm text-muted-foreground">
+                      {selectedChannels.length > 0
+                        ? `${selectedChannels.length} job${selectedChannels.length !== 1 ? 's' : ''} will be created`
+                        : eligibleChannels.length > 0
+                        ? 'Select channels to distribute'
+                        : 'No eligible channels'}
+                    </p>
                     <Button
                       onClick={handleDistribute}
                       disabled={selectedChannels.length === 0 || isDistributing}

@@ -5,6 +5,7 @@
 import { MyChannelDetailsClient } from '@/features/my-channels/components/my-channel-details-client'
 import { createGobbiClient } from '@/lib/supabase/gobbi'
 import { mapStructureAccountToChannel } from '@/features/my-channels/lib/adapters'
+import { mapBrandBibleToBrandBibleTab, type BrandBibleRow } from '@/features/my-channels/lib/brand-bible-adapter'
 import { myChannels } from '@/features/my-channels/lib/mock-data'
 import { notFound } from 'next/navigation'
 
@@ -34,6 +35,7 @@ export default async function ChannelDetailsPage({ params }: PageProps) {
     .single()
 
   let channelData
+  let brandBibleData = null
 
   if (error || !accountData) {
     console.error('Error fetching channel:', error)
@@ -44,7 +46,27 @@ export default async function ChannelDetailsPage({ params }: PageProps) {
     }
   } else {
     channelData = mapStructureAccountToChannel(accountData)
+
+    // Fetch brand bible data if brand_id exists
+    if (accountData.brand_id) {
+      const { data: brandBibleRow, error: brandBibleError } = await supabase
+        .from('structure_brand_bible')
+        .select('*')
+        .eq('id', accountData.brand_id)
+        .single()
+
+      if (!brandBibleError && brandBibleRow) {
+        brandBibleData = mapBrandBibleToBrandBibleTab(brandBibleRow as BrandBibleRow)
+      } else {
+        console.error('Error fetching brand bible:', {
+          error: brandBibleError,
+          brand_id: accountData.brand_id,
+          placeholder: accountData.placeholder,
+          message: brandBibleError?.message
+        })
+      }
+    }
   }
 
-  return <MyChannelDetailsClient channel={channelData} />
+  return <MyChannelDetailsClient channel={channelData} brandBibleData={brandBibleData} />
 }

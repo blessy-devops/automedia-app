@@ -27,12 +27,14 @@ import {
 import type { Channel } from '../types'
 import { BrandBibleTab } from './brand-bible-tab'
 import { CredentialsTab } from './credentials-tab'
+import type { BrandBibleData } from '../lib/brand-bible-adapter'
 
 interface MyChannelDetailsClientProps {
   channel: Channel
+  brandBibleData?: BrandBibleData | null
 }
 
-export function MyChannelDetailsClient({ channel }: MyChannelDetailsClientProps) {
+export function MyChannelDetailsClient({ channel, brandBibleData }: MyChannelDetailsClientProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState('overview')
 
@@ -237,7 +239,7 @@ export function MyChannelDetailsClient({ channel }: MyChannelDetailsClientProps)
 
           {/* Brand Bible Tab */}
           <TabsContent value="brandbible">
-            <BrandBibleTab channelName={channel.name} />
+            <BrandBibleTab channelName={channel.name} brandBibleData={brandBibleData} />
           </TabsContent>
 
           {/* Credentials Tab */}

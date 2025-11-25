@@ -69,40 +69,56 @@ interface DistributionResult {
 // Server Action 1: Get Videos Awaiting Distribution
 // ============================================================================
 
-export async function getVideosAwaitingDistribution(): Promise<{
+export async function getVideosAwaitingDistribution(options: {
+  offset?: number
+  limit?: number
+} = {}): Promise<{
   videos: VideoWithChannels[]
+  totalCount: number
   error: string | null
 }> {
   ensureServerSide()
 
+  const { offset = 0, limit = 50 } = options
+
   try {
-    // Call RPC function in Gobbi's database
-    const { data, error } = await gobbiClient.rpc('get_videos_awaiting_distribution')
+    // Call RPC function in Gobbi's database with pagination
+    const { data, error } = await gobbiClient.rpc('get_videos_awaiting_distribution', {
+      p_limit: limit,
+      p_offset: offset,
+    })
 
     if (error) {
       console.error('[getVideosAwaitingDistribution] RPC error:', error)
-      return { videos: [], error: error.message }
+      return { videos: [], totalCount: 0, error: error.message }
     }
 
     if (!data) {
-      return { videos: [], error: null }
+      return { videos: [], totalCount: 0, error: null }
     }
 
-    // RPC returns { videos: [...], error: null }
-    const result = data as { videos: VideoWithChannels[]; error: string | null }
+    // RPC returns { videos: [...], total_count: number, error: null }
+    const result = data as {
+      videos: VideoWithChannels[]
+      total_count: number
+      error: string | null
+    }
 
     if (result.error) {
       console.error('[getVideosAwaitingDistribution] RPC returned error:', result.error)
-      return { videos: [], error: result.error }
+      return { videos: [], totalCount: 0, error: result.error }
     }
 
-    console.log(`[getVideosAwaitingDistribution] Fetched ${result.videos.length} videos awaiting distribution`)
+    console.log(
+      `[getVideosAwaitingDistribution] Fetched ${result.videos.length} videos awaiting distribution (offset: ${offset}, total: ${result.total_count})`
+    )
 
-    return { videos: result.videos, error: null }
+    return { videos: result.videos, totalCount: result.total_count, error: null }
   } catch (error) {
     console.error('[getVideosAwaitingDistribution] Unexpected error:', error)
     return {
       videos: [],
+      totalCount: 0,
       error: error instanceof Error ? error.message : 'Unknown error',
     }
   }

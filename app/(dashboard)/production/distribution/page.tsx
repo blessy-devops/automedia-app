@@ -11,11 +11,11 @@ export const metadata = {
 export default async function ProductionDistributionPage() {
   // Fetch both pending and distributed videos in parallel
   const [pendingResult, distributedResult] = await Promise.all([
-    getVideosAwaitingDistribution(),
+    getVideosAwaitingDistribution({ offset: 0, limit: 50 }),
     getDistributedVideos({ offset: 0, limit: 20 }),
   ])
 
-  const { videos, error } = pendingResult
+  const { videos, totalCount, error } = pendingResult
   const {
     videos: distributedVideos,
     totalCount: distributedTotalCount,
@@ -54,6 +54,7 @@ export default async function ProductionDistributionPage() {
       <div className="p-8">
         <DistributionList
           initialVideos={videos}
+          initialPendingTotalCount={totalCount}
           initialDistributedVideos={distributedVideos}
           initialDistributedTotalCount={distributedTotalCount}
           initialDistributedHasMore={distributedHasMore}

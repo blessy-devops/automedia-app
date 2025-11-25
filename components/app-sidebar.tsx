@@ -238,8 +238,16 @@ export function AppSidebar() {
   const { theme, setTheme } = useTheme()
   const { state } = useSidebar()
 
+  // Track mounted state to prevent hydration mismatch
+  const [mounted, setMounted] = useState(false)
+
   // Track which section is expanded (only one at a time, starts all collapsed)
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
+
+  // Set mounted on client-side only
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Reset expanded section when sidebar collapses
   useEffect(() => {
@@ -506,16 +514,17 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              tooltip={theme === "dark" ? "Light Mode" : "Dark Mode"}
-              suppressHydrationWarning
+              tooltip={mounted ? (theme === "dark" ? "Light Mode" : "Dark Mode") : "Theme"}
             >
-              {theme === "dark" ? (
+              {!mounted ? (
+                <Sun className="w-5 h-5" />
+              ) : theme === "dark" ? (
                 <Sun className="w-5 h-5" />
               ) : (
                 <Moon className="w-5 h-5" />
               )}
-              <span suppressHydrationWarning>
-                {theme === "dark" ? "Light Mode" : "Dark Mode"}
+              <span>
+                {!mounted ? "Theme" : theme === "dark" ? "Light Mode" : "Dark Mode"}
               </span>
             </SidebarMenuButton>
           </SidebarMenuItem>

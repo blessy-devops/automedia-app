@@ -1,12 +1,18 @@
--- create-production-rpcs.sql
--- RPCs para Production Videos no banco do Gobbi
--- ⚠️ RODE ESTE SQL NO SQL EDITOR DO SUPABASE DO GOBBI
+-- ============================================
+-- FIX: Correção do cálculo de progresso para status 'queued'
+-- ============================================
+--
+-- PROBLEMA: Status 'queued' estava retornando 25% (lista) e 50% (detalhes)
+-- SOLUÇÃO: 'queued' agora retorna 0% (vídeo ainda não começou produção)
+--
+-- INSTRUÇÕES:
+-- 1. Copie todo este arquivo
+-- 2. Cole no Supabase SQL Editor: https://supabase.com/dashboard/project/eafkhsmgrzywrhviisdl/sql/new
+-- 3. Execute
+--
+-- ============================================
 
--- ========================================
--- RPC 1: get_production_videos_list
--- ========================================
--- Retorna lista paginada de vídeos em produção com stats
-
+-- Recriar get_production_videos_list (sem DROP - apenas substitui)
 CREATE OR REPLACE FUNCTION get_production_videos_list(
   p_status TEXT DEFAULT NULL,
   p_search TEXT DEFAULT NULL,
@@ -34,6 +40,8 @@ BEGIN
       pv.platform,
       bv.channel_name as source_channel,
       bv.title as source_title,
+      bv.youtube_video_id as source_youtube_video_id,
+      pv.content_id_on_platform as youtube_id,
       -- Calculate progress (0-100) based on status
       CASE
         WHEN pv.status = 'queued' THEN 0
@@ -52,15 +60,14 @@ BEGIN
             WHEN 'create_video_segments' THEN 80
             WHEN 'create_concatenated_audios' THEN 88
             WHEN 'create_final_video' THEN 96
-            ELSE 0  -- Status inválido do tipo create_* → 0%
+            ELSE 0
           END
         WHEN pv.status = 'pending_approval' THEN 98
         WHEN pv.status = 'approved' THEN 99
         WHEN pv.status = 'failed' THEN 0
         WHEN pv.status = 'on_hold' THEN 50
-        ELSE 0  -- Status completamente desconhecido → 0%
+        ELSE 0
       END as progress,
-      -- Production days
       EXTRACT(DAY FROM (NOW() - pv.created_at))::INT as production_days
     FROM production_videos pv
     LEFT JOIN benchmark_videos bv ON pv.benchmark_id = bv.id
@@ -98,11 +105,7 @@ BEGIN
 END;
 $$;
 
--- ========================================
--- RPC 2: get_production_video_details
--- ========================================
--- Retorna TODOS os dados de um vídeo em produção
-
+-- Recriar get_production_video_details (sem DROP - apenas substitui)
 CREATE OR REPLACE FUNCTION get_production_video_details(p_video_id INT)
 RETURNS JSON
 LANGUAGE plpgsql
@@ -152,13 +155,13 @@ BEGIN
             WHEN 'create_video_segments' THEN 80
             WHEN 'create_concatenated_audios' THEN 88
             WHEN 'create_final_video' THEN 96
-            ELSE 0  -- Status inválido do tipo create_* → 0%
+            ELSE 0
           END
         WHEN pv.status = 'pending_approval' THEN 98
         WHEN pv.status = 'approved' THEN 99
         WHEN pv.status = 'failed' THEN 0
         WHEN pv.status = 'on_hold' THEN 50
-        ELSE 0  -- Status completamente desconhecido → 0%
+        ELSE 0
       END as progress_percentage,
       -- Source video data
       bv.id as source_video_id,
@@ -206,15 +209,36 @@ BEGIN
         json_build_object(
           'id', id,
           'segmentNumber', segment_id,
-          'thumbnailUrl', COALESCE(
-            (covering_images->>0)::json->>'url',
-            'https://placehold.co/400x225'
-          ),
+          'thumbnailUrl', CASE
+            -- Se covering_images é objeto com 'images' array
+            WHEN covering_images IS NOT NULL
+              AND jsonb_typeof(covering_images) = 'object'
+              AND covering_images ? 'images'
+              AND jsonb_typeof(covering_images->'images') = 'array'
+              AND jsonb_array_length(covering_images->'images') > 0
+            THEN (covering_images->'images'->0->>'url')
+            -- Se covering_images é array direto (formato legado)
+            WHEN covering_images IS NOT NULL
+              AND jsonb_typeof(covering_images) = 'array'
+              AND jsonb_array_length(covering_images) > 0
+            THEN (covering_images->0->>'url')
+            -- Fallback: placeholder
+            ELSE 'https://placehold.co/400x225'
+          END,
           'filename', filename,
           'status', status,
           'imageCount', CASE
+            -- Se covering_images é objeto com 'images' array
             WHEN covering_images IS NOT NULL
+              AND jsonb_typeof(covering_images) = 'object'
+              AND covering_images ? 'images'
+              AND jsonb_typeof(covering_images->'images') = 'array'
+            THEN jsonb_array_length(covering_images->'images')
+            -- Se covering_images é array direto (formato legado)
+            WHEN covering_images IS NOT NULL
+              AND jsonb_typeof(covering_images) = 'array'
             THEN jsonb_array_length(covering_images)
+            -- Fallback: 0
             ELSE 0
           END,
           'videoUrl', video_url
@@ -233,7 +257,7 @@ BEGIN
     ) as workflow_stages
     FROM (
       SELECT 1 as stage_number, 'Create Title' as stage_name,
-        CASE WHEN pd.status IN ('published', 'create_outline', 'create_cast', 'create_rich_outline', 'create_script', 'review_script', 'create_seo_description', 'create_thumbnail', 'create_audio_segments', 'create_video_segments', 'create_concatenated_audios', 'create_final_video', 'pending_approval', 'approved') THEN 'completed' ELSE 'pending' END as stage_status
+        CASE WHEN pd.status IN ('published', 'create_outline', 'create_cast', 'create_rich_outline', 'create_script', 'review_script', 'create_seo_description', 'create_thumbnail', 'create_audio_segments', 'create_video_segments', 'create_concatenated_audios', 'create_final_video', 'pending_approval', 'approved') THEN 'completed' WHEN pd.status = 'create_title' THEN 'processing' ELSE 'pending' END as stage_status
       FROM production_data pd
       UNION ALL
       SELECT 2, 'Create Outline',
@@ -352,59 +376,20 @@ BEGIN
 END;
 $$;
 
--- ========================================
--- RPC 3: get_production_stats
--- ========================================
--- Retorna estatísticas gerais (para os cards)
-
-CREATE OR REPLACE FUNCTION get_production_stats()
-RETURNS JSON
-LANGUAGE plpgsql
-AS $$
-DECLARE
-  v_result JSON;
-BEGIN
-  SELECT json_build_object(
-    'total', COUNT(*)::INT,
-    'published', COUNT(*) FILTER (WHERE status = 'published')::INT,
-    'processing', COUNT(*) FILTER (WHERE status LIKE 'create_%' OR status IN ('pending_approval', 'approved'))::INT,
-    'failed', COUNT(*) FILTER (WHERE status = 'failed')::INT,
-    'onHold', COUNT(*) FILTER (WHERE status = 'on_hold')::INT
-  ) INTO v_result
-  FROM production_videos;
-
-  RETURN v_result;
-END;
-$$;
-
--- Grant execute permissions (opcional, ajuste conforme necessário)
-GRANT EXECUTE ON FUNCTION get_production_videos_list TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION get_production_video_details TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION get_production_stats TO anon, authenticated;
-
--- Test queries (comentado - descomente para testar)
-/*
--- Test 1: Get all videos
-SELECT get_production_videos_list();
-
--- Test 2: Get published videos only
-SELECT get_production_videos_list('published');
-
--- Test 3: Search by title
-SELECT get_production_videos_list(NULL, 'DEUS');
-
--- Test 4: Get video details (replace 168 with a real ID)
-SELECT get_production_video_details(168);
-
--- Test 5: Get stats
-SELECT get_production_stats();
-*/
-
--- Log
-DO $$
-BEGIN
-  RAISE NOTICE '✅ Created 3 RPC functions for production videos';
-  RAISE NOTICE '   - get_production_videos_list(status, search, page, per_page)';
-  RAISE NOTICE '   - get_production_video_details(video_id)';
-  RAISE NOTICE '   - get_production_stats()';
-END $$;
+-- Teste rápido para verificar se está funcionando
+SELECT
+  id,
+  status,
+  CASE
+    WHEN status = 'queued' THEN 0
+    WHEN status = 'published' THEN 100
+    WHEN status LIKE 'create_%' THEN
+      CASE status
+        WHEN 'create_title' THEN 8
+        ELSE 50
+      END
+    ELSE 0
+  END as expected_progress
+FROM production_videos
+WHERE id IN (176, 177)
+ORDER BY id;

@@ -6,6 +6,7 @@
  */
 
 import { useState } from 'react'
+import ReactMarkdown from 'react-markdown'
 import {
   FileText,
   Palette,
@@ -30,6 +31,43 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { ColorSwatch } from '@/components/ui/color-swatch'
+import type { BrandBibleData } from '../lib/brand-bible-adapter'
+
+/**
+ * Detecta hex codes no texto e retorna array de elementos JSX
+ * com ColorSwatch renderizado inline
+ */
+function parseTextWithHexCodes(text: string): React.ReactNode[] {
+  // Regex para detectar hex codes: #RRGGBB ou #RGB
+  const hexRegex = /#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})\b/g
+
+  const parts: React.ReactNode[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = hexRegex.exec(text)) !== null) {
+    // Adiciona texto antes do hex code
+    if (match.index > lastIndex) {
+      parts.push(text.substring(lastIndex, match.index))
+    }
+
+    // Adiciona o ColorSwatch
+    const hexCode = match[0]
+    parts.push(
+      <ColorSwatch key={`hex-${match.index}`} hex={hexCode} />
+    )
+
+    lastIndex = match.index + hexCode.length
+  }
+
+  // Adiciona texto restante após último hex code
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex))
+  }
+
+  return parts.length > 0 ? parts : [text]
+}
 
 interface BrandBibleFieldProps {
   icon: React.ReactNode
@@ -79,7 +117,57 @@ function BrandBibleField({ icon, title, description, value, usedIn, onEdit }: Br
               ))}
             </div>
           ) : (
-            <p className="text-sm">{value}</p>
+            <div className="prose prose-sm max-w-none dark:prose-invert">
+              <ReactMarkdown
+                components={{
+                  // Customizar parágrafos para melhor espaçamento
+                  p: ({ children, ...props }) => (
+                    <p className="mb-4 last:mb-0 leading-relaxed text-sm" {...props}>
+                      {children}
+                    </p>
+                  ),
+
+                  // Customizar strong para labels de seção
+                  strong: ({ children, ...props }) => {
+                    const text = String(children)
+                    const isLabel = text.endsWith(':')
+
+                    if (isLabel) {
+                      return (
+                        <strong
+                          className="block text-sm font-semibold text-foreground mt-4 first:mt-0 mb-2"
+                          {...props}
+                        >
+                          {children}
+                        </strong>
+                      )
+                    }
+
+                    return (
+                      <strong className="font-semibold text-foreground" {...props}>
+                        {children}
+                      </strong>
+                    )
+                  },
+
+                  // Processar texto para detectar hex codes
+                  text: ({ children }) => {
+                    const text = String(children)
+                    const parts = parseTextWithHexCodes(text)
+
+                    // Se não há hex codes, retorna texto normal
+                    if (parts.length === 1 && typeof parts[0] === 'string') {
+                      return <>{children}</>
+                    }
+
+                    // Retorna elementos com ColorSwatch inline
+                    return <>{parts}</>
+                  }
+                }}
+              >
+                {value}
+              </ReactMarkdown>
+            </div>
           )}
         </div>
 
@@ -117,15 +205,211 @@ function BrandBibleField({ icon, title, description, value, usedIn, onEdit }: Br
 
 interface BrandBibleTabProps {
   channelName: string
+  brandBibleData?: BrandBibleData | null
 }
 
-export function BrandBibleTab({ channelName }: BrandBibleTabProps) {
+// Helper to get icon for usedIn items
+function getUsedInIcon(title: string): React.ReactNode {
+  const iconMap: Record<string, React.ReactNode> = {
+    'Thumbnail Generation': <Layout className="w-3 h-3" />,
+    'Video Editing': <Film className="w-3 h-3" />,
+    'Brand Assets': <Image className="w-3 h-3" />,
+    'Script Generation': <FileText className="w-3 h-3" />,
+    'Avatar Generation': <User className="w-3 h-3" />,
+    'Voice Synthesis': <Mic className="w-3 h-3" />,
+    'Script Writing': <FileText className="w-3 h-3" />,
+    'Title Generation': <BookOpen className="w-3 h-3" />,
+    'Description Writing': <Settings className="w-3 h-3" />,
+    'Content Strategy': <Target className="w-3 h-3" />,
+    'Tone Calibration': <MessageSquare className="w-3 h-3" />,
+    'Topic Selection': <Lightbulb className="w-3 h-3" />,
+    'Video Planning': <Video className="w-3 h-3" />,
+    'Topic Research': <BookOpen className="w-3 h-3" />,
+    'Content Calendar': <Settings className="w-3 h-3" />,
+    'Asset Selection': <Image className="w-3 h-3" />,
+    'Video Finalization': <Film className="w-3 h-3" />,
+    'Quality Control': <TestTube className="w-3 h-3" />
+  }
+  return iconMap[title] || <Sparkles className="w-3 h-3" />
+}
+
+export function BrandBibleTab({ channelName, brandBibleData }: BrandBibleTabProps) {
   const handleEdit = (field: string) => {
     console.log('Editing field:', field)
     // TODO: Open edit modal
   }
 
-  const brandBibleFields = [
+  // Use real data if available, otherwise use mockdata
+  const getBrandBibleFields = () => {
+    if (brandBibleData) {
+      return [
+        {
+          icon: <Palette className="w-5 h-5" />,
+          title: brandBibleData.visualStyle.title,
+          description: brandBibleData.visualStyle.description,
+          value: brandBibleData.visualStyle.value,
+          usedIn: brandBibleData.visualStyle.usedIn.map(item => ({
+            icon: getUsedInIcon(item.title),
+            label: item.title,
+            description: item.description
+          }))
+        },
+        {
+          icon: <User className="w-5 h-5" />,
+          title: brandBibleData.hostProfile.title,
+          description: brandBibleData.hostProfile.description,
+          value: brandBibleData.hostProfile.value,
+          usedIn: brandBibleData.hostProfile.usedIn.map(item => ({
+            icon: getUsedInIcon(item.title),
+            label: item.title,
+            description: item.description
+          }))
+        },
+        {
+          icon: <MessageSquare className="w-5 h-5" />,
+          title: brandBibleData.writingStyle.title,
+          description: brandBibleData.writingStyle.description,
+          value: brandBibleData.writingStyle.value,
+          usedIn: brandBibleData.writingStyle.usedIn.map(item => ({
+            icon: getUsedInIcon(item.title),
+            label: item.title,
+            description: item.description
+          }))
+        },
+        {
+          icon: <Target className="w-5 h-5" />,
+          title: brandBibleData.targetAudience.title,
+          description: brandBibleData.targetAudience.description,
+          value: brandBibleData.targetAudience.value,
+          usedIn: brandBibleData.targetAudience.usedIn.map(item => ({
+            icon: getUsedInIcon(item.title),
+            label: item.title,
+            description: item.description
+          }))
+        },
+        {
+          icon: <Lightbulb className="w-5 h-5" />,
+          title: brandBibleData.contentPillars.title,
+          description: brandBibleData.contentPillars.description,
+          value: brandBibleData.contentPillars.value,
+          usedIn: brandBibleData.contentPillars.usedIn.map(item => ({
+            icon: getUsedInIcon(item.title),
+            label: item.title,
+            description: item.description
+          }))
+        },
+        {
+          icon: <Settings className="w-5 h-5" />,
+          title: brandBibleData.productionGuidelines.title,
+          description: brandBibleData.productionGuidelines.description,
+          value: brandBibleData.productionGuidelines.value,
+          usedIn: brandBibleData.productionGuidelines.usedIn.map(item => ({
+            icon: getUsedInIcon(item.title),
+            label: item.title,
+            description: item.description
+          }))
+        }
+      ]
+    }
+
+    // Fallback to mockdata
+    return getMockBrandBibleFields()
+  }
+
+  const brandBibleFields = getBrandBibleFields()
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-foreground mb-1">Brand Bible</h2>
+          <p className="text-sm text-muted-foreground">
+            Define channel identity and production guidelines. Each field affects multiple parts of the automation pipeline.
+          </p>
+        </div>
+        <Badge variant="secondary" className="flex items-center gap-1">
+          <TestTube className="w-3 h-3" />
+          {brandBibleData ? 'Live Data' : 'Mock Data'}
+        </Badge>
+      </div>
+
+      {/* Info Banner */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="py-4">
+          <div className="flex items-start gap-3">
+            <Sparkles className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm">
+                <strong>How it works:</strong> Each field below is stored as JSONB and automatically injected into the appropriate agents during video production.
+                Click any "Used in" section to see exactly where each field is applied.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Fields Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {brandBibleFields.map((field, idx) => (
+          <BrandBibleField
+            key={idx}
+            icon={field.icon}
+            title={field.title}
+            description={field.description}
+            value={field.value}
+            usedIn={field.usedIn}
+            onEdit={() => handleEdit(field.title)}
+          />
+        ))}
+      </div>
+
+      {/* Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Actions</CardTitle>
+          <CardDescription>Test changes before saving or clone this brand bible to another channel</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" className="gap-2">
+              <TestTube className="w-4 h-4" />
+              Test Changes
+            </Button>
+            <Button className="gap-2">
+              <Save className="w-4 h-4" />
+              Save Brand Bible
+            </Button>
+            <Button variant="outline" className="gap-2">
+              <Copy className="w-4 h-4" />
+              Clone to New Channel
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Debug Section */}
+      <Card className="border-dashed">
+        <CardHeader>
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Settings className="w-4 h-4" />
+            Raw JSONB Data
+          </CardTitle>
+          <CardDescription>For developers: View the raw database structure</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="ghost" size="sm" className="text-xs">
+            View JSON Schema →
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// Mockdata fallback function
+function getMockBrandBibleFields() {
+  return [
     {
       icon: <Palette className="w-5 h-5" />,
       title: 'Visual Style',
@@ -311,92 +595,4 @@ export function BrandBibleTab({ channelName }: BrandBibleTabProps) {
       ]
     }
   ]
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-foreground mb-1">Brand Bible</h2>
-          <p className="text-sm text-muted-foreground">
-            Define channel identity and production guidelines. Each field affects multiple parts of the automation pipeline.
-          </p>
-        </div>
-        <Badge variant="secondary" className="flex items-center gap-1">
-          <TestTube className="w-3 h-3" />
-          Experimental Lab
-        </Badge>
-      </div>
-
-      {/* Info Banner */}
-      <Card className="border-primary/20 bg-primary/5">
-        <CardContent className="py-4">
-          <div className="flex items-start gap-3">
-            <Sparkles className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm">
-                <strong>How it works:</strong> Each field below is stored as JSONB and automatically injected into the appropriate agents during video production.
-                Click any "Used in" section to see exactly where each field is applied.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Fields Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {brandBibleFields.map((field, idx) => (
-          <BrandBibleField
-            key={idx}
-            icon={field.icon}
-            title={field.title}
-            description={field.description}
-            value={field.value}
-            usedIn={field.usedIn}
-            onEdit={() => handleEdit(field.title)}
-          />
-        ))}
-      </div>
-
-      {/* Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Actions</CardTitle>
-          <CardDescription>Test changes before saving or clone this brand bible to another channel</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" className="gap-2">
-              <TestTube className="w-4 h-4" />
-              Test Changes
-            </Button>
-            <Button className="gap-2">
-              <Save className="w-4 h-4" />
-              Save Brand Bible
-            </Button>
-            <Button variant="outline" className="gap-2">
-              <Copy className="w-4 h-4" />
-              Clone to New Channel
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Debug Section */}
-      <Card className="border-dashed">
-        <CardHeader>
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Settings className="w-4 h-4" />
-            Raw JSONB Data
-          </CardTitle>
-          <CardDescription>For developers: View the raw database structure</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="ghost" size="sm" className="text-xs">
-            View JSON Schema →
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-  )
 }
