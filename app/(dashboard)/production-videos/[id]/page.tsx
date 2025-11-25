@@ -7,6 +7,7 @@ import { ArrowLeft, ExternalLink, Play, Download, Copy, Edit, CheckCircle2, Circ
 import { getProductionVideoDetails } from '@/app/actions/production-videos'
 import type { ProductionVideoDetails } from '@/types/production-video'
 import { ProductionVideoDetailsSkeleton } from '@/components/ProductionVideosSkeletons'
+import { getYouTubeThumbnail } from '@/lib/youtube-utils'
 
 /**
  * ProductionVideoDetails Component - Visualização completa de um vídeo em produção
@@ -277,7 +278,16 @@ export default function ProductionVideoDetailsPage() {
             <div className="bg-card rounded-lg border border-border p-6 mb-6">
               <div className="flex gap-6">
                 <img
-                  src={video.thumbnailUrl}
+                  src={
+                    // Se já foi publicado e tem youtubeId, usa thumb do YouTube
+                    video.status === 'published' && video.youtubeId
+                      ? getYouTubeThumbnail(video.youtubeId)
+                      // Se tem thumbnailUrl do storage, usa esse
+                      : video.thumbnailUrl && video.thumbnailUrl !== 'https://placehold.co/800x450'
+                        ? video.thumbnailUrl
+                        // Fallback: thumb do vídeo fonte ou placeholder
+                        : getYouTubeThumbnail(video.sourceVideo.youtubeVideoId)
+                  }
                   alt={video.title}
                   className="w-80 h-45 object-cover rounded-lg"
                 />
@@ -323,7 +333,7 @@ export default function ProductionVideoDetailsPage() {
               </h3>
               <div className="flex gap-4">
                 <img
-                  src={video.sourceVideo.thumbnailUrl}
+                  src={getYouTubeThumbnail(video.sourceVideo.youtubeVideoId)}
                   alt={video.sourceVideo.title}
                   className="w-60 h-34 object-cover rounded-lg"
                 />

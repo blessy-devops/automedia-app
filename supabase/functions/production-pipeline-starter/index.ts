@@ -45,12 +45,16 @@ serve(async (req) => {
     // ========================================================================
     // Step 1: Verificar se já tem vídeo em processamento (CATRACA)
     // ========================================================================
+    // SCHEDULED e PUBLISHED = vídeo finalizado (não trava a fila)
+    // Conforme feedback do Gobbi: "SCHEDULED tem que ter o mesmo valor de PUBLISHED pra fins de andamento da fila"
     const { data: processingVideos, error: checkError } = await supabase
       .from('production_videos')
       .select('id, placeholder, status, is_processing')
       .eq('is_processing', true)
       .neq('status', 'canceled')
       .neq('status', 'completed')
+      .neq('status', 'scheduled')
+      .neq('status', 'published')
       .limit(1)
 
     if (checkError) {

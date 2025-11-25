@@ -3,11 +3,12 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight, Clock, Video, CheckCircle2, Loader2, AlertCircle, Pause } from 'lucide-react'
+import { Search, SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight, Clock, Video, CheckCircle2, Loader2, AlertCircle, Pause, Calendar } from 'lucide-react'
 import { getProductionVideos } from '@/app/actions/production-videos'
 import type { ProductionVideo, ProductionStats } from '@/types/production-video'
 import { StatsCardsSkeleton, VideoTableSkeleton } from '@/components/ProductionVideosSkeletons'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { getYouTubeThumbnail } from '@/lib/youtube-utils'
 
 /**
  * ProductionVideos Component - Lista todos os vídeos em produção
@@ -82,6 +83,18 @@ export default function ProductionVideosPage() {
           color: 'bg-primary/10 text-primary',
           icon: <Loader2 className="w-3 h-3 animate-spin" />
         }
+      case 'scheduled':
+        return {
+          label: 'Scheduled',
+          color: 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400',
+          icon: <Calendar className="w-3 h-3" />
+        }
+      case 'waiting':
+        return {
+          label: 'Waiting',
+          color: 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400',
+          icon: <Clock className="w-3 h-3" />
+        }
       case 'pending_approval':
         return {
           label: 'Pending Review',
@@ -113,6 +126,12 @@ export default function ProductionVideosPage() {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+  }
+
+  // Função para formatar hora
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
   }
 
   // Função para calcular dias atrás
@@ -300,7 +319,9 @@ export default function ProductionVideosPage() {
                 >
                   <option value="all">Todos os status</option>
                   <option value="published">Published</option>
+                  <option value="scheduled">Scheduled</option>
                   <option value="processing">Processing</option>
+                  <option value="waiting">Waiting</option>
                   <option value="pending_approval">Pending Review</option>
                   <option value="failed">Failed</option>
                   <option value="on_hold">On Hold</option>
@@ -351,6 +372,9 @@ export default function ProductionVideosPage() {
                     <th className="px-4 py-3 text-left text-xs text-muted-foreground uppercase tracking-wide">
                       Canal Fonte
                     </th>
+                    <th className="px-4 py-3 text-left text-xs text-muted-foreground uppercase tracking-wide">
+                      Publish Date
+                    </th>
                     <th className="px-6 py-3 text-left text-xs text-muted-foreground uppercase tracking-wide">
                       Criado
                     </th>
@@ -370,7 +394,16 @@ export default function ProductionVideosPage() {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <img
-                              src={video.thumbnailUrl}
+                              src={
+                                // Se já foi publicado e tem youtubeId, usa thumb do YouTube
+                                video.status === 'published' && video.youtubeId
+                                  ? getYouTubeThumbnail(video.youtubeId)
+                                  // Se tem thumbnailUrl do storage, usa esse
+                                  : video.thumbnailUrl && video.thumbnailUrl !== 'https://placehold.co/400x225'
+                                    ? video.thumbnailUrl
+                                    // Fallback: thumb do vídeo fonte ou placeholder
+                                    : getYouTubeThumbnail(video.sourceYoutubeVideoId)
+                              }
                               alt={video.title}
                               className="w-24 h-14 object-cover rounded"
                             />
@@ -405,6 +438,16 @@ export default function ProductionVideosPage() {
                         </td>
                         <td className="px-4 py-4 text-sm text-muted-foreground">
                           {video.sourceChannel}
+                        </td>
+                        <td className="px-4 py-4 text-sm">
+                          {video.plannedUploadDate ? (
+                            <div>
+                              <div className="text-foreground">{formatDate(video.plannedUploadDate)}</div>
+                              <div className="text-xs text-muted-foreground">{formatTime(video.plannedUploadDate)}</div>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-foreground">{formatDate(video.createdAt)}</div>

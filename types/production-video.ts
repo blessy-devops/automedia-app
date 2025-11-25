@@ -3,7 +3,9 @@
 
 export type ProductionVideoStatus =
   | 'published'
+  | 'scheduled'
   | 'processing'
+  | 'waiting'
   | 'pending_approval'
   | 'failed'
   | 'on_hold'
@@ -29,7 +31,10 @@ export interface ProductionVideo {
   language: string
   platform: string
   sourceChannel: string
+  sourceYoutubeVideoId?: string
+  youtubeId?: string
   productionDays: number
+  plannedUploadDate?: string
 }
 
 // Stats para os cards

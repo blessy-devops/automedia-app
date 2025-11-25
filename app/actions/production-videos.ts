@@ -12,6 +12,7 @@ import type {
   GetProductionVideosResponse,
   ProductionVideoStatus,
 } from '@/types/production-video'
+import { VALID_PRODUCTION_STATUSES, type ValidProductionStatus } from './production-videos-constants'
 
 /**
  * Get paginated list of production videos
@@ -110,29 +111,43 @@ export async function getProductionStats(): Promise<ProductionStats> {
 // ============================================
 
 function mapToProductionVideo(video: any): ProductionVideo {
+  // Validate status before processing
+  const validatedStatus = validateStatus(video.status)
+
+  // Scheduled e published devem ter 100% de progresso
+  const progress = validatedStatus === 'scheduled' || validatedStatus === 'published'
+    ? 100
+    : (video.progress || 0)
+
   return {
     id: video.id,
     title: video.title || 'Untitled',
     thumbnailUrl: video.thumbnail_url || 'https://placehold.co/400x225',
-    status: normalizeStatus(video.status),
-    progress: video.progress || 0,
-    currentStage: formatStageName(video.status),
+    status: normalizeStatus(validatedStatus),
+    progress,
+    currentStage: formatStageName(validatedStatus),
     createdAt: video.created_at,
     updatedAt: video.updated_at,
     language: video.language || 'pt-BR',
     platform: video.platform || 'youtube',
     sourceChannel: video.source_channel || 'Unknown Channel',
+    sourceYoutubeVideoId: video.source_youtube_video_id,
+    youtubeId: video.youtube_id,
     productionDays: video.production_days || 0,
+    plannedUploadDate: video.planned_upload_date,
   }
 }
 
 function mapToProductionVideoDetails(data: any): ProductionVideoDetails {
+  // Validate status before processing
+  const validatedStatus = validateStatus(data.status)
+
   return {
     // Basic info
     id: data.id,
     title: data.title || 'Untitled',
     thumbnailUrl: data.thumbnailUrl || 'https://placehold.co/800x450',
-    status: normalizeStatus(data.status),
+    status: normalizeStatus(validatedStatus),
     language: data.language || 'pt-BR',
     platform: data.platform || 'youtube',
     createdAt: data.createdAt,
@@ -197,8 +212,42 @@ function mapToProductionVideoDetails(data: any): ProductionVideoDetails {
 // Utility Functions
 // ============================================
 
+/**
+ * Validates if a status is a valid production status
+ * Logs a warning if an invalid status is detected
+ */
+function isValidProductionStatus(status: string): status is ValidProductionStatus {
+  const isValid = VALID_PRODUCTION_STATUSES.includes(status as ValidProductionStatus)
+
+  if (!isValid) {
+    console.warn(
+      `[Production Videos] Invalid status detected: "${status}". ` +
+      `Valid statuses are: ${VALID_PRODUCTION_STATUSES.join(', ')}`
+    )
+  }
+
+  return isValid
+}
+
+/**
+ * Validates and returns a safe status value
+ * Returns 'create_title' as default for invalid statuses
+ */
+function validateStatus(status: string): ValidProductionStatus {
+  if (!isValidProductionStatus(status)) {
+    console.error(
+      `[Production Videos] CRITICAL: Invalid status "${status}" found in database. ` +
+      `Defaulting to 'create_title'. This should be investigated!`
+    )
+    return 'create_title'
+  }
+  return status
+}
+
 function normalizeStatus(gobbiStatus: string): ProductionVideoStatus {
+  if (gobbiStatus === 'queued') return 'waiting'
   if (gobbiStatus === 'published') return 'published'
+  if (gobbiStatus === 'scheduled') return 'scheduled'
   if (gobbiStatus === 'failed') return 'failed'
   if (gobbiStatus === 'on_hold') return 'on_hold'
   if (gobbiStatus === 'pending_approval' || gobbiStatus === 'approved') return 'pending_approval'
@@ -206,19 +255,32 @@ function normalizeStatus(gobbiStatus: string): ProductionVideoStatus {
   return 'processing'
 }
 
+/**
+ * Formats a status string into a human-readable stage name
+ * Handles invalid statuses gracefully
+ */
 function formatStageName(status: string): string {
+  // Validate status first
+  if (!isValidProductionStatus(status)) {
+    return 'Unknown Status'
+  }
+
+  // Handle special statuses
+  if (status === 'queued') return 'Queued'
   if (status === 'published') return 'Published'
+  if (status === 'scheduled') return 'Scheduled'
   if (status === 'pending_approval') return 'Pending Approval'
   if (status === 'approved') return 'Approved'
   if (status === 'failed') return 'Failed'
   if (status === 'on_hold') return 'On Hold'
 
-  // Format "create_something" -> "Create Something"
+  // Format "create_something" -> "Something" (removing "create_" prefix)
   if (status.startsWith('create_')) {
     const words = status.replace('create_', '').split('_')
     return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
   }
 
+  // Fallback: capitalize each word
   return status
     .split('_')
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
