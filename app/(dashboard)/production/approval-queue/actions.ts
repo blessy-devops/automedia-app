@@ -1,6 +1,6 @@
 'use server'
 
-import { createGobbiClient, createGobbiServiceClient } from '@/lib/supabase/gobbi'
+import { createGobbiClient } from '@/lib/supabase/gobbi'
 import { revalidatePath } from 'next/cache'
 
 // ============================================================================
@@ -62,8 +62,7 @@ export async function approveTitle(
   selectedTitle: string
 ): Promise<ApproveTitleResult> {
   try {
-    // ⚡ Use SERVICE_ROLE client to bypass RLS for write operations
-    const supabase = createGobbiServiceClient()
+    const supabase = createGobbiClient()
 
     if (!supabase) {
       return { success: false, error: 'Banco de dados do Gobbi não configurado' }
@@ -368,8 +367,7 @@ export async function approveThumbnail(
   videoId: number
 ): Promise<ApproveThumbnailResult> {
   try {
-    // ⚡ Use SERVICE_ROLE client to bypass RLS for write operations
-    const supabase = createGobbiServiceClient()
+    const supabase = createGobbiClient()
 
     if (!supabase) {
       return { success: false, error: 'Banco de dados do Gobbi não configurado' }
@@ -461,8 +459,7 @@ export async function rejectThumbnail(
   videoId: number
 ): Promise<ApproveThumbnailResult> {
   try {
-    // ⚡ Use SERVICE_ROLE client to bypass RLS for write operations
-    const supabase = createGobbiServiceClient()
+    const supabase = createGobbiClient()
 
     if (!supabase) {
       return { success: false, error: 'Banco de dados do Gobbi não configurado' }
