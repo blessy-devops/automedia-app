@@ -9,6 +9,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
+// Número máximo de vídeos em produção simultânea (default: 3)
+const MAX_CONCURRENT_VIDEOS = parseInt(Deno.env.get('MAX_CONCURRENT_VIDEOS') || '3', 10)
+
 interface ProductionVideo {
   id: number
   benchmark_id: number
@@ -55,33 +58,38 @@ serve(async (req) => {
       .neq('status', 'completed')
       .neq('status', 'scheduled')
       .neq('status', 'published')
-      .limit(1)
+      .limit(MAX_CONCURRENT_VIDEOS)
 
     if (checkError) {
       console.error('[Pipeline Starter] Error checking processing videos:', checkError)
       throw new Error(`Failed to check processing videos: ${checkError.message}`)
     }
 
-    // Se já tem vídeo processando, para por aqui (catraca)
-    if (processingVideos && processingVideos.length > 0) {
+    const currentCount = processingVideos?.length || 0
+
+    // Se já atingiu o limite de vídeos em produção, para por aqui (catraca)
+    if (currentCount >= MAX_CONCURRENT_VIDEOS) {
       console.log(
-        '[Pipeline Starter] ⏸️  Queue blocked - video already processing:',
-        processingVideos[0].id,
-        `(${processingVideos[0].placeholder}, status: ${processingVideos[0].status})`
+        `[Pipeline Starter] ⏸️  Queue blocked - ${currentCount}/${MAX_CONCURRENT_VIDEOS} videos already processing:`,
+        processingVideos?.map(v => `#${v.id} (${v.placeholder})`).join(', ')
       )
       return new Response(
         JSON.stringify({
           status: 'blocked',
-          message: 'A video is already being processed',
-          processing_video_id: processingVideos[0].id,
-          processing_video_placeholder: processingVideos[0].placeholder,
-          processing_video_status: processingVideos[0].status,
+          message: `Maximum concurrent videos reached (${currentCount}/${MAX_CONCURRENT_VIDEOS})`,
+          current_count: currentCount,
+          max_concurrent: MAX_CONCURRENT_VIDEOS,
+          processing_videos: processingVideos?.map(v => ({
+            id: v.id,
+            placeholder: v.placeholder,
+            status: v.status,
+          })),
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('[Pipeline Starter] ✅ No videos processing - queue is clear')
+    console.log(`[Pipeline Starter] ✅ Queue has capacity (${currentCount}/${MAX_CONCURRENT_VIDEOS} slots used)`)
 
     // ========================================================================
     // Step 2: Pegar próximo vídeo em 'queued'
