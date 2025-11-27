@@ -173,7 +173,7 @@ interface EditableTextProps {
 function EditableText({ value, onChange, className = '', isEdited = false }: EditableTextProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [localValue, setLocalValue] = useState(value)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // Sync local value when prop changes
   useEffect(() => {
@@ -198,7 +198,7 @@ function EditableText({ value, onChange, className = '', isEdited = false }: Edi
   }, [localValue, value, onChange])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter') {
       e.preventDefault()
       handleSave()
     }
@@ -210,15 +210,14 @@ function EditableText({ value, onChange, className = '', isEdited = false }: Edi
 
   if (isEditing) {
     return (
-      <textarea
+      <input
         ref={inputRef}
+        type="text"
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
-        className={`${className} bg-transparent border-none outline-none resize-none w-full focus:ring-2 focus:ring-primary/50 rounded px-1 -mx-1`}
-        rows={2}
-        style={{ minHeight: '2.5em' }}
+        className={`${className} bg-primary/5 border-none outline-none w-full focus:ring-1 focus:ring-primary/50 rounded px-1 -mx-1`}
       />
     )
   }
