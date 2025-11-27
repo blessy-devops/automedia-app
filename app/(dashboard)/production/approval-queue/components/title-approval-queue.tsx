@@ -1059,11 +1059,16 @@ export function TitleApprovalQueue({
                                 </Badge>
                               )}
                             </div>
-                            {option.score && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Score: {option.score}
-                              </p>
-                            )}
+                            <div className="flex items-center gap-3 mt-1">
+                              <span className={`text-xs ${getTitleText(selectedTitle.id, index, option.text).length > 100 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                                {getTitleText(selectedTitle.id, index, option.text).length} caracteres
+                              </span>
+                              {option.score && (
+                                <span className="text-xs text-muted-foreground">
+                                  Score: {option.score}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </label>
                       ))}
