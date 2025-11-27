@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   CheckCircle2,
   XCircle,
@@ -13,7 +13,8 @@ import {
   Filter,
   History as HistoryIcon,
   Image as ImageIcon,
-  Maximize2
+  Maximize2,
+  Pencil
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -153,6 +154,93 @@ interface TitleApprovalQueueProps {
 }
 
 // ============================================================================
+// COMPONENTE EDITABLE TEXT
+// ============================================================================
+
+interface EditableTextProps {
+  value: string
+  onChange: (newValue: string) => void
+  className?: string
+  isEdited?: boolean
+}
+
+/**
+ * Componente que parece texto normal mas permite edição ao clicar
+ * - Visual idêntico ao texto original
+ * - Ao clicar, vira um input editável
+ * - Ao sair do foco ou pressionar Enter, salva automaticamente
+ */
+function EditableText({ value, onChange, className = '', isEdited = false }: EditableTextProps) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [localValue, setLocalValue] = useState(value)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Sync local value when prop changes
+  useEffect(() => {
+    if (!isEditing) {
+      setLocalValue(value)
+    }
+  }, [value, isEditing])
+
+  // Focus input when entering edit mode
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [isEditing])
+
+  const handleSave = useCallback(() => {
+    setIsEditing(false)
+    if (localValue.trim() !== value.trim()) {
+      onChange(localValue.trim())
+    }
+  }, [localValue, value, onChange])
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSave()
+    }
+    if (e.key === 'Escape') {
+      setLocalValue(value)
+      setIsEditing(false)
+    }
+  }
+
+  if (isEditing) {
+    return (
+      <textarea
+        ref={inputRef}
+        value={localValue}
+        onChange={(e) => setLocalValue(e.target.value)}
+        onBlur={handleSave}
+        onKeyDown={handleKeyDown}
+        className={`${className} bg-transparent border-none outline-none resize-none w-full focus:ring-2 focus:ring-primary/50 rounded px-1 -mx-1`}
+        rows={2}
+        style={{ minHeight: '2.5em' }}
+      />
+    )
+  }
+
+  return (
+    <span
+      onClick={(e) => {
+        e.stopPropagation()
+        setIsEditing(true)
+      }}
+      className={`${className} cursor-text hover:bg-muted/50 rounded px-1 -mx-1 transition-colors inline-flex items-center gap-1.5`}
+      title="Clique para editar"
+    >
+      <span className="flex-1">{value}</span>
+      {isEdited && (
+        <Pencil className="w-3 h-3 text-primary flex-shrink-0" />
+      )}
+    </span>
+  )
+}
+
+// ============================================================================
 // COMPONENTE PRINCIPAL
 // ============================================================================
 
@@ -182,6 +270,9 @@ export function TitleApprovalQueue({
 
   // Título selecionado pelo usuário (índice: 0 = sugerido, 1-10 = alternativas)
   const [selectedTitleIndex, setSelectedTitleIndex] = useState<number | undefined>(undefined)
+
+  // Títulos editados pelo usuário (chave: `${videoId}-${index}`, valor: texto editado)
+  const [editedTitles, setEditedTitles] = useState<Record<string, string>>({})
 
   // Auto-approval
   const [autoApprovalTitles, setAutoApprovalTitles] = useState(false)
@@ -373,6 +464,30 @@ export function TitleApprovalQueue({
   // ============================================================================
 
   /**
+   * Handler para atualizar título editado
+   */
+  const handleTitleEdit = useCallback((videoId: number, index: number, newText: string) => {
+    const key = `${videoId}-${index}`
+    setEditedTitles(prev => ({ ...prev, [key]: newText }))
+  }, [])
+
+  /**
+   * Obter texto do título (editado ou original)
+   */
+  const getTitleText = useCallback((videoId: number, index: number, originalText: string) => {
+    const key = `${videoId}-${index}`
+    return editedTitles[key] ?? originalText
+  }, [editedTitles])
+
+  /**
+   * Verificar se título foi editado
+   */
+  const isTitleEdited = useCallback((videoId: number, index: number) => {
+    const key = `${videoId}-${index}`
+    return key in editedTitles
+  }, [editedTitles])
+
+  /**
    * Aprovar título selecionado e avançar para próximo
    */
   const handleApproveTitle = async () => {
@@ -384,11 +499,14 @@ export function TitleApprovalQueue({
     setIsApproving(true)
 
     try {
-      // Determinar qual título foi selecionado
-      const selectedText =
+      // Determinar texto original
+      const originalText =
         selectedTitleIndex === 0
           ? selectedTitle.title_approval_data.title // Título sugerido
           : selectedTitle.title_approval_data.alternatives[selectedTitleIndex - 1].text // Alternativa
+
+      // Usar texto editado se houver, senão usa o original
+      const selectedText = getTitleText(selectedTitle.id, selectedTitleIndex, originalText)
 
       // Chamar Server Action
       const result = await approveTitle(selectedTitle.id, selectedText)
@@ -928,12 +1046,15 @@ export function TitleApprovalQueue({
 
                           {/* 3. TEXTO - Ocupa espaço restante */}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm text-foreground leading-relaxed">
-                                {option.text}
-                              </p>
+                            <div className="flex items-start gap-2">
+                              <EditableText
+                                value={getTitleText(selectedTitle.id, index, option.text)}
+                                onChange={(newText) => handleTitleEdit(selectedTitle.id, index, newText)}
+                                isEdited={isTitleEdited(selectedTitle.id, index)}
+                                className="text-sm text-foreground leading-relaxed"
+                              />
                               {option.isMain && (
-                                <Badge className="flex-shrink-0 bg-yellow-500/10 text-yellow-700 dark:text-yellow-500 border-yellow-500/30 gap-1 text-xs">
+                                <Badge className="flex-shrink-0 bg-yellow-500/10 text-yellow-700 dark:text-yellow-500 border-yellow-500/30 gap-1 text-xs mt-0.5">
                                   <Sparkles className="w-3 h-3" />
                                   Sugerido
                                 </Badge>

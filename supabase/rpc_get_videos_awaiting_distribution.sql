@@ -95,11 +95,10 @@ BEGIN
   )
   SELECT json_build_object(
     'videos', av.videos_json,
-    'total_count', tc.count_value,
+    'total_count', total_count,
     'error', NULL
   ) INTO result
-  FROM aggregated_videos av
-  CROSS JOIN (SELECT total_count as count_value) tc;
+  FROM aggregated_videos av;
 
   RETURN result;
 EXCEPTION

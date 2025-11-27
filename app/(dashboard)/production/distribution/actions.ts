@@ -1,7 +1,7 @@
 'use server'
 
 import { gobbiClient, ensureServerSide } from '@/lib/gobbi-client'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, unstable_noStore } from 'next/cache'
 
 // ============================================================================
 // Type Definitions
@@ -77,6 +77,7 @@ export async function getVideosAwaitingDistribution(options: {
   totalCount: number
   error: string | null
 }> {
+  unstable_noStore() // Disable cache for fresh data
   ensureServerSide()
 
   const { offset = 0, limit = 50 } = options
