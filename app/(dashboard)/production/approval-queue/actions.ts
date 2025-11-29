@@ -725,3 +725,340 @@ export async function getThumbnailApprovalHistory(): Promise<ApprovalHistoryThum
     return []
   }
 }
+
+// ============================================================================
+// CONTENT APPROVAL SYSTEM
+// ============================================================================
+
+// ============================================================================
+// TYPES - CONTENT
+// ============================================================================
+
+interface PendingContent {
+  id: number
+  title: string | null
+  script: string | null
+  teaser_script: string | null
+  description: string | null
+  content_approval_status: string | null
+  created_at: string
+  benchmark_id: number | null
+  placeholder: string | null
+  status: string
+  benchmark_videos?: {
+    id: number
+    title: string
+    thumbnail_url: string | null
+  } | null
+}
+
+interface ApproveContentResult {
+  success: boolean
+  error?: string
+  videoId?: number
+}
+
+interface ApprovalHistoryContent {
+  id: number
+  title: string | null
+  script: string | null
+  teaser_script: string | null
+  description: string | null
+  content_approval_status: string
+  content_approved_at: string | null
+  content_approved_by: string | null
+  created_at: string
+  placeholder: string | null
+  benchmark_videos?: {
+    id: number
+    title: string
+    thumbnail_url: string | null
+  } | null
+}
+
+// ============================================================================
+// SERVER ACTIONS - CONTENT
+// ============================================================================
+
+/**
+ * Aprova o pacote de conteúdo (script, teaser, description) e avança o vídeo para a próxima etapa.
+ *
+ * Fluxo:
+ * 1. Valida se o vídeo está na etapa 'review_script' e content_approval_status 'pending'
+ * 2. Atualiza content_approval_status para 'approved' com timestamp
+ * 3. Avança o status do vídeo para 'create_cast' (próxima etapa)
+ *
+ * @param videoId - ID do vídeo na tabela production_videos
+ * @returns Resultado da operação com success/error
+ */
+export async function approveContent(
+  videoId: number
+): Promise<ApproveContentResult> {
+  try {
+    const supabase = createGobbiClient()
+
+    if (!supabase) {
+      return { success: false, error: 'Banco de dados do Gobbi não configurado' }
+    }
+
+    // 1. Buscar vídeo atual para validações
+    const { data: video, error: fetchError } = await supabase
+      .from('production_videos')
+      .select('id, status, content_approval_status, script, teaser_script, description')
+      .eq('id', videoId)
+      .single()
+
+    if (fetchError || !video) {
+      console.error('Error fetching video:', fetchError)
+      return { success: false, error: 'Vídeo não encontrado' }
+    }
+
+    // 2. Validações de estado
+    if (video.status !== 'review_script') {
+      return {
+        success: false,
+        error: `Vídeo não está na etapa de revisão de script. Status atual: ${video.status}`
+      }
+    }
+
+    if (video.content_approval_status !== 'pending') {
+      return {
+        success: false,
+        error: 'Conteúdo já foi aprovado ou não está pendente de aprovação'
+      }
+    }
+
+    // Validar que há conteúdo para aprovar
+    if (!video.script && !video.teaser_script && !video.description) {
+      return {
+        success: false,
+        error: 'Nenhum conteúdo disponível para aprovar'
+      }
+    }
+
+    // 3. Atualizar vídeo: aprovar conteúdo + avançar status
+    const now = new Date().toISOString()
+
+    const { error: updateError } = await supabase
+      .from('production_videos')
+      .update({
+        content_approval_status: 'approved',
+        content_approved_at: now,
+        // content_approved_by: 'user_email', // TODO: Integrar com sistema de autenticação
+        status: 'create_cast', // ⚡ AVANÇA PARA PRÓXIMA ETAPA DO WORKFLOW
+        updated_at: now
+      })
+      .eq('id', videoId)
+
+    if (updateError) {
+      console.error('Error updating video:', updateError)
+      return { success: false, error: 'Erro ao atualizar vídeo no banco de dados' }
+    }
+
+    // 4. Revalidar página para atualizar UI
+    revalidatePath('/production/approval-queue')
+
+    console.log(`✅ Content approved for video ${videoId}`)
+
+    return { success: true, videoId }
+
+  } catch (error) {
+    console.error('Unexpected error in approveContent:', error)
+    return {
+      success: false,
+      error: 'Erro interno ao aprovar conteúdo'
+    }
+  }
+}
+
+/**
+ * Rejeita o pacote de conteúdo e marca para regeneração.
+ *
+ * @param videoId - ID do vídeo na tabela production_videos
+ * @returns Resultado da operação com success/error
+ */
+export async function rejectContent(
+  videoId: number
+): Promise<ApproveContentResult> {
+  try {
+    const supabase = createGobbiClient()
+
+    if (!supabase) {
+      return { success: false, error: 'Banco de dados do Gobbi não configurado' }
+    }
+
+    // 1. Buscar vídeo atual
+    const { data: video, error: fetchError } = await supabase
+      .from('production_videos')
+      .select('id, status, content_approval_status')
+      .eq('id', videoId)
+      .single()
+
+    if (fetchError || !video) {
+      return { success: false, error: 'Vídeo não encontrado' }
+    }
+
+    // 2. Validações
+    if (video.status !== 'review_script') {
+      return {
+        success: false,
+        error: `Vídeo não está na etapa de revisão de script`
+      }
+    }
+
+    if (video.content_approval_status !== 'pending') {
+      return {
+        success: false,
+        error: 'Conteúdo não está pendente de aprovação'
+      }
+    }
+
+    // 3. Marcar como rejeitado
+    const now = new Date().toISOString()
+
+    const { error: updateError } = await supabase
+      .from('production_videos')
+      .update({
+        content_approval_status: 'rejected',
+        content_approved_at: now,
+        // content_approved_by: 'user_email',
+        status: 'regenerate_script', // Status para regenerar conteúdo
+        updated_at: now
+      })
+      .eq('id', videoId)
+
+    if (updateError) {
+      console.error('Error updating video:', updateError)
+      return { success: false, error: 'Erro ao atualizar vídeo' }
+    }
+
+    revalidatePath('/production/approval-queue')
+
+    console.log(`❌ Content rejected for video ${videoId} - Status changed to 'regenerate_script'`)
+
+    return { success: true, videoId }
+
+  } catch (error) {
+    console.error('Unexpected error in rejectContent:', error)
+    return { success: false, error: 'Erro interno ao rejeitar conteúdo' }
+  }
+}
+
+/**
+ * Busca todos os vídeos com conteúdo pendente de aprovação.
+ *
+ * Critérios:
+ * - status = 'review_script' (etapa de revisão de script)
+ * - content_approval_status = 'pending' (aguardando aprovação)
+ * - Pelo menos um dos campos script, teaser_script ou description deve existir
+ *
+ * Retorna ordenado por created_at (mais antigos primeiro).
+ *
+ * @returns Array de vídeos com conteúdo pendente de aprovação
+ */
+export async function getPendingContentApprovals(): Promise<PendingContent[]> {
+  try {
+    const supabase = createGobbiClient()
+
+    if (!supabase) {
+      console.error('❌ [getPendingContentApprovals] Gobbi client not configured')
+      return []
+    }
+
+    console.log('🔍 [getPendingContentApprovals] Fetching pending content from Gobbi database...')
+
+    // Query com JOIN para pegar dados do benchmark
+    const { data, error } = await supabase
+      .from('production_videos')
+      .select(`
+        id,
+        title,
+        script,
+        teaser_script,
+        description,
+        content_approval_status,
+        created_at,
+        benchmark_id,
+        placeholder,
+        status,
+        benchmark_videos (
+          id,
+          title,
+          thumbnail_url
+        )
+      `)
+      .eq('content_approval_status', 'pending')
+      .eq('status', 'review_script')
+      .order('created_at', { ascending: true })
+      .limit(50)
+
+    console.log('📊 [getPendingContentApprovals] Query result:', {
+      error: error ? JSON.stringify(error, null, 2) : null,
+      dataCount: data?.length || 0,
+      data: data?.map(d => ({ id: d.id, status: d.status, approval_status: d.content_approval_status }))
+    })
+
+    if (error) {
+      console.error('❌ [getPendingContentApprovals] Error:', error)
+      return []
+    }
+
+    return data || []
+
+  } catch (error) {
+    console.error('❌ [getPendingContentApprovals] Unexpected error:', error)
+    return []
+  }
+}
+
+/**
+ * Busca histórico de aprovações/rejeições de conteúdo.
+ *
+ * Retorna vídeos onde content_approval_status = 'approved' OR 'rejected'
+ * Ordenado por content_approved_at (mais recente primeiro)
+ */
+export async function getContentApprovalHistory(): Promise<ApprovalHistoryContent[]> {
+  try {
+    const supabase = createGobbiClient()
+
+    if (!supabase) {
+      console.error('❌ [getContentApprovalHistory] Gobbi client not configured')
+      return []
+    }
+
+    const { data, error } = await supabase
+      .from('production_videos')
+      .select(`
+        id,
+        title,
+        script,
+        teaser_script,
+        description,
+        content_approval_status,
+        content_approved_at,
+        content_approved_by,
+        created_at,
+        placeholder,
+        benchmark_videos (
+          id,
+          title,
+          thumbnail_url
+        )
+      `)
+      .in('content_approval_status', ['approved', 'rejected'])
+      .not('content_approved_at', 'is', null)
+      .order('content_approved_at', { ascending: false })
+      .limit(100)
+
+    if (error) {
+      console.error('❌ [getContentApprovalHistory] Error:', error)
+      return []
+    }
+
+    return data || []
+
+  } catch (error) {
+    console.error('❌ [getContentApprovalHistory] Unexpected error:', error)
+    return []
+  }
+}

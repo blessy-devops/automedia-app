@@ -14,7 +14,10 @@ import {
   History as HistoryIcon,
   Image as ImageIcon,
   Maximize2,
-  Pencil
+  Pencil,
+  Package,
+  Video,
+  User
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -25,8 +28,9 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { createClient } from '@supabase/supabase-js'
-import { approveTitle, approveThumbnail, rejectThumbnail } from '../actions'
+import { approveTitle, approveThumbnail, rejectThumbnail, approveContent, rejectContent } from '../actions'
 import { toast } from 'sonner'
 
 // ============================================================================
@@ -144,13 +148,57 @@ interface ApprovalHistoryThumbnail {
 }
 
 /**
+ * Conteúdo pendente de aprovação (script, teaser, description)
+ */
+interface PendingContent {
+  id: number
+  title: string | null
+  script: string | null
+  teaser_script: string | null
+  description: string | null
+  content_approval_status: string | null
+  created_at: string
+  benchmark_id: number | null
+  placeholder: string | null
+  status: string
+  benchmark_videos?: {
+    id: number
+    title: string
+    thumbnail_url: string | null
+  } | null
+}
+
+/**
+ * Histórico de aprovação de conteúdo (alinhado com dados reais do banco)
+ */
+interface ApprovalHistoryContent {
+  id: number
+  title: string | null
+  script: string | null
+  teaser_script: string | null
+  description: string | null
+  content_approval_status: string
+  content_approved_at: string | null
+  content_approved_by: string | null
+  created_at: string
+  placeholder: string | null
+  benchmark_videos?: {
+    id: number
+    title: string
+    thumbnail_url: string | null
+  } | null
+}
+
+/**
  * Props do componente
  */
 interface TitleApprovalQueueProps {
   initialPendingTitles: PendingTitle[]
   initialPendingThumbnails: PendingThumbnail[]
+  initialPendingContent: PendingContent[]
   initialTitleHistory: ApprovalHistoryTitle[]
   initialThumbnailHistory: ApprovalHistoryThumbnail[]
+  initialContentHistory: ApprovalHistoryContent[]
 }
 
 // ============================================================================
@@ -246,8 +294,10 @@ function EditableText({ value, onChange, className = '', isEdited = false }: Edi
 export function TitleApprovalQueue({
   initialPendingTitles,
   initialPendingThumbnails,
+  initialPendingContent,
   initialTitleHistory,
-  initialThumbnailHistory
+  initialThumbnailHistory,
+  initialContentHistory
 }: TitleApprovalQueueProps) {
   // ============================================================================
   // ESTADOS
@@ -306,6 +356,22 @@ export function TitleApprovalQueue({
 
   // Auto-approval para thumbnails
   const [autoApprovalThumbnails, setAutoApprovalThumbnails] = useState(false)
+
+  // ============================================================================
+  // ESTADOS - CONTENT
+  // ============================================================================
+
+  // Lista de conteúdo pendente (com Realtime)
+  const [pendingContent, setPendingContent] = useState<PendingContent[]>(initialPendingContent)
+
+  // Histórico de aprovações de conteúdo
+  const [contentHistory, setContentHistory] = useState<ApprovalHistoryContent[]>(initialContentHistory)
+
+  // Content removidos localmente (optimistic update)
+  const [removedContentIds, setRemovedContentIds] = useState<Set<number>>(new Set())
+
+  // Auto-approval para conteúdo
+  const [autoApprovalContent, setAutoApprovalContent] = useState(false)
 
   // ============================================================================
   // REALTIME SUBSCRIPTION
@@ -457,6 +523,32 @@ export function TitleApprovalQueue({
 
   // Contadores de thumbnails
   const pendingThumbnailsCount = visiblePendingThumbnails.length
+
+  // ============================================================================
+  // COMPUTED VALUES - CONTENT
+  // ============================================================================
+
+  // Filtrar content removidos localmente
+  const visiblePendingContent = pendingContent.filter((c) => !removedContentIds.has(c.id))
+
+  // Filtrar por busca
+  const filteredContent = visiblePendingContent.filter((c) => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    return (
+      (c.title?.toLowerCase().includes(query) || false) ||
+      (c.placeholder?.toLowerCase().includes(query) || false) ||
+      (c.teaser_script?.toLowerCase().includes(query) || false)
+    )
+  })
+
+  // Item de content selecionado atual
+  const selectedContentItem = activeTab === 'content'
+    ? filteredContent.find((c) => c.id === selectedItemId)
+    : null
+
+  // Contadores de content
+  const pendingContentCount = visiblePendingContent.length
 
   // ============================================================================
   // HANDLERS
@@ -665,6 +757,88 @@ export function TitleApprovalQueue({
   }
 
   // ============================================================================
+  // HANDLERS - CONTENT
+  // ============================================================================
+
+  /**
+   * Aprovar pacote de conteúdo e avançar para próximo
+   */
+  const handleApproveContent = async () => {
+    if (!selectedContentItem) {
+      toast.error('Nenhum conteúdo selecionado')
+      return
+    }
+
+    setIsApproving(true)
+
+    try {
+      // Chamar Server Action
+      const result = await approveContent(selectedContentItem.id)
+
+      if (result.success) {
+        toast.success('Conteúdo aprovado com sucesso!')
+
+        // Optimistic update - remover da lista
+        setRemovedContentIds((prev) => new Set(prev).add(selectedContentItem.id))
+
+        // Mover para próximo item
+        const currentIndex = filteredContent.findIndex((c) => c.id === selectedItemId)
+        const nextItem = filteredContent[currentIndex + 1] || filteredContent[currentIndex - 1]
+
+        if (nextItem) {
+          setSelectedItemId(nextItem.id)
+        } else {
+          setSelectedItemId(null)
+        }
+      } else {
+        toast.error(result.error || 'Erro ao aprovar conteúdo')
+      }
+    } catch (error) {
+      console.error('Error approving content:', error)
+      toast.error('Erro ao aprovar conteúdo')
+    } finally {
+      setIsApproving(false)
+    }
+  }
+
+  /**
+   * Rejeitar pacote de conteúdo e solicitar regeneração
+   */
+  const handleRejectContent = async () => {
+    if (!selectedContentItem) {
+      toast.error('Nenhum conteúdo selecionado')
+      return
+    }
+
+    try {
+      // Chamar Server Action
+      const result = await rejectContent(selectedContentItem.id)
+
+      if (result.success) {
+        toast.info('Conteúdo rejeitado. Será marcado para regeneração.')
+
+        // Optimistic update - remover da lista
+        setRemovedContentIds((prev) => new Set(prev).add(selectedContentItem.id))
+
+        // Mover para próximo item
+        const currentIndex = filteredContent.findIndex((c) => c.id === selectedItemId)
+        const nextItem = filteredContent[currentIndex + 1] || filteredContent[currentIndex - 1]
+
+        if (nextItem) {
+          setSelectedItemId(nextItem.id)
+        } else {
+          setSelectedItemId(null)
+        }
+      } else {
+        toast.error(result.error || 'Erro ao rejeitar conteúdo')
+      }
+    } catch (error) {
+      console.error('Error rejecting content:', error)
+      toast.error('Erro ao rejeitar conteúdo')
+    }
+  }
+
+  // ============================================================================
   // RENDER
   // ============================================================================
 
@@ -758,11 +932,15 @@ export function TitleApprovalQueue({
                     if (newTab === 'titles' && filteredTitles.length > 0) {
                       setSelectedItemId(filteredTitles[0].id)
                       setSelectedTitleIndex(undefined)
+                    } else if (newTab === 'thumbnails' && filteredThumbnails.length > 0) {
+                      setSelectedItemId(filteredThumbnails[0].id)
+                    } else if (newTab === 'content' && filteredContent.length > 0) {
+                      setSelectedItemId(filteredContent[0].id)
                     }
                   }}
                   className="w-full"
                 >
-                  <TabsList className="w-full grid grid-cols-2">
+                  <TabsList className="w-full grid grid-cols-3">
                     <TabsTrigger value="titles" className="gap-2">
                       <FileText className="w-4 h-4" />
                       Titles
@@ -774,10 +952,19 @@ export function TitleApprovalQueue({
                     </TabsTrigger>
                     <TabsTrigger value="thumbnails" className="gap-2">
                       <ImageIcon className="w-4 h-4" />
-                      Thumbnails
+                      Thumbs
                       {pendingThumbnailsCount > 0 && (
                         <Badge variant="default" className="ml-1 h-5 min-w-5 px-1.5">
                           {pendingThumbnailsCount}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger value="content" className="gap-2">
+                      <Package className="w-4 h-4" />
+                      Content
+                      {pendingContentCount > 0 && (
+                        <Badge variant="default" className="ml-1 h-5 min-w-5 px-1.5">
+                          {pendingContentCount}
                         </Badge>
                       )}
                     </TabsTrigger>
@@ -906,6 +1093,63 @@ export function TitleApprovalQueue({
                     )}
                   </div>
                 )}
+
+                {activeTab === 'content' && (
+                  <div className="p-2">
+                    {filteredContent.length === 0 ? (
+                      <div className="py-12 text-center px-4">
+                        <Package className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+                        <p className="text-sm font-medium text-foreground mb-1">
+                          {searchQuery ? 'No content match your search' : 'No pending content'}
+                        </p>
+                      </div>
+                    ) : (
+                      filteredContent.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => handleSelectItem(item.id)}
+                          className={`w-full text-left p-3 rounded-lg mb-2 transition-all ${
+                            selectedItemId === item.id
+                              ? 'bg-accent border-2 border-primary'
+                              : 'bg-muted/30 hover:bg-muted/50 border-2 border-transparent'
+                          }`}
+                        >
+                          {/* Icon Header */}
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-lg">📦</span>
+                            <span className="text-xs font-semibold text-muted-foreground">CONTENT PACK</span>
+                          </div>
+
+                          {/* Badges Container */}
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            {item.placeholder && (
+                              <Badge className="bg-primary/10 text-primary border-primary/30 text-xs">
+                                {item.placeholder}
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className="text-xs">
+                              ID: {item.id}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs gap-1">
+                              <Clock className="w-3 h-3" />
+                              {formatTimeAgo(item.created_at)}
+                            </Badge>
+                          </div>
+
+                          {/* Video Title */}
+                          <p className="text-xs font-medium line-clamp-2 mb-2">
+                            {item.title || 'Sem título'}
+                          </p>
+
+                          {/* Teaser Preview */}
+                          <p className="text-xs text-muted-foreground line-clamp-1">
+                            {item.teaser_script ? item.teaser_script.substring(0, 60) + '...' : 'Sem teaser'}
+                          </p>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -917,7 +1161,7 @@ export function TitleApprovalQueue({
             <div className="flex-1 flex flex-col bg-background overflow-hidden">
               {/* Content Area - Scrollable */}
               <div className="flex-1 overflow-y-auto p-6">
-                {!selectedTitle && !selectedThumbnailItem ? (
+                {!selectedTitle && !selectedThumbnailItem && !selectedContentItem ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
                       <AlertCircle className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
@@ -1138,6 +1382,102 @@ export function TitleApprovalQueue({
                     </div>
                   </div>
                 )}
+
+                {/* =============================================== */}
+                {/* CONTENT - Pacote de Conteúdo (Teaser, Script, Description) */}
+                {/* =============================================== */}
+                {activeTab === 'content' && selectedContentItem && (
+                  <div className="max-w-4xl mx-auto space-y-6">
+                    {/* Card 1: Video Info */}
+                    <div className="bg-muted/30 border border-border p-4 rounded-lg">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-2xl">📹</span>
+                        <h3 className="font-semibold">VIDEO INFO</h3>
+                      </div>
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        {selectedContentItem.placeholder && (
+                          <Badge className="bg-primary/10 text-primary border-primary/30 text-xs">
+                            {selectedContentItem.placeholder}
+                          </Badge>
+                        )}
+                        <Badge variant="outline" className="text-xs">
+                          ID: {selectedContentItem.id}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs gap-1">
+                          <Clock className="w-3 h-3" />
+                          {formatTimeAgo(selectedContentItem.created_at)}
+                        </Badge>
+                      </div>
+                      <p className="text-sm font-medium">
+                        {selectedContentItem.title || 'Sem título'}
+                      </p>
+                    </div>
+
+                    {/* Card 2: Teaser (Gradient roxo/rosa) */}
+                    <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-l-4 border-purple-500 p-4 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">🎬</span>
+                          <h3 className="font-semibold">TEASER</h3>
+                        </div>
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {(selectedContentItem.teaser_script?.length || 0).toLocaleString()} caracteres
+                        </Badge>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-4 border border-border min-h-[230px]">
+                        <p className="text-sm whitespace-pre-wrap">
+                          {selectedContentItem.teaser_script || 'Nenhum teaser disponível'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Card 3: Script (Gradient azul/cyan) com ScrollArea */}
+                    <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-l-4 border-blue-500 p-4 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">📝</span>
+                          <h3 className="font-semibold">SCRIPT COMPLETO</h3>
+                        </div>
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {(selectedContentItem.script?.length || 0).toLocaleString()} caracteres
+                        </Badge>
+                      </div>
+                      <ScrollArea className="h-[400px] rounded-lg border border-border bg-background/50">
+                        <div className="p-4">
+                          <p className="text-sm whitespace-pre-wrap font-mono leading-relaxed">
+                            {selectedContentItem.script || 'Nenhum script disponível'}
+                          </p>
+                        </div>
+                      </ScrollArea>
+                    </div>
+
+                    {/* Card 4: Description (Gradient verde) */}
+                    <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-l-4 border-green-500 p-4 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">📄</span>
+                          <h3 className="font-semibold">DESCRIPTION (YouTube)</h3>
+                        </div>
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {(selectedContentItem.description?.length || 0).toLocaleString()} caracteres
+                        </Badge>
+                      </div>
+                      <div className="bg-background/50 rounded-lg p-4 border border-border">
+                        <p className="text-sm whitespace-pre-wrap">
+                          {selectedContentItem.description || 'Nenhuma descrição disponível'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Card 5: Info/Dica */}
+                    <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg">
+                      <p className="text-xs text-blue-700 dark:text-blue-400">
+                        <span className="font-medium">💡 Dica:</span> Revise cuidadosamente o teaser, script e descrição antes de aprovar.
+                        Se algum conteúdo precisar de ajustes, clique em "Reject Package" para solicitar regeneração.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Action Bar - Fixed at bottom */}
@@ -1203,6 +1543,46 @@ export function TitleApprovalQueue({
                       <Button onClick={handleApproveThumbnail} className="gap-2">
                         <CheckCircle2 className="w-4 h-4" />
                         Aprovar & Next
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Bar para Content */}
+              {activeTab === 'content' && selectedContentItem && (
+                <div className="border-t border-border bg-card p-4 flex-shrink-0">
+                  <div className="max-w-4xl mx-auto flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Package className="w-4 h-4" />
+                      <span>Aprovando pacote completo (3 itens)</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={handleRejectContent}
+                        disabled={isApproving}
+                        className="gap-2"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Reject Package
+                      </Button>
+                      <Button
+                        onClick={handleApproveContent}
+                        disabled={isApproving}
+                        className="gap-2"
+                      >
+                        {isApproving ? (
+                          <>
+                            <span className="animate-spin">⏳</span>
+                            Approving...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-4 h-4" />
+                            Approve All
+                          </>
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -1377,6 +1757,99 @@ export function TitleApprovalQueue({
                           <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                             <User className="w-3 h-3" />
                             <span>{item.thumbnail_approved_by || 'Unknown'}</span>
+                            <span>•</span>
+                            <span>ID: {item.id}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+
+                {/* Content History */}
+                {activeTab === 'content' && contentHistory.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <HistoryIcon className="w-16 h-16 mb-4 text-muted-foreground opacity-50" />
+                    <p className="text-lg font-medium text-foreground mb-2">No Content History</p>
+                    <p className="text-sm text-muted-foreground">
+                      Approved/rejected content will appear here
+                    </p>
+                  </div>
+                )}
+
+                {activeTab === 'content' && contentHistory.map((item) => (
+                  <Card key={item.id} className="border-l-4" style={{
+                    borderLeftColor: item.content_approval_status === 'approved' ? '#22c55e' : '#ef4444'
+                  }}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        {/* Status Icon */}
+                        <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
+                          item.content_approval_status === 'approved'
+                            ? 'bg-green-100 dark:bg-green-950'
+                            : 'bg-red-100 dark:bg-red-950'
+                        }`}>
+                          {item.content_approval_status === 'approved' ? (
+                            <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-500" />
+                          ) : (
+                            <XCircle className="w-5 h-5 text-red-600 dark:text-red-500" />
+                          )}
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          {/* Header with badges */}
+                          <div className="flex items-center gap-2 flex-wrap mb-2">
+                            {item.placeholder && (
+                              <Badge className="bg-primary/10 text-primary border-primary/30 text-xs">
+                                {item.placeholder}
+                              </Badge>
+                            )}
+                            <Badge
+                              variant={item.content_approval_status === 'approved' ? 'default' : 'destructive'}
+                              className="text-xs"
+                            >
+                              {item.content_approval_status === 'approved' ? 'Approved' : 'Rejected'}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground ml-auto">
+                              {item.content_approved_at && formatTimeAgo(item.content_approved_at)}
+                            </span>
+                          </div>
+
+                          {/* Video Title */}
+                          <p className="text-sm font-medium mb-3">{item.title || 'Untitled video'}</p>
+
+                          {/* Content Preview - Only for approved */}
+                          {item.content_approval_status === 'approved' && (
+                            <div className="space-y-2">
+                              {/* Teaser Preview */}
+                              {item.teaser_script && (
+                                <div className="bg-purple-500/5 border border-purple-500/20 p-2 rounded">
+                                  <p className="text-xs text-purple-700 dark:text-purple-400 font-medium mb-1">🎬 Teaser</p>
+                                  <p className="text-xs text-muted-foreground line-clamp-2">{item.teaser_script}</p>
+                                </div>
+                              )}
+                              {/* Script Preview */}
+                              {item.script && (
+                                <div className="bg-blue-500/5 border border-blue-500/20 p-2 rounded">
+                                  <p className="text-xs text-blue-700 dark:text-blue-400 font-medium mb-1">📝 Script</p>
+                                  <p className="text-xs text-muted-foreground line-clamp-2">{item.script}</p>
+                                </div>
+                              )}
+                              {/* Description Preview */}
+                              {item.description && (
+                                <div className="bg-green-500/5 border border-green-500/20 p-2 rounded">
+                                  <p className="text-xs text-green-700 dark:text-green-400 font-medium mb-1">📄 Description</p>
+                                  <p className="text-xs text-muted-foreground line-clamp-2">{item.description}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Footer */}
+                          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                            <User className="w-3 h-3" />
+                            <span>{item.content_approved_by || 'Unknown'}</span>
                             <span>•</span>
                             <span>ID: {item.id}</span>
                           </div>
