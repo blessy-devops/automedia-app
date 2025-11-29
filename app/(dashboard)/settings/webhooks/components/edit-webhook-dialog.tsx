@@ -14,11 +14,18 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from 'sonner'
-import type { Database } from '@/types/supabase'
-import { updateWebhook } from '../actions'
+import { updateWebhook, type ProductionWebhook } from '../actions'
+import { WEBHOOK_TYPES, type WebhookType } from '../types'
 
-type Webhook = Database['public']['Tables']['production_webhooks']['Row']
+type Webhook = ProductionWebhook
 
 interface EditWebhookDialogProps {
   webhook: Webhook
@@ -37,6 +44,7 @@ export function EditWebhookDialog({
     webhook_url: webhook.webhook_url,
     description: webhook.description || '',
     is_active: webhook.is_active,
+    webhook_type: (webhook.webhook_type || 'benchmark') as WebhookType,
   })
 
   // Update form when webhook changes
@@ -46,6 +54,7 @@ export function EditWebhookDialog({
       webhook_url: webhook.webhook_url,
       description: webhook.description || '',
       is_active: webhook.is_active,
+      webhook_type: (webhook.webhook_type || 'benchmark') as WebhookType,
     })
   }, [webhook])
 
@@ -76,17 +85,40 @@ export function EditWebhookDialog({
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="edit-name">
-                Nome <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="edit-name"
-                placeholder="Ex: Produção Principal"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-name">
+                  Nome <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="edit-name"
+                  placeholder="Ex: Produção Principal"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-webhook_type">
+                  Tipo <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={formData.webhook_type}
+                  onValueChange={(value) => setFormData({ ...formData, webhook_type: value as WebhookType })}
+                >
+                  <SelectTrigger id="edit-webhook_type">
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WEBHOOK_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="grid gap-2">

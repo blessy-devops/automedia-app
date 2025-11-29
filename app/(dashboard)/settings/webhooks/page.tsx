@@ -1,27 +1,60 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import { Webhook } from 'lucide-react'
-import { getWebhooks } from './actions'
+import { getWebhooks, type ProductionWebhook } from './actions'
+import { WEBHOOK_TYPES, type WebhookType } from './types'
 import { WebhooksTable } from './components/webhooks-table'
 import { CreateWebhookDialog } from './components/create-webhook-dialog'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
+
+type WebhookRow = ProductionWebhook
 
 /**
- * Webhooks Settings Page - Server Component
+ * Webhooks Settings Page - Client Component
  *
  * This page manages production webhooks for sending benchmark videos
  * to external production environments.
  *
  * Features:
  * - List all configured webhooks
+ * - Filter by webhook type (tabs)
  * - Create new webhooks
  * - Edit existing webhooks
  * - Toggle webhook active status
  * - Delete webhooks
  */
-export default async function WebhooksPage() {
-  // Fetch all webhooks from the database
-  const { data: webhooks, error } = await getWebhooks()
+export default function WebhooksPage() {
+  const [webhooks, setWebhooks] = useState<WebhookRow[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [selectedType, setSelectedType] = useState<WebhookType | 'all'>('all')
 
-  if (error) {
-    console.error('Error loading webhooks:', error)
+  // Fetch webhooks on mount
+  useEffect(() => {
+    async function loadWebhooks() {
+      setIsLoading(true)
+      const result = await getWebhooks()
+      if (result.success && result.data) {
+        setWebhooks(result.data)
+      } else {
+        setError(result.error || 'Erro ao carregar webhooks')
+      }
+      setIsLoading(false)
+    }
+    loadWebhooks()
+  }, [])
+
+  // Filter webhooks by type
+  const filteredWebhooks = selectedType === 'all'
+    ? webhooks
+    : webhooks.filter(w => w.webhook_type === selectedType)
+
+  // Count webhooks by type
+  const getTypeCount = (type: WebhookType | 'all') => {
+    if (type === 'all') return webhooks.length
+    return webhooks.filter(w => w.webhook_type === type).length
   }
 
   return (
@@ -74,6 +107,22 @@ export default async function WebhooksPage() {
           </div>
         </div>
 
+        {/* Tabs de filtro por tipo */}
+        <Tabs value={selectedType} onValueChange={(value) => setSelectedType(value as WebhookType | 'all')}>
+          <TabsList>
+            <TabsTrigger value="all" className="gap-2">
+              Todos
+              <Badge variant="secondary" className="ml-1">{getTypeCount('all')}</Badge>
+            </TabsTrigger>
+            {WEBHOOK_TYPES.map((type) => (
+              <TabsTrigger key={type.value} value={type.value} className="gap-2">
+                {type.label}
+                <Badge variant="secondary" className="ml-1">{getTypeCount(type.value)}</Badge>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
         {error ? (
           <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-lg p-4">
             <div className="flex items-start gap-3">
@@ -99,8 +148,13 @@ export default async function WebhooksPage() {
               </div>
             </div>
           </div>
+        ) : isLoading ? (
+          <div className="border rounded-lg p-12 text-center">
+            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+            <p className="text-muted-foreground">Carregando webhooks...</p>
+          </div>
         ) : (
-          <WebhooksTable webhooks={webhooks || []} />
+          <WebhooksTable webhooks={filteredWebhooks} />
         )}
       </div>
     </div>

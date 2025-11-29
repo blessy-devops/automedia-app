@@ -17,7 +17,8 @@ import {
   Pencil,
   Package,
   Video,
-  User
+  User,
+  RotateCcw
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -27,6 +28,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { createClient } from '@supabase/supabase-js'
@@ -100,6 +102,7 @@ interface PendingThumbnail {
     thumbnail_url: string // URL da thumbnail gerada pelo N8N (temporária)
   } | null
   thumbnail_approval_status: string | null
+  thumb_text: string | null // Texto que aparece na thumbnail
   created_at: string
   benchmark_id: number | null
   placeholder: string | null
@@ -357,6 +360,10 @@ export function TitleApprovalQueue({
   // Auto-approval para thumbnails
   const [autoApprovalThumbnails, setAutoApprovalThumbnails] = useState(false)
 
+  // Estados para edição de thumb_text
+  const [editedThumbText, setEditedThumbText] = useState('')
+  const [isThumbTextModified, setIsThumbTextModified] = useState(false)
+
   // ============================================================================
   // ESTADOS - CONTENT
   // ============================================================================
@@ -520,6 +527,14 @@ export function TitleApprovalQueue({
   const selectedThumbnailItem = activeTab === 'thumbnails'
     ? filteredThumbnails.find((t) => t.id === selectedItemId)
     : null
+
+  // Sincronizar editedThumbText quando selectedThumbnailItem muda
+  useEffect(() => {
+    if (selectedThumbnailItem) {
+      setEditedThumbText(selectedThumbnailItem.thumb_text || '')
+      setIsThumbTextModified(false)
+    }
+  }, [selectedThumbnailItem?.id])
 
   // Contadores de thumbnails
   const pendingThumbnailsCount = visiblePendingThumbnails.length
@@ -713,7 +728,8 @@ export function TitleApprovalQueue({
   }
 
   /**
-   * Reprovar thumbnail e solicitar regeneração (por enquanto só marca como rejeitado)
+   * Reprovar thumbnail e solicitar regeneração
+   * Salva o thumb_text editado (se modificado) e limpa dados para regeneração
    */
   const handleRejectAndRegenerateThumbnail = async () => {
     if (!selectedThumbnailItem) {
@@ -721,15 +737,27 @@ export function TitleApprovalQueue({
       return
     }
 
+    setIsApproving(true)
+
     try {
-      // Chamar Server Action
-      const result = await rejectThumbnail(selectedThumbnailItem.id)
+      // Chamar Server Action passando o thumb_text editado (se foi modificado)
+      const result = await rejectThumbnail(
+        selectedThumbnailItem.id,
+        isThumbTextModified ? editedThumbText : undefined
+      )
 
       if (result.success) {
-        toast.info('Thumbnail reprovada. Por enquanto, não será regerada automaticamente.')
+        const message = isThumbTextModified
+          ? 'Thumbnail reprovada. Texto atualizado e pronto para regeneração.'
+          : 'Thumbnail reprovada e marcada para regeneração.'
+        toast.success(message)
 
         // Optimistic update - remover da lista
         setRemovedThumbnailIds((prev) => new Set(prev).add(selectedThumbnailItem.id))
+
+        // Reset estados de edição
+        setEditedThumbText('')
+        setIsThumbTextModified(false)
 
         // Mover para próximo item
         const currentIndex = filteredThumbnails.findIndex((t) => t.id === selectedItemId)
@@ -746,6 +774,8 @@ export function TitleApprovalQueue({
     } catch (error) {
       console.error('Error rejecting thumbnail:', error)
       toast.error('Erro ao reprovar thumbnail')
+    } finally {
+      setIsApproving(false)
     }
   }
 
@@ -1373,11 +1403,60 @@ export function TitleApprovalQueue({
                       </div>
                     </div>
 
-                    {/* Seção 2: Dica Informativa */}
+                    {/* Seção 2: Thumb Text Editor Card (Orange Gradient) */}
+                    <div className="bg-gradient-to-r from-orange-500/10 to-amber-500/10 border-l-4 border-orange-500 p-4 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">✏️</span>
+                          <h3 className="font-semibold text-orange-700 dark:text-orange-500">THUMB TEXT</h3>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isThumbTextModified && (
+                            <Badge className="bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-500/30">
+                              <Pencil className="w-3 h-3 mr-1" />
+                              Editado
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="font-mono text-xs">
+                            {editedThumbText.length} caracteres
+                          </Badge>
+                        </div>
+                      </div>
+                      <Textarea
+                        value={editedThumbText}
+                        onChange={(e) => {
+                          setEditedThumbText(e.target.value)
+                          setIsThumbTextModified(e.target.value !== (selectedThumbnailItem?.thumb_text || ''))
+                        }}
+                        placeholder="Digite o texto que aparecerá na thumbnail..."
+                        className="min-h-[100px] bg-background/50 border-orange-500/30 focus:border-orange-500"
+                      />
+                      {isThumbTextModified && (
+                        <div className="flex items-center justify-between mt-2">
+                          <p className="text-xs text-orange-700 dark:text-orange-400">
+                            O texto editado será salvo ao clicar em "Reprovar e Regerar"
+                          </p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditedThumbText(selectedThumbnailItem?.thumb_text || '')
+                              setIsThumbTextModified(false)
+                            }}
+                            className="gap-1 text-xs text-orange-700 hover:text-orange-800 dark:text-orange-400"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            Resetar
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Seção 3: Dica Informativa */}
                     <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg">
                       <p className="text-xs text-blue-700 dark:text-blue-400">
                         <span className="font-medium">Dica:</span> Se a thumbnail gerada não atender às expectativas,
-                        clique em "Reprovar e Regerar" para gerar uma nova versão.
+                        edite o texto acima e clique em "Reprovar e Regerar" para gerar uma nova versão com o texto atualizado.
                       </p>
                     </div>
                   </div>
@@ -1529,20 +1608,49 @@ export function TitleApprovalQueue({
                 <div className="border-t border-border bg-card p-4 flex-shrink-0">
                   <div className="max-w-4xl mx-auto flex items-center justify-between">
                     <div className="text-sm text-muted-foreground">
-                      <span>Ready to approve or regenerate</span>
+                      {isThumbTextModified ? (
+                        <span className="text-orange-600 dark:text-orange-400">
+                          Texto editado - clique em "Reprovar e Regerar" para salvar
+                        </span>
+                      ) : (
+                        <span>Pronto para aprovar ou regenerar</span>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
                         onClick={handleRejectAndRegenerateThumbnail}
+                        disabled={isApproving}
                         className="gap-2"
                       >
-                        <XCircle className="w-4 h-4" />
-                        Reprovar e Regerar
+                        {isApproving ? (
+                          <>
+                            <span className="animate-spin">⏳</span>
+                            Processando...
+                          </>
+                        ) : (
+                          <>
+                            <RotateCcw className="w-4 h-4" />
+                            Reprovar e Regerar
+                          </>
+                        )}
                       </Button>
-                      <Button onClick={handleApproveThumbnail} className="gap-2">
-                        <CheckCircle2 className="w-4 h-4" />
-                        Aprovar & Next
+                      <Button
+                        onClick={handleApproveThumbnail}
+                        disabled={isApproving}
+                        className="gap-2"
+                      >
+                        {isApproving ? (
+                          <>
+                            <span className="animate-spin">⏳</span>
+                            Aprovando...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-4 h-4" />
+                            Aprovar & Next
+                          </>
+                        )}
                       </Button>
                     </div>
                   </div>

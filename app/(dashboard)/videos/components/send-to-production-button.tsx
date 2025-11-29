@@ -20,11 +20,10 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { getActiveWebhooks } from '@/app/(dashboard)/settings/webhooks/actions'
+import { getActiveWebhooks, type ProductionWebhook } from '@/app/(dashboard)/settings/webhooks/actions'
 import { sendVideosToProduction } from '../actions'
-import type { Database } from '@/types/supabase'
 
-type Webhook = Database['public']['Tables']['production_webhooks']['Row']
+type Webhook = ProductionWebhook
 
 interface SendToProductionButtonProps {
   videoIds: number[]

@@ -329,6 +329,7 @@ interface PendingThumbnail {
   thumbnail_url: string | null // Thumbnail final aprovada (pode estar vazia durante aprovação)
   thumbnail_approval_data: ThumbnailApprovalData | null // JSONB com thumbnail gerada aguardando aprovação
   thumbnail_approval_status: string | null
+  thumb_text: string | null // Texto que aparece na thumbnail
   created_at: string
   benchmark_id: number | null
   placeholder: string | null
@@ -449,14 +450,20 @@ export async function approveThumbnail(
 /**
  * Rejeita a thumbnail gerada e marca para regeneração.
  *
- * ATENÇÃO: Por enquanto apenas marca como 'rejected' e faz log.
- * No futuro: dispará webhook para N8N regerar thumbnail automaticamente.
+ * Fluxo:
+ * 1. Valida se o vídeo está na etapa 'create_thumbnail' e status 'pending'
+ * 2. Salva o novo thumb_text editado pelo usuário (se fornecido)
+ * 3. Limpa thumbnail_url e thumbnail_approval_data para regeneração
+ * 4. Atualiza thumbnail_approval_status para 'rejected' com timestamp
+ * 5. Muda o status do vídeo para 'regenerate_thumbnail'
  *
  * @param videoId - ID do vídeo na tabela production_videos
+ * @param newThumbText - Texto editado pelo usuário para a thumbnail (opcional)
  * @returns Resultado da operação com success/error
  */
 export async function rejectThumbnail(
-  videoId: number
+  videoId: number,
+  newThumbText?: string
 ): Promise<ApproveThumbnailResult> {
   try {
     const supabase = createGobbiClient()
@@ -491,18 +498,27 @@ export async function rejectThumbnail(
       }
     }
 
-    // 3. Marcar como rejeitado e mudar status para regenerar
+    // 3. Marcar como rejeitado, salvar novo thumb_text e limpar dados para regeneração
     const now = new Date().toISOString()
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updateData: Record<string, any> = {
+      thumbnail_approval_status: 'rejected',
+      thumbnail_approved_at: now,
+      thumbnail_url: null, // Limpar thumbnail_url para regeneração
+      thumbnail_approval_data: null, // Limpar dados de aprovação para regeneração
+      status: 'regenerate_thumbnail',
+      updated_at: now
+    }
+
+    // Se foi fornecido um novo thumb_text, atualizar
+    if (newThumbText !== undefined) {
+      updateData.thumb_text = newThumbText
+    }
 
     const { error: updateError } = await supabase
       .from('production_videos')
-      .update({
-        thumbnail_approval_status: 'rejected',
-        thumbnail_approved_at: now,
-        // thumbnail_approved_by: 'user_email',
-        status: 'regenerate_thumbnail',
-        updated_at: now
-      })
+      .update(updateData)
       .eq('id', videoId)
 
     if (updateError) {
@@ -512,7 +528,31 @@ export async function rejectThumbnail(
 
     revalidatePath('/production/approval-queue')
 
-    console.log(`❌ Thumbnail rejected for video ${videoId} - Status changed to 'regenerate_thumbnail'`)
+    console.log(`❌ Thumbnail rejected for video ${videoId} - Status changed to 'regenerate_thumbnail'${newThumbText ? ` - New thumb_text: "${newThumbText.substring(0, 50)}..."` : ''}`)
+
+    // 4. Invocar Edge Function para chamar webhook N8N de regeneração
+    // Não bloqueia a resposta - webhook é secundário
+    try {
+      const { error: edgeFnError } = await supabase.functions.invoke(
+        'regenerate-thumbnail',
+        {
+          body: {
+            video_id: videoId,
+            thumb_text: newThumbText || ''
+          }
+        }
+      )
+
+      if (edgeFnError) {
+        console.warn('Failed to call regenerate-thumbnail webhook:', edgeFnError)
+        // Não falha a operação - webhook é secundário
+      } else {
+        console.log(`✅ Regenerate-thumbnail webhook triggered for video ${videoId}`)
+      }
+    } catch (webhookError) {
+      console.warn('Error invoking regenerate-thumbnail Edge Function:', webhookError)
+      // Não falha a operação principal
+    }
 
     return { success: true, videoId }
 
@@ -555,6 +595,7 @@ export async function getPendingThumbnailApprovals(): Promise<PendingThumbnail[]
         thumbnail_url,
         thumbnail_approval_data,
         thumbnail_approval_status,
+        thumb_text,
         created_at,
         benchmark_id,
         placeholder,

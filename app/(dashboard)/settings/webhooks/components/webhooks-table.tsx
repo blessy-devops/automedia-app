@@ -21,8 +21,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import type { Database } from '@/types/supabase'
-import { deleteWebhook, toggleWebhookStatus } from '../actions'
+import { deleteWebhook, toggleWebhookStatus, type ProductionWebhook } from '../actions'
+import { WEBHOOK_TYPES, type WebhookType } from '../types'
 import { EditWebhookDialog } from './edit-webhook-dialog'
 import {
   AlertDialog,
@@ -35,7 +35,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
-type Webhook = Database['public']['Tables']['production_webhooks']['Row']
+type Webhook = ProductionWebhook
 
 interface WebhooksTableProps {
   webhooks: Webhook[]
@@ -94,6 +94,26 @@ export function WebhooksTable({ webhooks }: WebhooksTableProps) {
     })
   }
 
+  // Helper para cores do badge de tipo
+  const getTypeBadgeVariant = (type: WebhookType | string | null): string => {
+    switch (type) {
+      case 'benchmark':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+      case 'regeneration':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
+      case 'creation':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+      case 'notification':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'
+    }
+  }
+
+  const getTypeLabel = (type: WebhookType | string | null): string => {
+    return WEBHOOK_TYPES.find(t => t.value === type)?.label || type || 'Desconhecido'
+  }
+
   if (webhooks.length === 0) {
     return (
       <div className="border rounded-lg p-12 text-center">
@@ -113,6 +133,7 @@ export function WebhooksTable({ webhooks }: WebhooksTableProps) {
           <TableHeader>
             <TableRow>
               <TableHead>Nome</TableHead>
+              <TableHead>Tipo</TableHead>
               <TableHead>URL</TableHead>
               <TableHead>Descrição</TableHead>
               <TableHead>Status</TableHead>
@@ -124,6 +145,11 @@ export function WebhooksTable({ webhooks }: WebhooksTableProps) {
             {webhooks.map((webhook) => (
               <TableRow key={webhook.id}>
                 <TableCell className="font-medium">{webhook.name}</TableCell>
+                <TableCell>
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getTypeBadgeVariant(webhook.webhook_type)}`}>
+                    {getTypeLabel(webhook.webhook_type)}
+                  </span>
+                </TableCell>
                 <TableCell>
                   <code className="text-xs bg-muted px-2 py-1 rounded">
                     {webhook.webhook_url}

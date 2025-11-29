@@ -16,8 +16,16 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from 'sonner'
 import { createWebhook } from '../actions'
+import { WEBHOOK_TYPES, type WebhookType } from '../types'
 
 export function CreateWebhookDialog() {
   const [open, setOpen] = useState(false)
@@ -27,6 +35,7 @@ export function CreateWebhookDialog() {
     webhook_url: '',
     description: '',
     is_active: true,
+    webhook_type: 'benchmark' as WebhookType,
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,6 +52,7 @@ export function CreateWebhookDialog() {
         webhook_url: '',
         description: '',
         is_active: true,
+        webhook_type: 'benchmark',
       })
     } else {
       toast.error(`Erro ao criar webhook: ${result.error}`)
@@ -68,20 +78,46 @@ export function CreateWebhookDialog() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="name">
-                Nome <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="name"
-                placeholder="Ex: Produção Principal"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                Um nome descritivo para identificar este webhook
-              </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="name">
+                  Nome <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="name"
+                  placeholder="Ex: Produção Principal"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Um nome descritivo para identificar este webhook
+                </p>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="webhook_type">
+                  Tipo <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={formData.webhook_type}
+                  onValueChange={(value) => setFormData({ ...formData, webhook_type: value as WebhookType })}
+                >
+                  <SelectTrigger id="webhook_type">
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WEBHOOK_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {WEBHOOK_TYPES.find(t => t.value === formData.webhook_type)?.description}
+                </p>
+              </div>
             </div>
 
             <div className="grid gap-2">

@@ -1,23 +1,56 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
-import type { Database } from '@/types/supabase'
-
-type ProductionWebhook = Database['public']['Tables']['production_webhooks']['Row']
-type WebhookInsert = Database['public']['Tables']['production_webhooks']['Insert']
-type WebhookUpdate = Database['public']['Tables']['production_webhooks']['Update']
+import { createGobbiAdminClient } from '@/lib/supabase/gobbi'
+import type { WebhookType } from './types'
 
 // ============================================================================
-// WEBHOOK CRUD OPERATIONS
+// TYPE DEFINITIONS (manual since Gobbi DB types may not be generated)
+// ============================================================================
+
+// Export type for use in other components
+export interface ProductionWebhook {
+  id: number
+  name: string
+  webhook_url: string
+  description: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  api_key: string | null
+  webhook_type: string | null
+}
+
+interface WebhookInsert {
+  name: string
+  webhook_url: string
+  description?: string | null
+  is_active?: boolean
+  webhook_type?: string
+}
+
+interface WebhookUpdate {
+  name?: string
+  webhook_url?: string
+  description?: string | null
+  is_active?: boolean
+  webhook_type?: string
+}
+
+// ============================================================================
+// WEBHOOK CRUD OPERATIONS (Using Gobbi's Database)
 // ============================================================================
 
 /**
- * Get all production webhooks
+ * Get all production webhooks from Gobbi's database
  */
 export async function getWebhooks() {
   try {
-    const supabase = await createClient()
+    const supabase = createGobbiAdminClient()
+
+    if (!supabase) {
+      return { success: false, error: 'Gobbi database not configured', data: null }
+    }
 
     const { data, error } = await supabase
       .from('production_webhooks')
@@ -29,7 +62,7 @@ export async function getWebhooks() {
       return { success: false, error: error.message, data: null }
     }
 
-    return { success: true, data, error: null }
+    return { success: true, data: data as ProductionWebhook[], error: null }
   } catch (error) {
     console.error('Unexpected error in getWebhooks:', error)
     return {
@@ -41,11 +74,15 @@ export async function getWebhooks() {
 }
 
 /**
- * Get active production webhooks only
+ * Get active production webhooks only from Gobbi's database
  */
 export async function getActiveWebhooks() {
   try {
-    const supabase = await createClient()
+    const supabase = createGobbiAdminClient()
+
+    if (!supabase) {
+      return { success: false, error: 'Gobbi database not configured', data: null }
+    }
 
     const { data, error } = await supabase
       .from('production_webhooks')
@@ -58,7 +95,7 @@ export async function getActiveWebhooks() {
       return { success: false, error: error.message, data: null }
     }
 
-    return { success: true, data, error: null }
+    return { success: true, data: data as ProductionWebhook[], error: null }
   } catch (error) {
     console.error('Unexpected error in getActiveWebhooks:', error)
     return {
@@ -70,11 +107,15 @@ export async function getActiveWebhooks() {
 }
 
 /**
- * Get a single webhook by ID
+ * Get a single webhook by ID from Gobbi's database
  */
 export async function getWebhook(id: number) {
   try {
-    const supabase = await createClient()
+    const supabase = createGobbiAdminClient()
+
+    if (!supabase) {
+      return { success: false, error: 'Gobbi database not configured', data: null }
+    }
 
     const { data, error } = await supabase
       .from('production_webhooks')
@@ -87,7 +128,7 @@ export async function getWebhook(id: number) {
       return { success: false, error: error.message, data: null }
     }
 
-    return { success: true, data, error: null }
+    return { success: true, data: data as ProductionWebhook, error: null }
   } catch (error) {
     console.error('Unexpected error in getWebhook:', error)
     return {
@@ -99,16 +140,21 @@ export async function getWebhook(id: number) {
 }
 
 /**
- * Create a new production webhook
+ * Create a new production webhook in Gobbi's database
  */
 export async function createWebhook(data: {
   name: string
   webhook_url: string
   description?: string
   is_active?: boolean
+  webhook_type?: WebhookType
 }) {
   try {
-    const supabase = await createClient()
+    const supabase = createGobbiAdminClient()
+
+    if (!supabase) {
+      return { success: false, error: 'Gobbi database not configured', data: null }
+    }
 
     // Validate name is not empty
     if (!data.name || data.name.trim().length === 0) {
@@ -141,6 +187,7 @@ export async function createWebhook(data: {
       webhook_url: data.webhook_url.trim(),
       description: data.description?.trim() || null,
       is_active: data.is_active !== undefined ? data.is_active : true,
+      webhook_type: data.webhook_type || 'benchmark',
     }
 
     const { data: webhook, error } = await supabase
@@ -163,7 +210,7 @@ export async function createWebhook(data: {
     }
 
     revalidatePath('/settings/webhooks')
-    return { success: true, data: webhook, error: null }
+    return { success: true, data: webhook as ProductionWebhook, error: null }
   } catch (error) {
     console.error('Unexpected error in createWebhook:', error)
     return {
@@ -175,19 +222,24 @@ export async function createWebhook(data: {
 }
 
 /**
- * Update an existing production webhook
+ * Update an existing production webhook in Gobbi's database
  */
 export async function updateWebhook(id: number, data: {
   name?: string
   webhook_url?: string
   description?: string
   is_active?: boolean
+  webhook_type?: WebhookType
 }) {
   try {
-    const supabase = await createClient()
+    const supabase = createGobbiAdminClient()
+
+    if (!supabase) {
+      return { success: false, error: 'Gobbi database not configured', data: null }
+    }
 
     // Validate at least one field is being updated
-    if (!data.name && !data.webhook_url && data.description === undefined && data.is_active === undefined) {
+    if (!data.name && !data.webhook_url && data.description === undefined && data.is_active === undefined && data.webhook_type === undefined) {
       return { success: false, error: 'No fields to update', data: null }
     }
 
@@ -231,6 +283,10 @@ export async function updateWebhook(id: number, data: {
       updateData.is_active = data.is_active
     }
 
+    if (data.webhook_type !== undefined) {
+      updateData.webhook_type = data.webhook_type
+    }
+
     const { data: webhook, error } = await supabase
       .from('production_webhooks')
       .update(updateData)
@@ -252,7 +308,7 @@ export async function updateWebhook(id: number, data: {
     }
 
     revalidatePath('/settings/webhooks')
-    return { success: true, data: webhook, error: null }
+    return { success: true, data: webhook as ProductionWebhook, error: null }
   } catch (error) {
     console.error('Unexpected error in updateWebhook:', error)
     return {
@@ -264,11 +320,15 @@ export async function updateWebhook(id: number, data: {
 }
 
 /**
- * Delete a production webhook
+ * Delete a production webhook from Gobbi's database
  */
 export async function deleteWebhook(id: number) {
   try {
-    const supabase = await createClient()
+    const supabase = createGobbiAdminClient()
+
+    if (!supabase) {
+      return { success: false, error: 'Gobbi database not configured' }
+    }
 
     const { error } = await supabase.from('production_webhooks').delete().eq('id', id)
 
@@ -289,11 +349,15 @@ export async function deleteWebhook(id: number) {
 }
 
 /**
- * Toggle webhook active status
+ * Toggle webhook active status in Gobbi's database
  */
 export async function toggleWebhookStatus(id: number, is_active: boolean) {
   try {
-    const supabase = await createClient()
+    const supabase = createGobbiAdminClient()
+
+    if (!supabase) {
+      return { success: false, error: 'Gobbi database not configured', data: null }
+    }
 
     const { data, error } = await supabase
       .from('production_webhooks')
@@ -308,7 +372,7 @@ export async function toggleWebhookStatus(id: number, is_active: boolean) {
     }
 
     revalidatePath('/settings/webhooks')
-    return { success: true, data, error: null }
+    return { success: true, data: data as ProductionWebhook, error: null }
   } catch (error) {
     console.error('Unexpected error in toggleWebhookStatus:', error)
     return {
