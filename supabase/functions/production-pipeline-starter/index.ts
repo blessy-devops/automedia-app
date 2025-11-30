@@ -149,7 +149,66 @@ serve(async (req) => {
     )
 
     // ========================================================================
-    // Step 4: Retornar sucesso
+    // Step 4: Chamar webhook create-tittle para iniciar geração de títulos
+    // ========================================================================
+    let webhookResult = { called: false, status: 0, error: null as string | null }
+
+    try {
+      // Buscar o webhook no banco
+      const { data: webhook, error: webhookFetchError } = await supabase
+        .from('production_webhooks')
+        .select('webhook_url, api_key')
+        .eq('name', 'create-tittle')
+        .eq('is_active', true)
+        .single()
+
+      if (webhookFetchError) {
+        console.warn('[Pipeline Starter] ⚠️ Webhook not found or inactive:', webhookFetchError.message)
+        webhookResult.error = `Webhook not found: ${webhookFetchError.message}`
+      } else if (webhook) {
+        // Preparar headers
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        }
+
+        // Se tem api_key, adiciona no header
+        if (webhook.api_key) {
+          headers['X-API-Key'] = webhook.api_key
+        }
+
+        // Payload para o N8N
+        const payload = {
+          production_video_id: nextVideo.id,
+          triggered_at: new Date().toISOString(),
+        }
+
+        console.log('[Pipeline Starter] 📤 Calling webhook create-tittle...')
+
+        // Fazer POST para o webhook
+        const webhookResponse = await fetch(webhook.webhook_url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        })
+
+        webhookResult.called = true
+        webhookResult.status = webhookResponse.status
+
+        if (webhookResponse.ok) {
+          console.log(`[Pipeline Starter] ✅ Webhook called successfully (${webhookResponse.status})`)
+        } else {
+          const errorText = await webhookResponse.text()
+          console.error(`[Pipeline Starter] ❌ Webhook failed (${webhookResponse.status}):`, errorText)
+          webhookResult.error = `HTTP ${webhookResponse.status}: ${errorText}`
+        }
+      }
+    } catch (webhookError) {
+      console.error('[Pipeline Starter] ❌ Webhook error:', webhookError)
+      webhookResult.error = webhookError instanceof Error ? webhookError.message : 'Unknown webhook error'
+    }
+
+    // ========================================================================
+    // Step 5: Retornar sucesso
     // ========================================================================
     return new Response(
       JSON.stringify({
@@ -159,6 +218,7 @@ serve(async (req) => {
         video_placeholder: nextVideo.placeholder,
         benchmark_id: nextVideo.benchmark_id,
         new_status: 'create_title',
+        webhook: webhookResult,
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     )
