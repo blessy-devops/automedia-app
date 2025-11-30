@@ -30,25 +30,35 @@ export function createGobbiClient() {
 
 /**
  * Creates an Admin Supabase client for Gobbi's database
- * Uses service role key - BYPASSES Row Level Security (RLS)
- * ONLY use in server-side code (Server Actions, API routes)
  *
- * Used for:
- * - Production Webhooks management (CRUD operations)
- * - Other admin operations requiring full access
+ * Strategy:
+ * 1. Try service role key first (bypasses RLS)
+ * 2. Fallback to anon key if service role not configured
  *
- * Returns null if environment variables are not configured
+ * Note: If using anon key, ensure RLS policies allow the operations
+ * or RLS is disabled on the table.
+ *
+ * Returns null if no credentials are configured
  */
 export function createGobbiAdminClient() {
   const GOBBI_SUPABASE_URL = process.env.GOBBI_SUPABASE_URL
   const GOBBI_SUPABASE_SERVICE_ROLE_KEY = process.env.GOBBI_SUPABASE_SERVICE_ROLE_KEY
+  const GOBBI_SUPABASE_ANON_KEY = process.env.GOBBI_SUPABASE_ANON_KEY
 
-  if (!GOBBI_SUPABASE_URL || !GOBBI_SUPABASE_SERVICE_ROLE_KEY) {
-    console.warn('Gobbi Admin credentials not configured')
+  if (!GOBBI_SUPABASE_URL) {
+    console.warn('Gobbi Supabase URL not configured')
     return null
   }
 
-  return createSupabaseClient(GOBBI_SUPABASE_URL, GOBBI_SUPABASE_SERVICE_ROLE_KEY, {
+  // Prefer service role key, fallback to anon key
+  const key = GOBBI_SUPABASE_SERVICE_ROLE_KEY || GOBBI_SUPABASE_ANON_KEY
+
+  if (!key) {
+    console.warn('Gobbi credentials not configured (no service role or anon key)')
+    return null
+  }
+
+  return createSupabaseClient(GOBBI_SUPABASE_URL, key, {
     auth: {
       persistSession: false,
     },
