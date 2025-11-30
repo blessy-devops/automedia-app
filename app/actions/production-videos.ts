@@ -250,6 +250,7 @@ function normalizeStatus(gobbiStatus: string): ProductionVideoStatus {
   if (gobbiStatus === 'scheduled') return 'scheduled'
   if (gobbiStatus === 'failed') return 'failed'
   if (gobbiStatus === 'on_hold') return 'on_hold'
+  if (gobbiStatus === 'canceled') return 'canceled'
   if (gobbiStatus === 'pending_approval' || gobbiStatus === 'approved') return 'pending_approval'
   // All "create_*" states are "processing"
   return 'processing'
@@ -273,6 +274,7 @@ function formatStageName(status: string): string {
   if (status === 'approved') return 'Approved'
   if (status === 'failed') return 'Failed'
   if (status === 'on_hold') return 'On Hold'
+  if (status === 'canceled') return 'Canceled'
 
   // Format "create_something" -> "Something" (removing "create_" prefix)
   if (status.startsWith('create_')) {

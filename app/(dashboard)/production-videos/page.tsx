@@ -113,6 +113,12 @@ export default function ProductionVideosPage() {
           color: 'bg-muted text-muted-foreground',
           icon: <Pause className="w-3 h-3" />
         }
+      case 'canceled':
+        return {
+          label: 'Canceled',
+          color: 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 line-through',
+          icon: <AlertCircle className="w-3 h-3" />
+        }
       default:
         return {
           label: status,
@@ -325,6 +331,7 @@ export default function ProductionVideosPage() {
                   <option value="pending_approval">Pending Review</option>
                   <option value="failed">Failed</option>
                   <option value="on_hold">On Hold</option>
+                  <option value="canceled">Canceled</option>
                 </select>
                 <ChevronDown className="w-4 h-4 absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
               </div>

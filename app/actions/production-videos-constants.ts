@@ -29,6 +29,7 @@ export const VALID_PRODUCTION_STATUSES = [
   // Special states
   'failed',
   'on_hold',
+  'canceled',
 ] as const
 
 export type ValidProductionStatus = (typeof VALID_PRODUCTION_STATUSES)[number]

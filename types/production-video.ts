@@ -9,6 +9,7 @@ export type ProductionVideoStatus =
   | 'pending_approval'
   | 'failed'
   | 'on_hold'
+  | 'canceled'
 
 export type EmotionalState = 'calm' | 'curiosity' | 'tension' | 'fear' | 'relief' | 'triumph'
 
