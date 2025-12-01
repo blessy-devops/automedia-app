@@ -124,6 +124,51 @@ export async function approveTitle(
 
     console.log(`✅ Title approved for video ${videoId}: "${selectedTitle.substring(0, 50)}..."`)
 
+    // 5. Chamar webhook create-content para iniciar geração de roteiro
+    try {
+      const { data: webhook, error: webhookFetchError } = await supabase
+        .from('production_webhooks')
+        .select('webhook_url, api_key')
+        .eq('name', 'create-content')
+        .eq('is_active', true)
+        .single()
+
+      if (webhookFetchError) {
+        console.warn(`⚠️ [approveTitle] Webhook create-content not found or inactive:`, webhookFetchError.message)
+      } else if (webhook) {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        }
+
+        if (webhook.api_key) {
+          headers['X-API-Key'] = webhook.api_key
+        }
+
+        const payload = {
+          production_video_id: videoId,
+          triggered_at: new Date().toISOString(),
+        }
+
+        console.log(`📤 [approveTitle] Calling webhook create-content for video ${videoId}...`)
+
+        const webhookResponse = await fetch(webhook.webhook_url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        })
+
+        if (webhookResponse.ok) {
+          console.log(`✅ [approveTitle] Webhook create-content called successfully (${webhookResponse.status})`)
+        } else {
+          const errorText = await webhookResponse.text()
+          console.error(`❌ [approveTitle] Webhook create-content failed (${webhookResponse.status}):`, errorText)
+        }
+      }
+    } catch (webhookError) {
+      console.error(`❌ [approveTitle] Webhook error:`, webhookError)
+      // Não falha a operação principal - webhook é secundário
+    }
+
     return { success: true, videoId }
 
   } catch (error) {
