@@ -35,7 +35,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { createClient } from '@supabase/supabase-js'
-import { approveTitle, rejectTitle, retryTitleRegenerationWebhook, approveThumbnail, rejectThumbnail, approveContent, rejectContent } from '../actions'
+import { approveTitle, rejectTitle, retryTitleRegenerationWebhook, approveThumbnail, rejectThumbnail, approveContent, rejectContent, retryContentWebhook } from '../actions'
 import { toast } from 'sonner'
 
 // ============================================================================
@@ -390,6 +390,12 @@ export function TitleApprovalQueue({
   // Auto-approval para conteúdo
   const [autoApprovalContent, setAutoApprovalContent] = useState(false)
 
+  // IDs de vídeos com erro no webhook de conteúdo (approve ou regenerate)
+  const [contentWebhookFailedIds, setContentWebhookFailedIds] = useState<Set<number>>(new Set())
+
+  // Loading state para retry de webhook de conteúdo
+  const [isRetryingContentWebhook, setIsRetryingContentWebhook] = useState(false)
+
   // ============================================================================
   // REALTIME SUBSCRIPTION
   // ============================================================================
@@ -425,6 +431,7 @@ export function TitleApprovalQueue({
           const newData = payload.new as any
           const oldData = payload.old as any
 
+          // ========== TITLES ==========
           if (payload.eventType === 'INSERT') {
             // Novo título pendente
             if (newData.title_approval_status === 'pending' && newData.status === 'create_title') {
@@ -452,9 +459,54 @@ export function TitleApprovalQueue({
                 prev.map((t) => (t.id === newData.id ? (newData as PendingTitle) : t))
               )
             }
+
+            // ========== CONTENT ==========
+            // Conteúdo voltou de regenerating para pending (regeneração concluída)
+            if (
+              oldData?.content_approval_status === 'regenerating' &&
+              newData.content_approval_status === 'pending' &&
+              newData.status === 'review_script'
+            ) {
+              setPendingContent((prev) =>
+                prev.map((c) => (c.id === newData.id ? (newData as PendingContent) : c))
+              )
+              // Remover do set de erros se existir
+              setContentWebhookFailedIds((prev) => {
+                const newSet = new Set(prev)
+                newSet.delete(newData.id)
+                return newSet
+              })
+              toast.success(`Novo conteúdo gerado para o vídeo #${newData.id}!`)
+            }
+            // Conteúdo saiu da fila (status mudou para create_cast)
+            else if (newData.status === 'create_cast' && oldData?.status !== 'create_cast') {
+              setPendingContent((prev) => prev.filter((c) => c.id !== newData.id))
+              setContentWebhookFailedIds((prev) => {
+                const newSet = new Set(prev)
+                newSet.delete(newData.id)
+                return newSet
+              })
+            }
+            // Conteúdo entrou em regeneração (via outro cliente)
+            else if (newData.status === 'regenerate_script' && newData.content_approval_status === 'regenerating') {
+              setPendingContent((prev) =>
+                prev.map((c) => (c.id === newData.id ? (newData as PendingContent) : c))
+              )
+            }
+            // Conteúdo aprovado mas webhook pode ter falhado (update sem mudar status)
+            else if (
+              newData.content_approval_status === 'approved' &&
+              newData.status === 'review_script'
+            ) {
+              setPendingContent((prev) =>
+                prev.map((c) => (c.id === newData.id ? (newData as PendingContent) : c))
+              )
+            }
           } else if (payload.eventType === 'DELETE') {
             // Título foi deletado
             setPendingTitles((prev) => prev.filter((t) => t.id !== oldData.id))
+            // Conteúdo foi deletado
+            setPendingContent((prev) => prev.filter((c) => c.id !== oldData.id))
           }
         }
       )
@@ -882,7 +934,7 @@ export function TitleApprovalQueue({
   // ============================================================================
 
   /**
-   * Aprovar pacote de conteúdo e avançar para próximo
+   * Aprovar pacote de conteúdo e chamar webhook create-cast
    */
   const handleApproveContent = async () => {
     if (!selectedContentItem) {
@@ -897,19 +949,31 @@ export function TitleApprovalQueue({
       const result = await approveContent(selectedContentItem.id)
 
       if (result.success) {
-        toast.success('Conteúdo aprovado com sucesso!')
-
-        // Optimistic update - remover da lista
-        setRemovedContentIds((prev) => new Set(prev).add(selectedContentItem.id))
-
-        // Mover para próximo item
-        const currentIndex = filteredContent.findIndex((c) => c.id === selectedItemId)
-        const nextItem = filteredContent[currentIndex + 1] || filteredContent[currentIndex - 1]
-
-        if (nextItem) {
-          setSelectedItemId(nextItem.id)
+        if (result.webhookFailed) {
+          // Webhook falhou - item fica na fila com erro
+          toast.warning('Conteúdo aprovado, mas webhook falhou. Clique em Retry para reenviar.')
+          setContentWebhookFailedIds((prev) => new Set(prev).add(selectedContentItem.id))
+          // Atualiza o item localmente para refletir o novo status
+          setPendingContent((prev) =>
+            prev.map((c) =>
+              c.id === selectedContentItem.id
+                ? { ...c, content_approval_status: 'approved' }
+                : c
+            )
+          )
         } else {
-          setSelectedItemId(null)
+          // Webhook OK - item sai da fila
+          toast.success('Conteúdo aprovado com sucesso!')
+          // Optimistic update - remover da lista
+          setRemovedContentIds((prev) => new Set(prev).add(selectedContentItem.id))
+          // Mover para próximo item
+          const currentIndex = filteredContent.findIndex((c) => c.id === selectedItemId)
+          const nextItem = filteredContent[currentIndex + 1] || filteredContent[currentIndex - 1]
+          if (nextItem) {
+            setSelectedItemId(nextItem.id)
+          } else {
+            setSelectedItemId(null)
+          }
         }
       } else {
         toast.error(result.error || 'Erro ao aprovar conteúdo')
@@ -923,7 +987,7 @@ export function TitleApprovalQueue({
   }
 
   /**
-   * Rejeitar pacote de conteúdo e solicitar regeneração
+   * Rejeitar pacote de conteúdo, chamar webhook create-content para regenerar
    */
   const handleRejectContent = async () => {
     if (!selectedContentItem) {
@@ -936,26 +1000,79 @@ export function TitleApprovalQueue({
       const result = await rejectContent(selectedContentItem.id)
 
       if (result.success) {
-        toast.info('Conteúdo rejeitado. Será marcado para regeneração.')
-
-        // Optimistic update - remover da lista
-        setRemovedContentIds((prev) => new Set(prev).add(selectedContentItem.id))
-
-        // Mover para próximo item
-        const currentIndex = filteredContent.findIndex((c) => c.id === selectedItemId)
-        const nextItem = filteredContent[currentIndex + 1] || filteredContent[currentIndex - 1]
-
-        if (nextItem) {
-          setSelectedItemId(nextItem.id)
+        if (result.webhookFailed) {
+          // Webhook falhou - mostrar erro
+          toast.warning('Conteúdo rejeitado, mas webhook falhou. Clique em Retry para reenviar.')
+          setContentWebhookFailedIds((prev) => new Set(prev).add(selectedContentItem.id))
         } else {
-          setSelectedItemId(null)
+          toast.info('Conteúdo rejeitado. Regenerando...')
         }
+
+        // Atualiza o item localmente para refletir o novo status (regenerating)
+        setPendingContent((prev) =>
+          prev.map((c) =>
+            c.id === selectedContentItem.id
+              ? { ...c, content_approval_status: 'regenerating', status: 'regenerate_script' }
+              : c
+          )
+        )
+        // NÃO remove da lista - item fica visível com estado de regeneração
       } else {
         toast.error(result.error || 'Erro ao rejeitar conteúdo')
       }
     } catch (error) {
       console.error('Error rejecting content:', error)
       toast.error('Erro ao rejeitar conteúdo')
+    }
+  }
+
+  /**
+   * Retry de webhook de conteúdo (tanto create-cast quanto create-content)
+   */
+  const handleRetryContentWebhook = async (videoId: number) => {
+    setIsRetryingContentWebhook(true)
+
+    try {
+      const result = await retryContentWebhook(videoId)
+
+      if (result.success) {
+        if (result.webhookFailed) {
+          toast.error('Webhook falhou novamente. Tente mais tarde.')
+        } else {
+          toast.success('Webhook reenviado com sucesso!')
+          // Remove do set de erros
+          setContentWebhookFailedIds((prev) => {
+            const newSet = new Set(prev)
+            newSet.delete(videoId)
+            return newSet
+          })
+
+          // Buscar o item atual para verificar se era aprovação ou regeneração
+          const item = pendingContent.find(c => c.id === videoId)
+          if (item?.content_approval_status === 'approved') {
+            // Era aprovação - item sai da fila
+            setRemovedContentIds((prev) => new Set(prev).add(videoId))
+            // Mover para próximo item se era o selecionado
+            if (selectedItemId === videoId) {
+              const currentIndex = filteredContent.findIndex((c) => c.id === videoId)
+              const nextItem = filteredContent[currentIndex + 1] || filteredContent[currentIndex - 1]
+              if (nextItem) {
+                setSelectedItemId(nextItem.id)
+              } else {
+                setSelectedItemId(null)
+              }
+            }
+          }
+          // Se era regeneração, o item fica na fila aguardando o N8N atualizar
+        }
+      } else {
+        toast.error(result.error || 'Erro ao reenviar webhook')
+      }
+    } catch (error) {
+      console.error('Error retrying content webhook:', error)
+      toast.error('Erro ao reenviar webhook')
+    } finally {
+      setIsRetryingContentWebhook(false)
     }
   }
 
@@ -1273,49 +1390,99 @@ export function TitleApprovalQueue({
                         </p>
                       </div>
                     ) : (
-                      filteredContent.map((item) => (
-                        <button
-                          key={item.id}
-                          onClick={() => handleSelectItem(item.id)}
-                          className={`w-full text-left p-3 rounded-lg mb-2 transition-all ${
-                            selectedItemId === item.id
-                              ? 'bg-accent border-2 border-primary'
-                              : 'bg-muted/30 hover:bg-muted/50 border-2 border-transparent'
-                          }`}
-                        >
-                          {/* Icon Header */}
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-lg">📦</span>
-                            <span className="text-xs font-semibold text-muted-foreground">CONTENT PACK</span>
-                          </div>
+                      filteredContent.map((item) => {
+                        const isRegenerating = item.status === 'regenerate_script'
+                        const isApprovedButWebhookFailed = item.content_approval_status === 'approved' && item.status === 'review_script'
+                        const hasWebhookError = contentWebhookFailedIds.has(item.id)
 
-                          {/* Badges Container */}
-                          <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            {item.placeholder && (
-                              <Badge className="bg-primary/10 text-primary border-primary/30 text-xs">
-                                {item.placeholder}
-                              </Badge>
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => handleSelectItem(item.id)}
+                            className={`relative w-full text-left p-3 rounded-lg mb-2 transition-all ${
+                              selectedItemId === item.id
+                                ? 'bg-accent border-2 border-primary'
+                                : hasWebhookError || isApprovedButWebhookFailed
+                                  ? 'bg-red-50/50 dark:bg-red-950/30 border-2 border-red-300 dark:border-red-700'
+                                  : isRegenerating
+                                    ? 'bg-yellow-50/50 dark:bg-yellow-950/30 border-2 border-yellow-300 dark:border-yellow-700'
+                                    : 'bg-muted/30 hover:bg-muted/50 border-2 border-transparent'
+                            }`}
+                          >
+                            {/* Overlay de Erro de Webhook */}
+                            {(hasWebhookError || isApprovedButWebhookFailed) && (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-500/10 rounded-lg z-10">
+                                <AlertTriangle className="w-6 h-6 text-red-500 mb-1" />
+                                <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                                  Webhook falhou
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="mt-2 h-6 text-xs border-red-300 text-red-600 hover:bg-red-100"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleRetryContentWebhook(item.id)
+                                  }}
+                                  disabled={isRetryingContentWebhook}
+                                >
+                                  {isRetryingContentWebhook ? (
+                                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                  ) : (
+                                    <RefreshCw className="w-3 h-3 mr-1" />
+                                  )}
+                                  Retry
+                                </Button>
+                              </div>
                             )}
-                            <Badge variant="outline" className="text-xs">
-                              ID: {item.id}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs gap-1">
-                              <Clock className="w-3 h-3" />
-                              {formatTimeAgo(item.created_at)}
-                            </Badge>
-                          </div>
 
-                          {/* Video Title */}
-                          <p className="text-xs font-medium line-clamp-2 mb-2">
-                            {item.title || 'Sem título'}
-                          </p>
+                            {/* Overlay de Regeneração (sem erro) */}
+                            {isRegenerating && !hasWebhookError && (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-yellow-500/10 rounded-lg z-10">
+                                <Loader2 className="w-6 h-6 text-yellow-600 dark:text-yellow-400 animate-spin mb-1" />
+                                <span className="text-xs font-medium text-yellow-600 dark:text-yellow-400">
+                                  Regenerando...
+                                </span>
+                              </div>
+                            )}
 
-                          {/* Teaser Preview */}
-                          <p className="text-xs text-muted-foreground line-clamp-1">
-                            {item.teaser_script ? item.teaser_script.substring(0, 60) + '...' : 'Sem teaser'}
-                          </p>
-                        </button>
-                      ))
+                            {/* Conteúdo do Card (blur se regenerating/erro) */}
+                            <div className={(isRegenerating || hasWebhookError || isApprovedButWebhookFailed) ? 'blur-[1px] opacity-60' : ''}>
+                              {/* Icon Header */}
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-lg">📦</span>
+                                <span className="text-xs font-semibold text-muted-foreground">CONTENT PACK</span>
+                              </div>
+
+                              {/* Badges Container */}
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                {item.placeholder && (
+                                  <Badge className="bg-primary/10 text-primary border-primary/30 text-xs">
+                                    {item.placeholder}
+                                  </Badge>
+                                )}
+                                <Badge variant="outline" className="text-xs">
+                                  ID: {item.id}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {formatTimeAgo(item.created_at)}
+                                </Badge>
+                              </div>
+
+                              {/* Video Title */}
+                              <p className="text-xs font-medium line-clamp-2 mb-2">
+                                {item.title || 'Sem título'}
+                              </p>
+
+                              {/* Teaser Preview */}
+                              <p className="text-xs text-muted-foreground line-clamp-1">
+                                {item.teaser_script ? item.teaser_script.substring(0, 60) + '...' : 'Sem teaser'}
+                              </p>
+                            </div>
+                          </button>
+                        )
+                      })
                     )}
                   </div>
                 )}
@@ -1678,94 +1845,153 @@ export function TitleApprovalQueue({
                 {/* =============================================== */}
                 {activeTab === 'content' && selectedContentItem && (
                   <div className="max-w-4xl mx-auto space-y-6">
-                    {/* Card 1: Video Info */}
-                    <div className="bg-muted/30 border border-border p-4 rounded-lg">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-2xl">📹</span>
-                        <h3 className="font-semibold">VIDEO INFO</h3>
-                      </div>
-                      <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        {selectedContentItem.placeholder && (
-                          <Badge className="bg-primary/10 text-primary border-primary/30 text-xs">
-                            {selectedContentItem.placeholder}
-                          </Badge>
-                        )}
-                        <Badge variant="outline" className="text-xs">
-                          ID: {selectedContentItem.id}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs gap-1">
-                          <Clock className="w-3 h-3" />
-                          {formatTimeAgo(selectedContentItem.created_at)}
-                        </Badge>
-                      </div>
-                      <p className="text-sm font-medium">
-                        {selectedContentItem.title || 'Sem título'}
-                      </p>
-                    </div>
-
-                    {/* Card 2: Teaser (Gradient roxo/rosa) */}
-                    <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-l-4 border-purple-500 p-4 rounded-lg">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl">🎬</span>
-                          <h3 className="font-semibold">TEASER</h3>
-                        </div>
-                        <Badge variant="outline" className="font-mono text-xs">
-                          {(selectedContentItem.teaser_script?.length || 0).toLocaleString()} caracteres
-                        </Badge>
-                      </div>
-                      <div className="bg-background/50 rounded-lg p-4 border border-border min-h-[230px]">
-                        <p className="text-sm whitespace-pre-wrap">
-                          {selectedContentItem.teaser_script || 'Nenhum teaser disponível'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Card 3: Script (Gradient azul/cyan) com ScrollArea */}
-                    <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-l-4 border-blue-500 p-4 rounded-lg">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl">📝</span>
-                          <h3 className="font-semibold">SCRIPT COMPLETO</h3>
-                        </div>
-                        <Badge variant="outline" className="font-mono text-xs">
-                          {(selectedContentItem.script?.length || 0).toLocaleString()} caracteres
-                        </Badge>
-                      </div>
-                      <ScrollArea className="h-[400px] rounded-lg border border-border bg-background/50">
-                        <div className="p-4">
-                          <p className="text-sm whitespace-pre-wrap font-mono leading-relaxed">
-                            {selectedContentItem.script || 'Nenhum script disponível'}
+                    {/* Estado de Regeneração ou Erro de Webhook */}
+                    {selectedContentItem.status === 'regenerate_script' ||
+                     (selectedContentItem.content_approval_status === 'approved' && selectedContentItem.status === 'review_script') ? (
+                      contentWebhookFailedIds.has(selectedContentItem.id) ||
+                      (selectedContentItem.content_approval_status === 'approved' && selectedContentItem.status === 'review_script') ? (
+                        // Estado de ERRO - Webhook falhou
+                        <div className="flex flex-col items-center justify-center py-16">
+                          <div className="relative mb-6">
+                            <AlertTriangle className="w-16 h-16 text-red-500" />
+                          </div>
+                          <h3 className="text-xl font-semibold mb-2 text-red-600 dark:text-red-400">
+                            Erro ao Chamar Webhook
+                          </h3>
+                          <p className="text-muted-foreground text-center max-w-md mb-6">
+                            {selectedContentItem.content_approval_status === 'approved'
+                              ? 'O conteúdo foi aprovado, mas o webhook create-cast não conseguiu ser chamado.'
+                              : 'O conteúdo foi marcado para regeneração, mas o webhook create-content não conseguiu ser chamado.'}
+                            {' '}Clique no botão abaixo para tentar novamente.
+                          </p>
+                          <Button
+                            onClick={() => handleRetryContentWebhook(selectedContentItem.id)}
+                            disabled={isRetryingContentWebhook}
+                            className="gap-2 mb-4"
+                            variant="destructive"
+                          >
+                            {isRetryingContentWebhook ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-4 h-4" />
+                            )}
+                            Tentar Novamente
+                          </Button>
+                          <p className="text-xs text-muted-foreground">
+                            ID: {selectedContentItem.id} | Status: {selectedContentItem.status} | Approval: {selectedContentItem.content_approval_status}
                           </p>
                         </div>
-                      </ScrollArea>
-                    </div>
-
-                    {/* Card 4: Description (Gradient verde) */}
-                    <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-l-4 border-green-500 p-4 rounded-lg">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl">📄</span>
-                          <h3 className="font-semibold">DESCRIPTION (YouTube)</h3>
+                      ) : (
+                        // Estado de LOADING - Regenerando conteúdo
+                        <div className="flex flex-col items-center justify-center py-16">
+                          <div className="relative mb-6">
+                            <Loader2 className="w-16 h-16 text-yellow-500 animate-spin" />
+                          </div>
+                          <h3 className="text-xl font-semibold mb-2">Regenerando Conteúdo...</h3>
+                          <p className="text-muted-foreground text-center max-w-md mb-4">
+                            O N8N está gerando um novo pacote de conteúdo (teaser, script, description).
+                            Aguarde alguns segundos...
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>ID: {selectedContentItem.id}</span>
+                            <span>•</span>
+                            <span>Placeholder: {selectedContentItem.placeholder || 'N/A'}</span>
+                          </div>
                         </div>
-                        <Badge variant="outline" className="font-mono text-xs">
-                          {(selectedContentItem.description?.length || 0).toLocaleString()} caracteres
-                        </Badge>
-                      </div>
-                      <div className="bg-background/50 rounded-lg p-4 border border-border">
-                        <p className="text-sm whitespace-pre-wrap">
-                          {selectedContentItem.description || 'Nenhuma descrição disponível'}
-                        </p>
-                      </div>
-                    </div>
+                      )
+                    ) : (
+                      // Estado NORMAL - Mostrar conteúdo para aprovação
+                      <>
+                        {/* Card 1: Video Info */}
+                        <div className="bg-muted/30 border border-border p-4 rounded-lg">
+                          <div className="flex items-center gap-2 mb-3">
+                            <span className="text-2xl">📹</span>
+                            <h3 className="font-semibold">VIDEO INFO</h3>
+                          </div>
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            {selectedContentItem.placeholder && (
+                              <Badge className="bg-primary/10 text-primary border-primary/30 text-xs">
+                                {selectedContentItem.placeholder}
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className="text-xs">
+                              ID: {selectedContentItem.id}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs gap-1">
+                              <Clock className="w-3 h-3" />
+                              {formatTimeAgo(selectedContentItem.created_at)}
+                            </Badge>
+                          </div>
+                          <p className="text-sm font-medium">
+                            {selectedContentItem.title || 'Sem título'}
+                          </p>
+                        </div>
 
-                    {/* Card 5: Info/Dica */}
-                    <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg">
-                      <p className="text-xs text-blue-700 dark:text-blue-400">
-                        <span className="font-medium">💡 Dica:</span> Revise cuidadosamente o teaser, script e descrição antes de aprovar.
-                        Se algum conteúdo precisar de ajustes, clique em "Reject Package" para solicitar regeneração.
-                      </p>
-                    </div>
+                        {/* Card 2: Teaser (Gradient roxo/rosa) */}
+                        <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-l-4 border-purple-500 p-4 rounded-lg">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-2xl">🎬</span>
+                              <h3 className="font-semibold">TEASER</h3>
+                            </div>
+                            <Badge variant="outline" className="font-mono text-xs">
+                              {(selectedContentItem.teaser_script?.length || 0).toLocaleString()} caracteres
+                            </Badge>
+                          </div>
+                          <div className="bg-background/50 rounded-lg p-4 border border-border min-h-[230px]">
+                            <p className="text-sm whitespace-pre-wrap">
+                              {selectedContentItem.teaser_script || 'Nenhum teaser disponível'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Card 3: Script (Gradient azul/cyan) com ScrollArea */}
+                        <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-l-4 border-blue-500 p-4 rounded-lg">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-2xl">📝</span>
+                              <h3 className="font-semibold">SCRIPT COMPLETO</h3>
+                            </div>
+                            <Badge variant="outline" className="font-mono text-xs">
+                              {(selectedContentItem.script?.length || 0).toLocaleString()} caracteres
+                            </Badge>
+                          </div>
+                          <ScrollArea className="h-[400px] rounded-lg border border-border bg-background/50">
+                            <div className="p-4">
+                              <p className="text-sm whitespace-pre-wrap font-mono leading-relaxed">
+                                {selectedContentItem.script || 'Nenhum script disponível'}
+                              </p>
+                            </div>
+                          </ScrollArea>
+                        </div>
+
+                        {/* Card 4: Description (Gradient verde) */}
+                        <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-l-4 border-green-500 p-4 rounded-lg">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-2xl">📄</span>
+                              <h3 className="font-semibold">DESCRIPTION (YouTube)</h3>
+                            </div>
+                            <Badge variant="outline" className="font-mono text-xs">
+                              {(selectedContentItem.description?.length || 0).toLocaleString()} caracteres
+                            </Badge>
+                          </div>
+                          <div className="bg-background/50 rounded-lg p-4 border border-border">
+                            <p className="text-sm whitespace-pre-wrap">
+                              {selectedContentItem.description || 'Nenhuma descrição disponível'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Card 5: Info/Dica */}
+                        <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg">
+                          <p className="text-xs text-blue-700 dark:text-blue-400">
+                            <span className="font-medium">💡 Dica:</span> Revise cuidadosamente o teaser, script e descrição antes de aprovar.
+                            Se algum conteúdo precisar de ajustes, clique em "Reject Package" para solicitar regeneração.
+                          </p>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -1874,44 +2100,57 @@ export function TitleApprovalQueue({
               )}
 
               {/* Action Bar para Content */}
-              {activeTab === 'content' && selectedContentItem && (
-                <div className="border-t border-border bg-card p-4 flex-shrink-0">
-                  <div className="max-w-4xl mx-auto flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Package className="w-4 h-4" />
-                      <span>Aprovando pacote completo (3 itens)</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={handleRejectContent}
-                        disabled={isApproving}
-                        className="gap-2"
-                      >
-                        <XCircle className="w-4 h-4" />
-                        Reject Package
-                      </Button>
-                      <Button
-                        onClick={handleApproveContent}
-                        disabled={isApproving}
-                        className="gap-2"
-                      >
-                        {isApproving ? (
-                          <>
-                            <span className="animate-spin">⏳</span>
-                            Approving...
-                          </>
+              {activeTab === 'content' && selectedContentItem && (() => {
+                const isContentRegenerating = selectedContentItem.status === 'regenerate_script'
+                const isContentApprovedButFailed = selectedContentItem.content_approval_status === 'approved' && selectedContentItem.status === 'review_script'
+                const hasContentWebhookError = contentWebhookFailedIds.has(selectedContentItem.id)
+                const isContentDisabled = isApproving || isContentRegenerating || isContentApprovedButFailed || hasContentWebhookError
+
+                return (
+                  <div className="border-t border-border bg-card p-4 flex-shrink-0">
+                    <div className="max-w-4xl mx-auto flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Package className="w-4 h-4" />
+                        {isContentRegenerating ? (
+                          <span className="text-yellow-600 dark:text-yellow-400">Regenerando conteúdo...</span>
+                        ) : isContentApprovedButFailed || hasContentWebhookError ? (
+                          <span className="text-red-600 dark:text-red-400">Webhook falhou - clique em Retry acima</span>
                         ) : (
-                          <>
-                            <CheckCircle2 className="w-4 h-4" />
-                            Approve All
-                          </>
+                          <span>Aprovando pacote completo (3 itens)</span>
                         )}
-                      </Button>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={handleRejectContent}
+                          disabled={isContentDisabled}
+                          className="gap-2"
+                        >
+                          <XCircle className="w-4 h-4" />
+                          Reject Package
+                        </Button>
+                        <Button
+                          onClick={handleApproveContent}
+                          disabled={isContentDisabled}
+                          className="gap-2"
+                        >
+                          {isApproving ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Approving...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="w-4 h-4" />
+                              Approve All
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
             </div>
           )}
 

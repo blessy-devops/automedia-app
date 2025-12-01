@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -38,6 +39,7 @@ export function EditWebhookDialog({
   open,
   onOpenChange,
 }: EditWebhookDialogProps) {
+  const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     name: webhook.name,
@@ -66,6 +68,7 @@ export function EditWebhookDialog({
 
     if (result.success) {
       toast.success('Webhook atualizado com sucesso!')
+      router.refresh()
       onOpenChange(false)
     } else {
       toast.error(`Erro ao atualizar webhook: ${result.error}`)

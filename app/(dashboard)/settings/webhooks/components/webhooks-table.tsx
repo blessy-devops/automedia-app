@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { MoreHorizontal, Pencil, Trash2, Power, PowerOff, Webhook } from 'lucide-react'
 import {
   Table,
@@ -42,6 +43,7 @@ interface WebhooksTableProps {
 }
 
 export function WebhooksTable({ webhooks }: WebhooksTableProps) {
+  const router = useRouter()
   const [editingWebhook, setEditingWebhook] = useState<Webhook | null>(null)
   const [deletingWebhookId, setDeletingWebhookId] = useState<number | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -59,6 +61,7 @@ export function WebhooksTable({ webhooks }: WebhooksTableProps) {
           ? `Webhook "${webhook.name}" ativado com sucesso`
           : `Webhook "${webhook.name}" desativado com sucesso`
       )
+      router.refresh()
     } else {
       toast.error(`Erro ao atualizar webhook: ${result.error}`)
     }
@@ -76,6 +79,7 @@ export function WebhooksTable({ webhooks }: WebhooksTableProps) {
 
     if (result.success) {
       toast.success(`Webhook "${webhook?.name}" excluído com sucesso`)
+      router.refresh()
       setDeletingWebhookId(null)
     } else {
       toast.error(`Erro ao excluir webhook: ${result.error}`)

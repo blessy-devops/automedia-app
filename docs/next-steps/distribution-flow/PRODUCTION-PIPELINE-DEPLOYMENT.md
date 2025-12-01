@@ -176,7 +176,8 @@ CREATE TABLE public.production_webhooks (
 | name | webhook_type | Disparado quando | Payload |
 |------|-------------|------------------|---------|
 | `create-tittle` | creation | Vídeo entra em produção (queued → create_title) | `{ production_video_id, triggered_at }` |
-| `create-content` | creation | Título é aprovado (pending_approval → approved) | `{ production_video_id, triggered_at }` |
+| `create-content` | creation | Título é aprovado OU Conteúdo é rejeitado (regenerar) | `{ production_video_id, triggered_at, is_regeneration? }` |
+| `create-cast` | creation | Conteúdo é aprovado (review_script → create_cast) | `{ production_video_id, triggered_at }` |
 
 ### Autenticação
 

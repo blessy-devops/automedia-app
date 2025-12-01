@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -28,6 +29,7 @@ import { createWebhook } from '../actions'
 import { WEBHOOK_TYPES, type WebhookType } from '../types'
 
 export function CreateWebhookDialog() {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
@@ -46,6 +48,7 @@ export function CreateWebhookDialog() {
 
     if (result.success) {
       toast.success('Webhook criado com sucesso!')
+      router.refresh()
       setOpen(false)
       setFormData({
         name: '',

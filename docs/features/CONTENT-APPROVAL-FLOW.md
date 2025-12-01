@@ -1,5 +1,8 @@
 # Content Approval Flow - Documentação Técnica
 
+**Última atualização:** 2025-12-01
+**Status:** ✅ Implementado com Webhooks e Retry
+
 ## Visão Geral
 
 O Content Approval Flow é a etapa do workflow de produção onde o usuário revisa e aprova/rejeita o pacote de conteúdo gerado pela automação N8N. O pacote inclui:
@@ -12,12 +15,13 @@ O Content Approval Flow é a etapa do workflow de produção onde o usuário rev
 
 ## Critérios para Aparecer na Tela de Aprovação
 
-Um vídeo aparece na aba "Content" da tela de aprovação quando:
+Um vídeo aparece na aba "Content" da tela de aprovação nos seguintes casos:
 
-| Campo | Valor Esperado |
-|-------|----------------|
-| `status` | `'review_script'` |
-| `content_approval_status` | `'pending'` |
+| `content_approval_status` | `status` | Situação |
+|--------------------------|----------|----------|
+| `'pending'` | `'review_script'` | Aguardando aprovação normal |
+| `'regenerating'` | `'regenerate_script'` | Regenerando conteúdo (loading) |
+| `'approved'` | `'review_script'` | Aprovado mas webhook create-cast falhou (retry) |
 
 ### Query de Busca (Server Action)
 
@@ -44,10 +48,12 @@ const { data } = await supabase
       thumbnail_url
     )
   `)
-  .eq('status', 'review_script')
-  .eq('content_approval_status', 'pending')
+  .in('content_approval_status', ['pending', 'regenerating', 'approved'])
+  .in('status', ['review_script', 'regenerate_script'])
   .order('created_at', { ascending: true })
 ```
+
+**NOTA:** Quando `content_approval_status = 'approved'` E `status = 'review_script'`, significa que o conteúdo foi aprovado mas o webhook create-cast falhou. O item continua na fila para retry.
 
 ---
 
@@ -86,7 +92,7 @@ interface PendingContent {
 
 **Localização:** `app/(dashboard)/production/approval-queue/actions.ts`
 
-**Propósito:** Aprovar o pacote de conteúdo e avançar o vídeo para a próxima etapa.
+**Propósito:** Aprovar o pacote de conteúdo e chamar webhook `create-cast`.
 
 **Validações:**
 1. Vídeo existe
@@ -94,22 +100,40 @@ interface PendingContent {
 3. `content_approval_status` é `'pending'`
 4. Há pelo menos um conteúdo (script, teaser_script ou description)
 
-**Ações no Banco:**
+**Fluxo:**
+```
+1. Marca content_approval_status = 'approved' (mas NÃO muda status ainda)
+2. Chama webhook 'create-cast'
+3. SE webhook OK → muda status para 'create_cast' (sai da fila)
+4. SE webhook FALHA → status fica 'review_script' (continua na fila com erro)
+```
+
+**Retorno:**
+```typescript
+{
+  success: boolean
+  error?: string
+  videoId?: number
+  webhookFailed?: boolean  // true se webhook falhou
+}
+```
+
+**Ações no Banco (webhook OK):**
 ```sql
+-- Primeiro update (antes do webhook)
 UPDATE production_videos
 SET
   content_approval_status = 'approved',
   content_approved_at = NOW(),
+  updated_at = NOW()
+WHERE id = :videoId
+
+-- Segundo update (após webhook OK)
+UPDATE production_videos
+SET
   status = 'create_cast',
   updated_at = NOW()
 WHERE id = :videoId
-```
-
-**Fluxo do Workflow:**
-```
-review_script (7) → create_cast (3)
-                    ↓
-                    (próximas etapas de produção)
 ```
 
 ---
@@ -118,33 +142,68 @@ review_script (7) → create_cast (3)
 
 **Localização:** `app/(dashboard)/production/approval-queue/actions.ts`
 
-**Propósito:** Rejeitar o pacote de conteúdo e marcar para regeneração.
+**Propósito:** Rejeitar o pacote de conteúdo, marcar para regeneração e chamar webhook `create-content`.
 
 **Validações:**
 1. Vídeo existe
 2. Status atual é `'review_script'`
 3. `content_approval_status` é `'pending'`
 
+**Fluxo:**
+```
+1. Marca content_approval_status = 'regenerating' (não 'rejected')
+2. Muda status para 'regenerate_script'
+3. Chama webhook 'create-content' para regenerar
+4. Item fica na fila com visual de loading
+5. SE webhook FALHA → visual de erro com botão Retry
+```
+
+**Retorno:**
+```typescript
+{
+  success: boolean
+  error?: string
+  videoId?: number
+  webhookFailed?: boolean  // true se webhook falhou
+}
+```
+
 **Ações no Banco:**
 ```sql
 UPDATE production_videos
 SET
-  content_approval_status = 'rejected',
-  content_approved_at = NOW(),
+  content_approval_status = 'regenerating',  -- NÃO 'rejected'
   status = 'regenerate_script',
   updated_at = NOW()
 WHERE id = :videoId
 ```
 
-**Fluxo do Workflow:**
+---
+
+### 4. retryContentWebhook(videoId: number)
+
+**Localização:** `app/(dashboard)/production/approval-queue/actions.ts`
+
+**Propósito:** Retry de webhook quando falhou. Detecta automaticamente qual webhook chamar.
+
+**Lógica:**
 ```
-review_script (7) → regenerate_script (8)
-                    ↓
-                    (N8N detecta e regenera o conteúdo)
-                    ↓
-                    review_script (7)
-                    ↓
-                    (volta para aprovação)
+SE content_approval_status = 'approved' E status = 'review_script':
+   → Chama webhook 'create-cast' (aprovação que falhou)
+   → Se OK, avança status para 'create_cast'
+
+SE content_approval_status = 'regenerating' E status = 'regenerate_script':
+   → Chama webhook 'create-content' (regeneração que falhou)
+```
+
+**Retorno:**
+```typescript
+{
+  success: boolean
+  error?: string
+  videoId?: number
+  webhookFailed?: boolean  // true se webhook falhou novamente
+}
 ```
 
 ---
@@ -303,4 +362,18 @@ const { data } = await supabase
 - [ ] Adicionar campo de notas/feedback ao rejeitar
 - [ ] Implementar edição inline do conteúdo
 - [ ] Adicionar histórico de versões do conteúdo
-- [ ] Webhook para notificar N8N sobre rejeição
+- [x] ~~Webhook para notificar N8N sobre rejeição~~ (Implementado: `create-content` é chamado ao rejeitar)
+- [x] ~~Webhook para continuar pipeline ao aprovar~~ (Implementado: `create-cast` é chamado ao aprovar)
+- [x] ~~UI de loading durante regeneração~~ (Implementado)
+- [x] ~~Botão de retry quando webhook falha~~ (Implementado)
+
+---
+
+## Webhooks Relacionados
+
+| Webhook | Disparado Quando | Payload |
+|---------|-----------------|---------|
+| `create-cast` | Conteúdo é aprovado | `{ production_video_id, triggered_at }` |
+| `create-content` | Conteúdo é rejeitado (regenerar) | `{ production_video_id, triggered_at, is_regeneration: true }` |
+
+**Nota:** Os webhooks são configurados na tabela `production_webhooks` e usam Header Auth com `X-API-Key`.

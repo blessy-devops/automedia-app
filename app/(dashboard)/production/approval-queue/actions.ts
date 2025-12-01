@@ -623,6 +623,7 @@ interface ApproveThumbnailResult {
   success: boolean
   error?: string
   videoId?: number
+  webhookFailed?: boolean // true se webhook falhou (para mostrar botão Retry)
 }
 
 // ============================================================================
@@ -630,17 +631,19 @@ interface ApproveThumbnailResult {
 // ============================================================================
 
 /**
- * Aprova a thumbnail gerada e avança o vídeo para a próxima etapa do workflow.
+ * Aprova a thumbnail gerada e chama webhook create-audio-segments.
  *
  * Fluxo:
  * 1. Valida se o vídeo está na etapa 'create_thumbnail' e status 'pending'
  * 2. Extrai thumbnail_url de dentro do JSONB thumbnail_approval_data
  * 3. Copia thumbnail_url extraído para a coluna thumbnail_url (thumbnail final aprovada)
- * 4. Atualiza thumbnail_approval_status para 'approved' com timestamp
- * 5. Avança o status do vídeo para 'create_audio_segments' (próxima etapa)
+ * 4. Atualiza thumbnail_approval_status para 'approved' com timestamp (NÃO muda status ainda)
+ * 5. Chama webhook 'create-audio-segments' para continuar pipeline
+ * 6. SE webhook OK: avança status para 'create_audio_segments' (sai da fila)
+ * 7. SE webhook FALHA: status fica 'create_thumbnail', continua na fila com visual de erro + Retry
  *
  * @param videoId - ID do vídeo na tabela production_videos
- * @returns Resultado da operação com success/error
+ * @returns Resultado da operação com success/error e webhookFailed
  */
 export async function approveThumbnail(
   videoId: number
@@ -689,7 +692,7 @@ export async function approveThumbnail(
     // 3. Extrair thumbnail_url do JSONB
     const thumbnailUrl = video.thumbnail_approval_data.thumbnail_url
 
-    // 4. Atualizar vídeo: copiar URL para coluna final + aprovar + avançar status
+    // 4. Marcar como aprovado + copiar URL (mas NÃO avança status ainda - só avança se webhook funcionar)
     const now = new Date().toISOString()
 
     const { error: updateError } = await supabase
@@ -699,7 +702,7 @@ export async function approveThumbnail(
         thumbnail_approval_status: 'approved',
         thumbnail_approved_at: now,
         // thumbnail_approved_by: 'user_email', // TODO: Integrar com sistema de autenticação
-        status: 'create_audio_segments', // ⚡ AVANÇA PARA PRÓXIMA ETAPA DO WORKFLOW
+        // status: NÃO MUDA AINDA - só muda se webhook funcionar
         updated_at: now
       })
       .eq('id', videoId)
@@ -712,9 +715,78 @@ export async function approveThumbnail(
     // 5. Revalidar página para atualizar UI
     revalidatePath('/production/approval-queue')
 
-    console.log(`✅ Thumbnail approved for video ${videoId}: ${thumbnailUrl}`)
+    console.log(`✅ Thumbnail marked as approved for video ${videoId} - Now calling webhook...`)
 
-    return { success: true, videoId }
+    // 6. Chamar webhook create-audio-segments para continuar pipeline
+    let webhookFailed = false
+
+    try {
+      const { data: webhook, error: webhookFetchError } = await supabase
+        .from('production_webhooks')
+        .select('webhook_url, api_key')
+        .eq('name', 'create-audio-segments')
+        .eq('is_active', true)
+        .single()
+
+      if (webhookFetchError) {
+        console.warn(`⚠️ [approveThumbnail] Webhook create-audio-segments not found or inactive:`, webhookFetchError.message)
+        webhookFailed = true
+      } else if (webhook) {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        }
+
+        if (webhook.api_key) {
+          headers['X-API-Key'] = webhook.api_key
+        }
+
+        const payload = {
+          production_video_id: videoId,
+          triggered_at: new Date().toISOString(),
+        }
+
+        console.log(`📤 [approveThumbnail] Calling webhook create-audio-segments for video ${videoId}...`)
+
+        const webhookResponse = await fetch(webhook.webhook_url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        })
+
+        if (webhookResponse.ok) {
+          console.log(`✅ [approveThumbnail] Webhook create-audio-segments called successfully (${webhookResponse.status})`)
+
+          // 7. Webhook OK! Agora sim avança o status para create_audio_segments
+          const { error: advanceError } = await supabase
+            .from('production_videos')
+            .update({
+              status: 'create_audio_segments', // ⚡ AVANÇA PARA PRÓXIMA ETAPA
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', videoId)
+
+          if (advanceError) {
+            console.error(`❌ [approveThumbnail] Failed to advance status:`, advanceError)
+            // Não marca webhookFailed porque o webhook funcionou, só o update falhou
+          } else {
+            console.log(`✅ [approveThumbnail] Video ${videoId} advanced to create_audio_segments`)
+          }
+
+          revalidatePath('/production/approval-queue')
+        } else {
+          const errorText = await webhookResponse.text()
+          console.error(`❌ [approveThumbnail] Webhook create-audio-segments failed (${webhookResponse.status}):`, errorText)
+          webhookFailed = true
+        }
+      } else {
+        webhookFailed = true
+      }
+    } catch (webhookError) {
+      console.error(`❌ [approveThumbnail] Webhook error:`, webhookError)
+      webhookFailed = true
+    }
+
+    return { success: true, videoId, webhookFailed }
 
   } catch (error) {
     console.error('Unexpected error in approveThumbnail:', error)
@@ -726,18 +798,20 @@ export async function approveThumbnail(
 }
 
 /**
- * Rejeita a thumbnail gerada e marca para regeneração.
+ * Rejeita a thumbnail gerada, marca para regeneração e chama webhook create-thumbnail.
  *
  * Fluxo:
  * 1. Valida se o vídeo está na etapa 'create_thumbnail' e status 'pending'
  * 2. Salva o novo thumb_text editado pelo usuário (se fornecido)
  * 3. Limpa thumbnail_url e thumbnail_approval_data para regeneração
- * 4. Atualiza thumbnail_approval_status para 'rejected' com timestamp
- * 5. Muda o status do vídeo para 'regenerate_thumbnail'
+ * 4. Atualiza thumbnail_approval_status para 'regenerating' e status para 'regenerate_thumbnail'
+ * 5. Chama webhook 'create-thumbnail' para regenerar (N8N busca thumb_text da tabela)
+ * 6. Vídeo fica na fila com visual de loading (regenerando)
+ * 7. SE webhook FALHA: visual de erro + botão Retry
  *
  * @param videoId - ID do vídeo na tabela production_videos
  * @param newThumbText - Texto editado pelo usuário para a thumbnail (opcional)
- * @returns Resultado da operação com success/error
+ * @returns Resultado da operação com success/error e webhookFailed
  */
 export async function rejectThumbnail(
   videoId: number,
@@ -776,13 +850,12 @@ export async function rejectThumbnail(
       }
     }
 
-    // 3. Marcar como rejeitado, salvar novo thumb_text e limpar dados para regeneração
+    // 3. Marcar como regenerating (não rejected!), salvar novo thumb_text e limpar dados
     const now = new Date().toISOString()
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: Record<string, any> = {
-      thumbnail_approval_status: 'rejected',
-      thumbnail_approved_at: now,
+      thumbnail_approval_status: 'regenerating', // ⚡ REGENERATING, não rejected
       thumbnail_url: null, // Limpar thumbnail_url para regeneração
       thumbnail_approval_data: null, // Limpar dados de aprovação para regeneração
       status: 'regenerate_thumbnail',
@@ -808,31 +881,62 @@ export async function rejectThumbnail(
 
     console.log(`❌ Thumbnail rejected for video ${videoId} - Status changed to 'regenerate_thumbnail'${newThumbText ? ` - New thumb_text: "${newThumbText.substring(0, 50)}..."` : ''}`)
 
-    // 4. Invocar Edge Function para chamar webhook N8N de regeneração
-    // Não bloqueia a resposta - webhook é secundário
-    try {
-      const { error: edgeFnError } = await supabase.functions.invoke(
-        'regenerate-thumbnail',
-        {
-          body: {
-            video_id: videoId,
-            thumb_text: newThumbText || ''
-          }
-        }
-      )
+    // 4. Chamar webhook create-thumbnail para regenerar
+    // N8N busca thumb_text diretamente da tabela production_videos
+    let webhookFailed = false
 
-      if (edgeFnError) {
-        console.warn('Failed to call regenerate-thumbnail webhook:', edgeFnError)
-        // Não falha a operação - webhook é secundário
+    try {
+      const { data: webhook, error: webhookFetchError } = await supabase
+        .from('production_webhooks')
+        .select('webhook_url, api_key')
+        .eq('name', 'create-thumbnail')
+        .eq('is_active', true)
+        .single()
+
+      if (webhookFetchError) {
+        console.warn(`⚠️ [rejectThumbnail] Webhook create-thumbnail not found or inactive:`, webhookFetchError.message)
+        webhookFailed = true
+      } else if (webhook) {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        }
+
+        if (webhook.api_key) {
+          headers['X-API-Key'] = webhook.api_key
+        }
+
+        // Payload simples: só production_video_id
+        // N8N busca thumb_text da tabela production_videos
+        const payload = {
+          production_video_id: videoId,
+          triggered_at: new Date().toISOString(),
+          is_regeneration: true,
+        }
+
+        console.log(`📤 [rejectThumbnail] Calling webhook create-thumbnail for video ${videoId} (regeneration)...`)
+
+        const webhookResponse = await fetch(webhook.webhook_url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        })
+
+        if (webhookResponse.ok) {
+          console.log(`✅ [rejectThumbnail] Webhook create-thumbnail called successfully (${webhookResponse.status})`)
+        } else {
+          const errorText = await webhookResponse.text()
+          console.error(`❌ [rejectThumbnail] Webhook create-thumbnail failed (${webhookResponse.status}):`, errorText)
+          webhookFailed = true
+        }
       } else {
-        console.log(`✅ Regenerate-thumbnail webhook triggered for video ${videoId}`)
+        webhookFailed = true
       }
     } catch (webhookError) {
-      console.warn('Error invoking regenerate-thumbnail Edge Function:', webhookError)
-      // Não falha a operação principal
+      console.error(`❌ [rejectThumbnail] Webhook error:`, webhookError)
+      webhookFailed = true
     }
 
-    return { success: true, videoId }
+    return { success: true, videoId, webhookFailed }
 
   } catch (error) {
     console.error('Unexpected error in rejectThumbnail:', error)
@@ -841,17 +945,150 @@ export async function rejectThumbnail(
 }
 
 /**
- * Busca todos os vídeos com thumbnails pendentes de aprovação.
+ * Retry de webhook de thumbnail quando falhou.
  *
- * Critérios:
- * - status = 'create_thumbnail' (etapa de criação de thumbnail)
- * - thumbnail_approval_status = 'pending' (aguardando aprovação)
- * - thumbnail_approval_data->>'thumbnail_url' IS NOT NULL (thumbnail já foi gerada pelo N8N)
+ * Detecta automaticamente qual webhook chamar baseado no estado:
+ * - Se thumbnail_approval_status = 'approved' e status = 'create_thumbnail': chama 'create-audio-segments'
+ *   (aprovação que falhou no webhook)
+ * - Se thumbnail_approval_status = 'regenerating' e status = 'regenerate_thumbnail': chama 'create-thumbnail'
+ *   (regeneração que falhou no webhook)
+ *
+ * @param videoId - ID do vídeo na tabela production_videos
+ * @returns Resultado da operação com success/error e webhookFailed
+ */
+export async function retryThumbnailWebhook(
+  videoId: number
+): Promise<ApproveThumbnailResult> {
+  try {
+    const supabase = createGobbiClient()
+
+    if (!supabase) {
+      return { success: false, error: 'Banco de dados do Gobbi não configurado' }
+    }
+
+    // 1. Buscar vídeo para determinar qual webhook chamar
+    const { data: video, error: fetchError } = await supabase
+      .from('production_videos')
+      .select('id, status, thumbnail_approval_status')
+      .eq('id', videoId)
+      .single()
+
+    if (fetchError || !video) {
+      return { success: false, error: 'Vídeo não encontrado' }
+    }
+
+    // 2. Determinar qual webhook chamar baseado no estado
+    let webhookName: string
+    let isRegeneration = false
+
+    if (video.thumbnail_approval_status === 'approved' && video.status === 'create_thumbnail') {
+      // Caso: Aprovação que falhou no webhook create-audio-segments
+      webhookName = 'create-audio-segments'
+    } else if (video.thumbnail_approval_status === 'regenerating' && video.status === 'regenerate_thumbnail') {
+      // Caso: Regeneração que falhou no webhook create-thumbnail
+      webhookName = 'create-thumbnail'
+      isRegeneration = true
+    } else {
+      return {
+        success: false,
+        error: `Estado inválido para retry. Status: ${video.status}, Approval: ${video.thumbnail_approval_status}`
+      }
+    }
+
+    // 3. Buscar e chamar o webhook
+    let webhookFailed = false
+
+    try {
+      const { data: webhook, error: webhookFetchError } = await supabase
+        .from('production_webhooks')
+        .select('webhook_url, api_key')
+        .eq('name', webhookName)
+        .eq('is_active', true)
+        .single()
+
+      if (webhookFetchError) {
+        console.warn(`⚠️ [retryThumbnailWebhook] Webhook ${webhookName} not found or inactive:`, webhookFetchError.message)
+        webhookFailed = true
+      } else if (webhook) {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        }
+
+        if (webhook.api_key) {
+          headers['X-API-Key'] = webhook.api_key
+        }
+
+        const payload = {
+          production_video_id: videoId,
+          triggered_at: new Date().toISOString(),
+          is_regeneration: isRegeneration,
+          is_retry: true,
+        }
+
+        console.log(`📤 [retryThumbnailWebhook] Calling webhook ${webhookName} for video ${videoId} (retry)...`)
+
+        const webhookResponse = await fetch(webhook.webhook_url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        })
+
+        if (webhookResponse.ok) {
+          console.log(`✅ [retryThumbnailWebhook] Webhook ${webhookName} called successfully (${webhookResponse.status})`)
+
+          // Se foi create-audio-segments e deu certo, agora avança o status
+          if (webhookName === 'create-audio-segments') {
+            const { error: advanceError } = await supabase
+              .from('production_videos')
+              .update({
+                status: 'create_audio_segments',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', videoId)
+
+            if (advanceError) {
+              console.error(`❌ [retryThumbnailWebhook] Failed to advance status:`, advanceError)
+            } else {
+              console.log(`✅ [retryThumbnailWebhook] Video ${videoId} advanced to create_audio_segments`)
+            }
+          }
+
+          revalidatePath('/production/approval-queue')
+        } else {
+          const errorText = await webhookResponse.text()
+          console.error(`❌ [retryThumbnailWebhook] Webhook ${webhookName} failed (${webhookResponse.status}):`, errorText)
+          webhookFailed = true
+        }
+      } else {
+        webhookFailed = true
+      }
+    } catch (webhookError) {
+      console.error(`❌ [retryThumbnailWebhook] Webhook error:`, webhookError)
+      webhookFailed = true
+    }
+
+    return { success: true, videoId, webhookFailed }
+
+  } catch (error) {
+    console.error('Unexpected error in retryThumbnailWebhook:', error)
+    return { success: false, error: 'Erro interno ao reenviar webhook' }
+  }
+}
+
+/**
+ * Busca todos os vídeos com thumbnails para exibir na fila de aprovação.
+ *
+ * Critérios (inclui múltiplos estados):
+ * 1. pending + create_thumbnail = aguardando aprovação normal (com thumbnail gerada)
+ * 2. regenerating + regenerate_thumbnail = regenerando thumbnail (visual loading)
+ * 3. approved + create_thumbnail = aprovado mas webhook create-audio-segments falhou (precisa retry)
+ *
+ * NOTA: Quando webhook create-audio-segments funciona, status muda para 'create_audio_segments' e sai da query.
  *
  * Retorna ordenado por created_at (mais antigos primeiro).
  * Inclui dados do vídeo de benchmark para exibir thumbnail de referência.
  *
- * @returns Array de vídeos com thumbnails pendentes de aprovação
+ * @returns Array de vídeos com thumbnails para aprovação/retry
  */
 export async function getPendingThumbnailApprovals(): Promise<PendingThumbnail[]> {
   try {
@@ -862,9 +1099,10 @@ export async function getPendingThumbnailApprovals(): Promise<PendingThumbnail[]
       return []
     }
 
-    console.log('🔍 [getPendingThumbnailApprovals] Fetching pending thumbnails from Gobbi database...')
+    console.log('🔍 [getPendingThumbnailApprovals] Fetching thumbnails from Gobbi database...')
 
     // Query com JOIN para pegar thumbnail do benchmark
+    // Inclui múltiplos estados: pending, regenerating, approved (webhook falhou)
     const { data, error } = await supabase
       .from('production_videos')
       .select(`
@@ -884,9 +1122,8 @@ export async function getPendingThumbnailApprovals(): Promise<PendingThumbnail[]
           thumbnail_url
         )
       `)
-      .eq('thumbnail_approval_status', 'pending')
-      .eq('status', 'create_thumbnail')
-      .not('thumbnail_approval_data->thumbnail_url', 'is', null)
+      .in('thumbnail_approval_status', ['pending', 'regenerating', 'approved'])
+      .in('status', ['create_thumbnail', 'regenerate_thumbnail'])
       .order('created_at', { ascending: true })
       .limit(50)
 
@@ -901,7 +1138,18 @@ export async function getPendingThumbnailApprovals(): Promise<PendingThumbnail[]
       return []
     }
 
-    return data || []
+    // Filtrar: para 'pending', só mostrar se thumbnail foi gerada
+    // Para 'regenerating' e 'approved' (retry), mostrar sempre
+    const filtered = (data || []).filter(item => {
+      if (item.thumbnail_approval_status === 'pending') {
+        // Só mostrar pending se thumbnail já foi gerada
+        return item.thumbnail_approval_data?.thumbnail_url != null
+      }
+      // Para regenerating e approved, sempre mostrar
+      return true
+    })
+
+    return filtered
 
   } catch (error) {
     console.error('❌ [getPendingThumbnailApprovals] Unexpected error:', error)
@@ -1075,6 +1323,7 @@ interface ApproveContentResult {
   success: boolean
   error?: string
   videoId?: number
+  webhookFailed?: boolean
 }
 
 interface ApprovalHistoryContent {
@@ -1100,15 +1349,17 @@ interface ApprovalHistoryContent {
 // ============================================================================
 
 /**
- * Aprova o pacote de conteúdo (script, teaser, description) e avança o vídeo para a próxima etapa.
+ * Aprova o pacote de conteúdo (script, teaser, description) e chama webhook create-cast.
  *
  * Fluxo:
  * 1. Valida se o vídeo está na etapa 'review_script' e content_approval_status 'pending'
- * 2. Atualiza content_approval_status para 'approved' com timestamp
- * 3. Avança o status do vídeo para 'create_cast' (próxima etapa)
+ * 2. Atualiza content_approval_status para 'approved' com timestamp (mas NÃO muda status ainda)
+ * 3. Chama webhook 'create-cast' para continuar pipeline
+ * 4. SE webhook OK: avança status para 'create_cast' (sai da fila)
+ * 5. SE webhook FALHA: status fica 'review_script', continua na fila com visual de erro + Retry
  *
  * @param videoId - ID do vídeo na tabela production_videos
- * @returns Resultado da operação com success/error
+ * @returns Resultado da operação com success/error e webhookFailed
  */
 export async function approveContent(
   videoId: number
@@ -1155,7 +1406,7 @@ export async function approveContent(
       }
     }
 
-    // 3. Atualizar vídeo: aprovar conteúdo + avançar status
+    // 3. Marcar como aprovado (mas NÃO avança status ainda - só avança se webhook funcionar)
     const now = new Date().toISOString()
 
     const { error: updateError } = await supabase
@@ -1164,7 +1415,7 @@ export async function approveContent(
         content_approval_status: 'approved',
         content_approved_at: now,
         // content_approved_by: 'user_email', // TODO: Integrar com sistema de autenticação
-        status: 'create_cast', // ⚡ AVANÇA PARA PRÓXIMA ETAPA DO WORKFLOW
+        // status: NÃO MUDA AINDA - só muda se webhook funcionar
         updated_at: now
       })
       .eq('id', videoId)
@@ -1177,9 +1428,78 @@ export async function approveContent(
     // 4. Revalidar página para atualizar UI
     revalidatePath('/production/approval-queue')
 
-    console.log(`✅ Content approved for video ${videoId}`)
+    console.log(`✅ Content marked as approved for video ${videoId} - Now calling webhook...`)
 
-    return { success: true, videoId }
+    // 5. Chamar webhook create-cast para continuar pipeline
+    let webhookFailed = false
+
+    try {
+      const { data: webhook, error: webhookFetchError } = await supabase
+        .from('production_webhooks')
+        .select('webhook_url, api_key')
+        .eq('name', 'create-cast')
+        .eq('is_active', true)
+        .single()
+
+      if (webhookFetchError) {
+        console.warn(`⚠️ [approveContent] Webhook create-cast not found or inactive:`, webhookFetchError.message)
+        webhookFailed = true
+      } else if (webhook) {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        }
+
+        if (webhook.api_key) {
+          headers['X-API-Key'] = webhook.api_key
+        }
+
+        const payload = {
+          production_video_id: videoId,
+          triggered_at: new Date().toISOString(),
+        }
+
+        console.log(`📤 [approveContent] Calling webhook create-cast for video ${videoId}...`)
+
+        const webhookResponse = await fetch(webhook.webhook_url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        })
+
+        if (webhookResponse.ok) {
+          console.log(`✅ [approveContent] Webhook create-cast called successfully (${webhookResponse.status})`)
+
+          // 6. Webhook OK! Agora sim avança o status para create_cast
+          const { error: advanceError } = await supabase
+            .from('production_videos')
+            .update({
+              status: 'create_cast', // ⚡ AVANÇA PARA PRÓXIMA ETAPA
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', videoId)
+
+          if (advanceError) {
+            console.error(`❌ [approveContent] Failed to advance status:`, advanceError)
+            // Não marca webhookFailed porque o webhook funcionou, só o update falhou
+          } else {
+            console.log(`✅ [approveContent] Video ${videoId} advanced to create_cast`)
+          }
+
+          revalidatePath('/production/approval-queue')
+        } else {
+          const errorText = await webhookResponse.text()
+          console.error(`❌ [approveContent] Webhook create-cast failed (${webhookResponse.status}):`, errorText)
+          webhookFailed = true
+        }
+      } else {
+        webhookFailed = true
+      }
+    } catch (webhookError) {
+      console.error(`❌ [approveContent] Webhook error:`, webhookError)
+      webhookFailed = true
+    }
+
+    return { success: true, videoId, webhookFailed }
 
   } catch (error) {
     console.error('Unexpected error in approveContent:', error)
@@ -1191,10 +1511,17 @@ export async function approveContent(
 }
 
 /**
- * Rejeita o pacote de conteúdo e marca para regeneração.
+ * Rejeita o pacote de conteúdo, marca para regeneração e chama webhook create-content.
+ *
+ * Fluxo:
+ * 1. Valida se o vídeo está na etapa 'review_script' e content_approval_status 'pending'
+ * 2. Atualiza content_approval_status para 'regenerating' e status para 'regenerate_script'
+ * 3. Chama webhook 'create-content' para regenerar conteúdo
+ * 4. Vídeo fica na fila com visual de loading (regenerando)
+ * 5. SE webhook FALHA: visual de erro + botão Retry
  *
  * @param videoId - ID do vídeo na tabela production_videos
- * @returns Resultado da operação com success/error
+ * @returns Resultado da operação com success/error e webhookFailed
  */
 export async function rejectContent(
   videoId: number
@@ -1232,15 +1559,13 @@ export async function rejectContent(
       }
     }
 
-    // 3. Marcar como rejeitado
+    // 3. Marcar como regenerating (não rejected!)
     const now = new Date().toISOString()
 
     const { error: updateError } = await supabase
       .from('production_videos')
       .update({
-        content_approval_status: 'rejected',
-        content_approved_at: now,
-        // content_approved_by: 'user_email',
+        content_approval_status: 'regenerating', // ⚡ REGENERATING, não rejected
         status: 'regenerate_script', // Status para regenerar conteúdo
         updated_at: now
       })
@@ -1255,7 +1580,59 @@ export async function rejectContent(
 
     console.log(`❌ Content rejected for video ${videoId} - Status changed to 'regenerate_script'`)
 
-    return { success: true, videoId }
+    // 4. Chamar webhook create-content para regenerar
+    let webhookFailed = false
+
+    try {
+      const { data: webhook, error: webhookFetchError } = await supabase
+        .from('production_webhooks')
+        .select('webhook_url, api_key')
+        .eq('name', 'create-content')
+        .eq('is_active', true)
+        .single()
+
+      if (webhookFetchError) {
+        console.warn(`⚠️ [rejectContent] Webhook create-content not found or inactive:`, webhookFetchError.message)
+        webhookFailed = true
+      } else if (webhook) {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        }
+
+        if (webhook.api_key) {
+          headers['X-API-Key'] = webhook.api_key
+        }
+
+        const payload = {
+          production_video_id: videoId,
+          triggered_at: new Date().toISOString(),
+          is_regeneration: true,
+        }
+
+        console.log(`📤 [rejectContent] Calling webhook create-content for video ${videoId} (regeneration)...`)
+
+        const webhookResponse = await fetch(webhook.webhook_url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        })
+
+        if (webhookResponse.ok) {
+          console.log(`✅ [rejectContent] Webhook create-content called successfully (${webhookResponse.status})`)
+        } else {
+          const errorText = await webhookResponse.text()
+          console.error(`❌ [rejectContent] Webhook create-content failed (${webhookResponse.status}):`, errorText)
+          webhookFailed = true
+        }
+      } else {
+        webhookFailed = true
+      }
+    } catch (webhookError) {
+      console.error(`❌ [rejectContent] Webhook error:`, webhookError)
+      webhookFailed = true
+    }
+
+    return { success: true, videoId, webhookFailed }
 
   } catch (error) {
     console.error('Unexpected error in rejectContent:', error)
@@ -1264,16 +1641,149 @@ export async function rejectContent(
 }
 
 /**
- * Busca todos os vídeos com conteúdo pendente de aprovação.
+ * Retry de webhook de conteúdo quando falhou.
  *
- * Critérios:
- * - status = 'review_script' (etapa de revisão de script)
- * - content_approval_status = 'pending' (aguardando aprovação)
- * - Pelo menos um dos campos script, teaser_script ou description deve existir
+ * Detecta automaticamente qual webhook chamar baseado no estado:
+ * - Se content_approval_status = 'approved' e status = 'review_script': chama 'create-cast'
+ *   (aprovação que falhou no webhook)
+ * - Se content_approval_status = 'regenerating' e status = 'regenerate_script': chama 'create-content'
+ *   (regeneração que falhou no webhook)
+ *
+ * @param videoId - ID do vídeo na tabela production_videos
+ * @returns Resultado da operação com success/error e webhookFailed
+ */
+export async function retryContentWebhook(
+  videoId: number
+): Promise<ApproveContentResult> {
+  try {
+    const supabase = createGobbiClient()
+
+    if (!supabase) {
+      return { success: false, error: 'Banco de dados do Gobbi não configurado' }
+    }
+
+    // 1. Buscar vídeo para determinar qual webhook chamar
+    const { data: video, error: fetchError } = await supabase
+      .from('production_videos')
+      .select('id, status, content_approval_status')
+      .eq('id', videoId)
+      .single()
+
+    if (fetchError || !video) {
+      return { success: false, error: 'Vídeo não encontrado' }
+    }
+
+    // 2. Determinar qual webhook chamar baseado no estado
+    let webhookName: string
+    let isRegeneration = false
+
+    if (video.content_approval_status === 'approved' && video.status === 'review_script') {
+      // Caso: Aprovação que falhou no webhook create-cast
+      webhookName = 'create-cast'
+    } else if (video.content_approval_status === 'regenerating' && video.status === 'regenerate_script') {
+      // Caso: Regeneração que falhou no webhook create-content
+      webhookName = 'create-content'
+      isRegeneration = true
+    } else {
+      return {
+        success: false,
+        error: `Estado inválido para retry. Status: ${video.status}, Approval: ${video.content_approval_status}`
+      }
+    }
+
+    // 3. Buscar e chamar o webhook
+    let webhookFailed = false
+
+    try {
+      const { data: webhook, error: webhookFetchError } = await supabase
+        .from('production_webhooks')
+        .select('webhook_url, api_key')
+        .eq('name', webhookName)
+        .eq('is_active', true)
+        .single()
+
+      if (webhookFetchError) {
+        console.warn(`⚠️ [retryContentWebhook] Webhook ${webhookName} not found or inactive:`, webhookFetchError.message)
+        webhookFailed = true
+      } else if (webhook) {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        }
+
+        if (webhook.api_key) {
+          headers['X-API-Key'] = webhook.api_key
+        }
+
+        const payload = {
+          production_video_id: videoId,
+          triggered_at: new Date().toISOString(),
+          is_regeneration: isRegeneration,
+          is_retry: true,
+        }
+
+        console.log(`📤 [retryContentWebhook] Calling webhook ${webhookName} for video ${videoId} (retry)...`)
+
+        const webhookResponse = await fetch(webhook.webhook_url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        })
+
+        if (webhookResponse.ok) {
+          console.log(`✅ [retryContentWebhook] Webhook ${webhookName} called successfully (${webhookResponse.status})`)
+
+          // Se foi create-cast e deu certo, agora avança o status
+          if (webhookName === 'create-cast') {
+            const { error: advanceError } = await supabase
+              .from('production_videos')
+              .update({
+                status: 'create_cast',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', videoId)
+
+            if (advanceError) {
+              console.error(`❌ [retryContentWebhook] Failed to advance status:`, advanceError)
+            } else {
+              console.log(`✅ [retryContentWebhook] Video ${videoId} advanced to create_cast`)
+            }
+          }
+
+          revalidatePath('/production/approval-queue')
+        } else {
+          const errorText = await webhookResponse.text()
+          console.error(`❌ [retryContentWebhook] Webhook ${webhookName} failed (${webhookResponse.status}):`, errorText)
+          webhookFailed = true
+        }
+      } else {
+        webhookFailed = true
+      }
+    } catch (webhookError) {
+      console.error(`❌ [retryContentWebhook] Webhook error:`, webhookError)
+      webhookFailed = true
+    }
+
+    return { success: true, videoId, webhookFailed }
+
+  } catch (error) {
+    console.error('Unexpected error in retryContentWebhook:', error)
+    return { success: false, error: 'Erro interno ao reenviar webhook' }
+  }
+}
+
+/**
+ * Busca todos os vídeos com conteúdo para exibir na fila de aprovação.
+ *
+ * Critérios (inclui múltiplos estados):
+ * 1. pending + review_script = aguardando aprovação normal
+ * 2. regenerating + regenerate_script = regenerando conteúdo (visual loading)
+ * 3. approved + review_script = aprovado mas webhook falhou (precisa retry)
+ *
+ * NOTA: Quando webhook create-cast funciona, status muda para 'create_cast' e sai da query.
  *
  * Retorna ordenado por created_at (mais antigos primeiro).
  *
- * @returns Array de vídeos com conteúdo pendente de aprovação
+ * @returns Array de vídeos com conteúdo para aprovação/retry
  */
 export async function getPendingContentApprovals(): Promise<PendingContent[]> {
   try {
@@ -1287,6 +1797,7 @@ export async function getPendingContentApprovals(): Promise<PendingContent[]> {
     console.log('🔍 [getPendingContentApprovals] Fetching pending content from Gobbi database...')
 
     // Query com JOIN para pegar dados do benchmark
+    // Inclui múltiplos estados para suportar regeneração e retry
     const { data, error } = await supabase
       .from('production_videos')
       .select(`
@@ -1306,8 +1817,8 @@ export async function getPendingContentApprovals(): Promise<PendingContent[]> {
           thumbnail_url
         )
       `)
-      .eq('content_approval_status', 'pending')
-      .eq('status', 'review_script')
+      .in('content_approval_status', ['pending', 'regenerating', 'approved'])
+      .in('status', ['review_script', 'regenerate_script'])
       .order('created_at', { ascending: true })
       .limit(50)
 
