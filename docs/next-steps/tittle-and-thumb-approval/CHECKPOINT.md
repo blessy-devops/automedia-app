@@ -72,7 +72,7 @@ Aprova um título e avança o workflow.
 1. Valida se vídeo está em `status='create_title'` e `title_approval_status='pending'`
 2. Atualiza campo `title` com título escolhido
 3. Marca `title_approval_status='approved'` com timestamp
-4. **Avança status para `'create_outline'`** (próxima etapa)
+4. **Avança status para `'create_script'`** (próxima etapa)
 5. Revalida página
 
 **Retorno:**
@@ -268,7 +268,7 @@ SET
   title = 'Título escolhido',
   title_approval_status = 'approved',
   title_approved_at = NOW(),
-  status = 'create_outline',
+  status = 'create_script',
   updated_at = NOW()
 WHERE id = SEU_VIDEO_ID;
 ```
@@ -323,7 +323,7 @@ graph TD
     D --> E[Plataforma: Fila Real-time<br/>/production/approval-queue]
     E --> F[Usuário: Seleciona e aprova título]
     F --> G[Server Action: approveTitle]
-    G --> H[DB Update:<br/>- title = escolhido<br/>- status = 'create_outline'<br/>- title_approval_status = 'approved']
+    G --> H[DB Update:<br/>- title = escolhido<br/>- status = 'create_script'<br/>- title_approval_status = 'approved']
     H --> I[Próximo workflow continua automaticamente]
 ```
 
@@ -332,7 +332,7 @@ graph TD
 ## 📝 NOTAS IMPORTANTES
 
 1. **Status do Workflow:**
-   - Ao aprovar, muda de `'create_title'` → `'create_outline'`
+   - Ao aprovar, muda de `'create_title'` → `'create_script'`
    - Baseado no schema do banco do Gobbi
 
 2. **Real-time:**

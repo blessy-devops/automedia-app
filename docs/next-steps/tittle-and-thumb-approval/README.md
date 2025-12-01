@@ -90,7 +90,7 @@ graph TD
     D --> E[Plataforma: Fila Real-time<br/>/production/approval-queue]
     E --> F[Usuário: Seleciona e aprova título]
     F --> G[Server Action: approveTitle]
-    G --> H[DB Update:<br/>- title = escolhido<br/>- status = 'create_outline'<br/>- title_approval_status = 'approved']
+    G --> H[DB Update:<br/>- title = escolhido<br/>- status = 'create_script'<br/>- title_approval_status = 'approved']
     H --> I[Próximo workflow continua]
 ```
 
@@ -164,7 +164,7 @@ SET
   title = 'Título escolhido',
   title_approval_status = 'approved',
   title_approved_at = NOW(),
-  status = 'create_outline',
+  status = 'create_script',
   updated_at = NOW()
 WHERE id = SEU_VIDEO_ID;
 ```
@@ -248,7 +248,7 @@ LIMIT 5;
 4. Verifique no banco que:
    - `title` foi atualizado com o título escolhido
    - `title_approval_status` = `'approved'`
-   - `status` mudou de `'create_title'` → `'create_outline'`
+   - `status` mudou de `'create_title'` → `'create_script'`
 
 ---
 
