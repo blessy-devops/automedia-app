@@ -283,7 +283,7 @@ export async function retryTitleRegenerationWebhook(
  * 1. Valida se o vídeo está na etapa 'create_title' e status 'pending'
  * 2. Atualiza o campo 'title' com o título escolhido
  * 3. Marca title_approval_status como 'approved' com timestamp
- * 4. Avança o status do vídeo para 'create_outline' (próxima etapa)
+ * 4. Avança o status do vídeo para 'create_script' (próxima etapa)
  *
  * @param videoId - ID do vídeo na tabela production_videos
  * @param selectedTitle - Título escolhido pelo usuário (pode ser o sugerido ou uma das alternativas)
@@ -341,7 +341,7 @@ export async function approveTitle(
         title_approval_status: 'approved',
         title_approved_at: now,
         // title_approved_by: 'user_email', // TODO: Integrar com sistema de autenticação quando disponível
-        status: 'create_outline', // ⚡ AVANÇA PARA PRÓXIMA ETAPA DO WORKFLOW
+        status: 'create_script', // ⚡ AVANÇA PARA PRÓXIMA ETAPA DO WORKFLOW
         updated_at: now
       })
       .eq('id', videoId)
