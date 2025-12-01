@@ -1,6 +1,6 @@
 'use server'
 
-import { createGobbiClient } from '@/lib/supabase/gobbi'
+import { createGobbiClient, createGobbiAdminClient } from '@/lib/supabase/gobbi'
 import { revalidatePath } from 'next/cache'
 
 // ============================================================================
@@ -357,6 +357,8 @@ export async function approveTitle(
     console.log(`✅ Title approved for video ${videoId}: "${selectedTitle.substring(0, 50)}..."`)
 
     // 5. Chamar webhook create-content para iniciar geração de roteiro
+    let webhookFailed = false
+
     try {
       const { data: webhook, error: webhookFetchError } = await supabase
         .from('production_webhooks')
@@ -367,6 +369,7 @@ export async function approveTitle(
 
       if (webhookFetchError) {
         console.warn(`⚠️ [approveTitle] Webhook create-content not found or inactive:`, webhookFetchError.message)
+        webhookFailed = true
       } else if (webhook) {
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
@@ -382,6 +385,8 @@ export async function approveTitle(
         }
 
         console.log(`📤 [approveTitle] Calling webhook create-content for video ${videoId}...`)
+        console.log(`📤 [approveTitle] Webhook URL: ${webhook.webhook_url}`)
+        console.log(`📤 [approveTitle] Payload:`, JSON.stringify(payload))
 
         const webhookResponse = await fetch(webhook.webhook_url, {
           method: 'POST',
@@ -394,14 +399,19 @@ export async function approveTitle(
         } else {
           const errorText = await webhookResponse.text()
           console.error(`❌ [approveTitle] Webhook create-content failed (${webhookResponse.status}):`, errorText)
+          webhookFailed = true
         }
+      } else {
+        console.warn(`⚠️ [approveTitle] Webhook create-content not found (no data returned)`)
+        webhookFailed = true
       }
     } catch (webhookError) {
       console.error(`❌ [approveTitle] Webhook error:`, webhookError)
+      webhookFailed = true
       // Não falha a operação principal - webhook é secundário
     }
 
-    return { success: true, videoId }
+    return { success: true, videoId, webhookFailed }
 
   } catch (error) {
     console.error('Unexpected error in approveTitle:', error)
@@ -836,21 +846,46 @@ export async function rejectThumbnail(
     }
 
     // 2. Validações
-    if (video.status !== 'create_thumbnail') {
+    // Permite rejeição tanto em create_thumbnail quanto em regenerate_thumbnail
+    // (caso webhook tenha falhado e usuário queira tentar novamente)
+    const validStatuses = ['create_thumbnail', 'regenerate_thumbnail']
+    if (!validStatuses.includes(video.status)) {
       return {
         success: false,
-        error: `Vídeo não está na etapa de criação de thumbnail`
+        error: `Vídeo não está na etapa de thumbnail (status atual: ${video.status})`
       }
     }
 
-    if (video.thumbnail_approval_status !== 'pending') {
+    // Permite rejeição se pending ou regenerating (retry após falha de webhook)
+    const validApprovalStatuses = ['pending', 'regenerating']
+    if (!validApprovalStatuses.includes(video.thumbnail_approval_status || '')) {
       return {
         success: false,
-        error: 'Thumbnail não está pendente de aprovação'
+        error: `Thumbnail não está pendente de aprovação (status: ${video.thumbnail_approval_status})`
       }
     }
 
-    // 3. Marcar como regenerating (não rejected!), salvar novo thumb_text e limpar dados
+    // 3. Deletar arquivo de thumbnail do storage antes de regenerar
+    const adminClient = createGobbiAdminClient()
+    if (adminClient) {
+      const thumbnailPath = `${videoId}_thumbnail_final.jpg`
+      console.log(`🗑️ [rejectThumbnail] Deleting thumbnail from storage: thumbnails/${thumbnailPath}`)
+
+      const { error: deleteError } = await adminClient.storage
+        .from('thumbnails')
+        .remove([thumbnailPath])
+
+      if (deleteError) {
+        console.warn(`⚠️ [rejectThumbnail] Failed to delete thumbnail from storage:`, deleteError.message)
+        // Não falha a operação, apenas loga o warning
+      } else {
+        console.log(`✅ [rejectThumbnail] Thumbnail deleted from storage successfully`)
+      }
+    } else {
+      console.warn(`⚠️ [rejectThumbnail] Admin client not available, skipping storage deletion`)
+    }
+
+    // 4. Marcar como regenerating, salvar novo thumb_text e limpar dados do banco
     const now = new Date().toISOString()
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -881,7 +916,7 @@ export async function rejectThumbnail(
 
     console.log(`❌ Thumbnail rejected for video ${videoId} - Status changed to 'regenerate_thumbnail'${newThumbText ? ` - New thumb_text: "${newThumbText.substring(0, 50)}..."` : ''}`)
 
-    // 4. Chamar webhook create-thumbnail para regenerar
+    // 5. Chamar webhook create-thumbnail para regenerar
     // N8N busca thumb_text diretamente da tabela production_videos
     let webhookFailed = false
 

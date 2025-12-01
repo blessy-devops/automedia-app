@@ -396,6 +396,9 @@ export function TitleApprovalQueue({
   // Loading state para retry de webhook de conteúdo
   const [isRetryingContentWebhook, setIsRetryingContentWebhook] = useState(false)
 
+  // IDs de vídeos com erro no webhook de thumbnail (regenerate)
+  const [thumbnailWebhookFailedIds, setThumbnailWebhookFailedIds] = useState<Set<number>>(new Set())
+
   // ============================================================================
   // REALTIME SUBSCRIPTION
   // ============================================================================
@@ -890,26 +893,36 @@ export function TitleApprovalQueue({
       )
 
       if (result.success) {
-        const message = isThumbTextModified
-          ? 'Thumbnail reprovada. Texto atualizado e pronto para regeneração.'
-          : 'Thumbnail reprovada e marcada para regeneração.'
-        toast.success(message)
-
-        // Optimistic update - remover da lista
-        setRemovedThumbnailIds((prev) => new Set(prev).add(selectedThumbnailItem.id))
-
         // Reset estados de edição
         setEditedThumbText('')
         setIsThumbTextModified(false)
 
-        // Mover para próximo item
-        const currentIndex = filteredThumbnails.findIndex((t) => t.id === selectedItemId)
-        const nextItem = filteredThumbnails[currentIndex + 1] || filteredThumbnails[currentIndex - 1]
+        // Atualizar item localmente para mostrar estado de regeneração
+        // NÃO removemos da lista - ele deve continuar aparecendo com visual de "Regenerando..."
+        setPendingThumbnails((prev) =>
+          prev.map((t) =>
+            t.id === selectedThumbnailItem.id
+              ? { ...t, status: 'regenerate_thumbnail', thumbnail_approval_status: 'regenerating' }
+              : t
+          )
+        )
 
-        if (nextItem) {
-          setSelectedItemId(nextItem.id)
+        // Se webhook falhou, marcar para mostrar erro
+        if (result.webhookFailed) {
+          setThumbnailWebhookFailedIds((prev) => new Set(prev).add(selectedThumbnailItem.id))
+          toast.warning('Thumbnail reprovada, mas o webhook falhou. Use o botão Retry.')
         } else {
-          setSelectedItemId(null)
+          // Limpar erro se existia antes
+          setThumbnailWebhookFailedIds((prev) => {
+            const next = new Set(prev)
+            next.delete(selectedThumbnailItem.id)
+            return next
+          })
+
+          const message = isThumbTextModified
+            ? 'Thumbnail reprovada. Texto atualizado e regenerando...'
+            : 'Thumbnail reprovada. Regenerando...'
+          toast.success(message)
         }
       } else {
         toast.error(result.error || 'Erro ao reprovar thumbnail')
@@ -1335,47 +1348,76 @@ export function TitleApprovalQueue({
                         </p>
                       </div>
                     ) : (
-                      filteredThumbnails.map((item) => (
-                        <button
-                          key={item.id}
-                          onClick={() => handleSelectItem(item.id)}
-                          className={`w-full text-left p-3 rounded-lg mb-2 transition-all ${
-                            selectedItemId === item.id
-                              ? 'bg-accent border-2 border-primary'
-                              : 'bg-muted/30 hover:bg-muted/50 border-2 border-transparent'
-                          }`}
-                        >
-                          {/* Thumbnail preview image */}
-                          <div className="aspect-video rounded mb-2 overflow-hidden border border-border">
-                            <img
-                              src={item.benchmark_videos?.thumbnail_url || '/placeholder-thumbnail.jpg'}
-                              alt={item.title || 'Thumbnail'}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
+                      filteredThumbnails.map((item) => {
+                        // Detectar estado de regeneração: status = 'regenerate_thumbnail' OU thumbnail_approval_status = 'regenerating'
+                        const isRegenerating = item.status === 'regenerate_thumbnail' || item.thumbnail_approval_status === 'regenerating'
+                        const hasWebhookError = thumbnailWebhookFailedIds.has(item.id)
 
-                          {/* Row 1: Canal + ID + Time (3 badges) */}
-                          <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            {item.placeholder && (
-                              <Badge className="bg-primary/10 text-primary border-primary/30 text-xs">
-                                {item.placeholder}
-                              </Badge>
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => handleSelectItem(item.id)}
+                            className={`relative w-full text-left p-3 rounded-lg mb-2 transition-all ${
+                              selectedItemId === item.id
+                                ? 'bg-accent border-2 border-primary'
+                                : hasWebhookError
+                                  ? 'bg-red-50/50 dark:bg-red-950/30 border-2 border-red-300 dark:border-red-700'
+                                  : isRegenerating
+                                    ? 'bg-yellow-50/50 dark:bg-yellow-950/30 border-2 border-yellow-300 dark:border-yellow-700'
+                                    : 'bg-muted/30 hover:bg-muted/50 border-2 border-transparent'
+                            }`}
+                          >
+                            {/* Overlay de Erro de Webhook */}
+                            {hasWebhookError && (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-500/10 rounded-lg z-10">
+                                <AlertTriangle className="w-6 h-6 text-red-500 mb-1" />
+                                <span className="text-xs font-medium text-red-600 dark:text-red-400">Webhook falhou</span>
+                              </div>
                             )}
-                            <Badge variant="outline" className="text-xs">
-                              ID: {item.id}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs gap-1">
-                              <Clock className="w-3 h-3" />
-                              {formatTimeAgo(item.created_at)}
-                            </Badge>
-                          </div>
 
-                          {/* Video Title */}
-                          <p className="text-xs font-medium line-clamp-2">
-                            {item.title || 'Sem título'}
-                          </p>
-                        </button>
-                      ))
+                            {/* Overlay de Regeneração (sem erro) */}
+                            {isRegenerating && !hasWebhookError && (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-yellow-500/10 rounded-lg z-10">
+                                <Loader2 className="w-6 h-6 text-yellow-600 dark:text-yellow-400 animate-spin mb-1" />
+                                <span className="text-xs font-medium text-yellow-600 dark:text-yellow-400">Regenerando...</span>
+                              </div>
+                            )}
+
+                            {/* Conteúdo do card (com blur se regenerating) */}
+                            <div className={isRegenerating || hasWebhookError ? 'blur-[1px] opacity-60' : ''}>
+                              {/* Thumbnail preview image */}
+                              <div className="aspect-video rounded mb-2 overflow-hidden border border-border">
+                                <img
+                                  src={item.benchmark_videos?.thumbnail_url || '/placeholder-thumbnail.jpg'}
+                                  alt={item.title || 'Thumbnail'}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+
+                              {/* Row 1: Canal + ID + Time (3 badges) */}
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                {item.placeholder && (
+                                  <Badge className="bg-primary/10 text-primary border-primary/30 text-xs">
+                                    {item.placeholder}
+                                  </Badge>
+                                )}
+                                <Badge variant="outline" className="text-xs">
+                                  ID: {item.id}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {formatTimeAgo(item.created_at)}
+                                </Badge>
+                              </div>
+
+                              {/* Video Title */}
+                              <p className="text-xs font-medium line-clamp-2">
+                                {item.title || 'Sem título'}
+                              </p>
+                            </div>
+                          </button>
+                        )
+                      })
                     )}
                   </div>
                 )}
@@ -1733,110 +1775,173 @@ export function TitleApprovalQueue({
                 {/* =============================================== */}
                 {activeTab === 'thumbnails' && selectedThumbnailItem && (
                   <div className="max-w-4xl mx-auto space-y-6">
-                    {/* Seção 1: Grid de Comparação 2 Colunas */}
-                    <div className="grid grid-cols-2 gap-6">
-                      {/* Coluna 1: Thumbnail de Referência (Original) */}
-                      <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <p className="text-xs uppercase tracking-wide font-medium text-muted-foreground">
-                            Referência (Original)
-                          </p>
-                        </div>
-                        <div className="aspect-video rounded-lg border-2 border-border overflow-hidden bg-muted/20">
-                          <img
-                            src={selectedThumbnailItem.benchmark_videos?.thumbnail_url || '/placeholder-thumbnail.jpg'}
-                            alt="Reference Thumbnail"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Coluna 2: Thumbnail Gerada pelo Claude */}
-                      <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <Sparkles className="w-4 h-4 text-yellow-600 dark:text-yellow-500" />
-                          <p className="text-xs uppercase tracking-wide font-medium text-yellow-700 dark:text-yellow-500">
-                            Gerada pelo Claude
-                          </p>
-                        </div>
-                        <div className="aspect-video rounded-lg border-2 border-primary overflow-hidden bg-muted/20 relative group cursor-pointer">
-                          <img
-                            src={selectedThumbnailItem.thumbnail_approval_data?.thumbnail_url || '/placeholder-thumbnail.jpg'}
-                            alt="Generated Thumbnail"
-                            className="w-full h-full object-cover"
-                          />
-                          {/* Overlay com botão de preview ao hover */}
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center">
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => handlePreviewThumbnail(selectedThumbnailItem.thumbnail_approval_data?.thumbnail_url || '/placeholder-thumbnail.jpg')}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity gap-2"
-                            >
-                              <Maximize2 className="w-4 h-4" />
-                              Visualizar Ampliado
-                            </Button>
+                    {/* Estado de Regeneração ou Erro de Webhook */}
+                    {selectedThumbnailItem.status === 'regenerate_thumbnail' ||
+                     selectedThumbnailItem.thumbnail_approval_status === 'regenerating' ? (
+                      thumbnailWebhookFailedIds.has(selectedThumbnailItem.id) ? (
+                        // Estado de ERRO - Webhook falhou
+                        <div className="flex flex-col items-center justify-center py-16">
+                          <div className="relative mb-6">
+                            <AlertTriangle className="w-16 h-16 text-red-500" />
                           </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Seção 2: Thumb Text Editor Card (Orange Gradient) */}
-                    <div className="bg-gradient-to-r from-orange-500/10 to-amber-500/10 border-l-4 border-orange-500 p-4 rounded-lg">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl">✏️</span>
-                          <h3 className="font-semibold text-orange-700 dark:text-orange-500">THUMB TEXT</h3>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {isThumbTextModified && (
-                            <Badge className="bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-500/30">
-                              <Pencil className="w-3 h-3 mr-1" />
-                              Editado
-                            </Badge>
-                          )}
-                          <Badge variant="outline" className="font-mono text-xs">
-                            {editedThumbText.length} caracteres
-                          </Badge>
-                        </div>
-                      </div>
-                      <Textarea
-                        value={editedThumbText}
-                        onChange={(e) => {
-                          setEditedThumbText(e.target.value)
-                          setIsThumbTextModified(e.target.value !== (selectedThumbnailItem?.thumb_text || ''))
-                        }}
-                        placeholder="Digite o texto que aparecerá na thumbnail..."
-                        className="min-h-[100px] bg-background/50 border-orange-500/30 focus:border-orange-500"
-                      />
-                      {isThumbTextModified && (
-                        <div className="flex items-center justify-between mt-2">
-                          <p className="text-xs text-orange-700 dark:text-orange-400">
-                            O texto editado será salvo ao clicar em "Reprovar e Regerar"
+                          <h3 className="text-xl font-semibold mb-2 text-red-600 dark:text-red-400">
+                            Erro ao Chamar Webhook
+                          </h3>
+                          <p className="text-muted-foreground text-center max-w-md mb-6">
+                            A thumbnail foi marcada para regeneração, mas o webhook create-thumbnail não conseguiu ser chamado.
+                            Clique no botão abaixo para tentar novamente.
                           </p>
                           <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setEditedThumbText(selectedThumbnailItem?.thumb_text || '')
-                              setIsThumbTextModified(false)
-                            }}
-                            className="gap-1 text-xs text-orange-700 hover:text-orange-800 dark:text-orange-400"
+                            onClick={() => handleRejectAndRegenerateThumbnail()}
+                            disabled={isApproving}
+                            className="gap-2 mb-4"
+                            variant="destructive"
                           >
-                            <RotateCcw className="w-3 h-3" />
-                            Resetar
+                            {isApproving ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-4 h-4" />
+                            )}
+                            Tentar Novamente
                           </Button>
+                          <p className="text-xs text-muted-foreground">
+                            ID: {selectedThumbnailItem.id} | Status: {selectedThumbnailItem.status} | Approval: {selectedThumbnailItem.thumbnail_approval_status}
+                          </p>
                         </div>
-                      )}
-                    </div>
+                      ) : (
+                        // Estado de LOADING - Regenerando thumbnail
+                        <div className="flex flex-col items-center justify-center py-16">
+                          <div className="relative mb-6">
+                            <Loader2 className="w-16 h-16 text-yellow-500 animate-spin" />
+                          </div>
+                          <h3 className="text-xl font-semibold mb-2">Regenerando Thumbnail...</h3>
+                          <p className="text-muted-foreground text-center max-w-md mb-4">
+                            O N8N está gerando uma nova thumbnail com base no texto atualizado.
+                            Aguarde alguns segundos...
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
+                            <span>ID: {selectedThumbnailItem.id}</span>
+                            <span>•</span>
+                            <span>Placeholder: {selectedThumbnailItem.placeholder || 'N/A'}</span>
+                          </div>
+                          {/* Mostrar thumb_text que está sendo usado */}
+                          {selectedThumbnailItem.thumb_text && (
+                            <div className="bg-muted/30 border border-border p-4 rounded-lg max-w-lg">
+                              <p className="text-xs text-muted-foreground mb-2">Texto da thumbnail:</p>
+                              <p className="text-sm">{selectedThumbnailItem.thumb_text}</p>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    ) : (
+                      // Estado NORMAL - Mostrar comparação para aprovação
+                      <>
+                        {/* Seção 1: Grid de Comparação 2 Colunas */}
+                        <div className="grid grid-cols-2 gap-6">
+                          {/* Coluna 1: Thumbnail de Referência (Original) */}
+                          <div>
+                            <div className="flex items-center gap-2 mb-3">
+                              <p className="text-xs uppercase tracking-wide font-medium text-muted-foreground">
+                                Referência (Original)
+                              </p>
+                            </div>
+                            <div className="aspect-video rounded-lg border-2 border-border overflow-hidden bg-muted/20">
+                              <img
+                                src={selectedThumbnailItem.benchmark_videos?.thumbnail_url || '/placeholder-thumbnail.jpg'}
+                                alt="Reference Thumbnail"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          </div>
 
-                    {/* Seção 3: Dica Informativa */}
-                    <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg">
-                      <p className="text-xs text-blue-700 dark:text-blue-400">
-                        <span className="font-medium">Dica:</span> Se a thumbnail gerada não atender às expectativas,
-                        edite o texto acima e clique em "Reprovar e Regerar" para gerar uma nova versão com o texto atualizado.
-                      </p>
-                    </div>
+                          {/* Coluna 2: Thumbnail Gerada pelo Claude */}
+                          <div>
+                            <div className="flex items-center gap-2 mb-3">
+                              <Sparkles className="w-4 h-4 text-yellow-600 dark:text-yellow-500" />
+                              <p className="text-xs uppercase tracking-wide font-medium text-yellow-700 dark:text-yellow-500">
+                                Gerada pelo Claude
+                              </p>
+                            </div>
+                            <div className="aspect-video rounded-lg border-2 border-primary overflow-hidden bg-muted/20 relative group cursor-pointer">
+                              <img
+                                src={selectedThumbnailItem.thumbnail_approval_data?.thumbnail_url || '/placeholder-thumbnail.jpg'}
+                                alt="Generated Thumbnail"
+                                className="w-full h-full object-cover"
+                              />
+                              {/* Overlay com botão de preview ao hover */}
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center">
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => handlePreviewThumbnail(selectedThumbnailItem.thumbnail_approval_data?.thumbnail_url || '/placeholder-thumbnail.jpg')}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity gap-2"
+                                >
+                                  <Maximize2 className="w-4 h-4" />
+                                  Visualizar Ampliado
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Seção 2: Thumb Text Editor Card (Orange Gradient) */}
+                        <div className="bg-gradient-to-r from-orange-500/10 to-amber-500/10 border-l-4 border-orange-500 p-4 rounded-lg">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-2xl">✏️</span>
+                              <h3 className="font-semibold text-orange-700 dark:text-orange-500">THUMB TEXT</h3>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {isThumbTextModified && (
+                                <Badge className="bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-500/30">
+                                  <Pencil className="w-3 h-3 mr-1" />
+                                  Editado
+                                </Badge>
+                              )}
+                              <Badge variant="outline" className="font-mono text-xs">
+                                {editedThumbText.length} caracteres
+                              </Badge>
+                            </div>
+                          </div>
+                          <Textarea
+                            value={editedThumbText}
+                            onChange={(e) => {
+                              setEditedThumbText(e.target.value)
+                              setIsThumbTextModified(e.target.value !== (selectedThumbnailItem?.thumb_text || ''))
+                            }}
+                            placeholder="Digite o texto que aparecerá na thumbnail..."
+                            className="min-h-[100px] bg-background/50 border-orange-500/30 focus:border-orange-500"
+                          />
+                          {isThumbTextModified && (
+                            <div className="flex items-center justify-between mt-2">
+                              <p className="text-xs text-orange-700 dark:text-orange-400">
+                                O texto editado será salvo ao clicar em "Reprovar e Regerar"
+                              </p>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setEditedThumbText(selectedThumbnailItem?.thumb_text || '')
+                                  setIsThumbTextModified(false)
+                                }}
+                                className="gap-1 text-xs text-orange-700 hover:text-orange-800 dark:text-orange-400"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                Resetar
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Seção 3: Dica Informativa */}
+                        <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg">
+                          <p className="text-xs text-blue-700 dark:text-blue-400">
+                            <span className="font-medium">Dica:</span> Se a thumbnail gerada não atender às expectativas,
+                            edite o texto acima e clique em "Reprovar e Regerar" para gerar uma nova versão com o texto atualizado.
+                          </p>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -2046,58 +2151,75 @@ export function TitleApprovalQueue({
               )}
 
               {/* Action Bar para Thumbnails */}
-              {activeTab === 'thumbnails' && selectedThumbnailItem && (
-                <div className="border-t border-border bg-card p-4 flex-shrink-0">
-                  <div className="max-w-4xl mx-auto flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
-                      {isThumbTextModified ? (
-                        <span className="text-orange-600 dark:text-orange-400">
-                          Texto editado - clique em "Reprovar e Regerar" para salvar
-                        </span>
-                      ) : (
-                        <span>Pronto para aprovar ou regenerar</span>
+              {activeTab === 'thumbnails' && selectedThumbnailItem && (() => {
+                const isThumbnailRegenerating = selectedThumbnailItem.status === 'regenerate_thumbnail' ||
+                                                 selectedThumbnailItem.thumbnail_approval_status === 'regenerating'
+                const hasThumbnailWebhookError = thumbnailWebhookFailedIds.has(selectedThumbnailItem.id)
+
+                // Não mostrar action bar se está regenerando (exceto se tem erro de webhook)
+                if (isThumbnailRegenerating && !hasThumbnailWebhookError) {
+                  return null
+                }
+
+                return (
+                  <div className="border-t border-border bg-card p-4 flex-shrink-0">
+                    <div className="max-w-4xl mx-auto flex items-center justify-between">
+                      <div className="text-sm text-muted-foreground">
+                        {hasThumbnailWebhookError ? (
+                          <span className="text-red-600 dark:text-red-400">
+                            Webhook falhou - clique em "Tentar Novamente" acima
+                          </span>
+                        ) : isThumbTextModified ? (
+                          <span className="text-orange-600 dark:text-orange-400">
+                            Texto editado - clique em "Reprovar e Regerar" para salvar
+                          </span>
+                        ) : (
+                          <span>Pronto para aprovar ou regenerar</span>
+                        )}
+                      </div>
+                      {!hasThumbnailWebhookError && (
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={handleRejectAndRegenerateThumbnail}
+                            disabled={isApproving}
+                            className="gap-2"
+                          >
+                            {isApproving ? (
+                              <>
+                                <span className="animate-spin">⏳</span>
+                                Processando...
+                              </>
+                            ) : (
+                              <>
+                                <RotateCcw className="w-4 h-4" />
+                                Reprovar e Regerar
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            onClick={handleApproveThumbnail}
+                            disabled={isApproving}
+                            className="gap-2"
+                          >
+                            {isApproving ? (
+                              <>
+                                <span className="animate-spin">⏳</span>
+                                Aprovando...
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="w-4 h-4" />
+                                Aprovar & Next
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       )}
                     </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={handleRejectAndRegenerateThumbnail}
-                        disabled={isApproving}
-                        className="gap-2"
-                      >
-                        {isApproving ? (
-                          <>
-                            <span className="animate-spin">⏳</span>
-                            Processando...
-                          </>
-                        ) : (
-                          <>
-                            <RotateCcw className="w-4 h-4" />
-                            Reprovar e Regerar
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        onClick={handleApproveThumbnail}
-                        disabled={isApproving}
-                        className="gap-2"
-                      >
-                        {isApproving ? (
-                          <>
-                            <span className="animate-spin">⏳</span>
-                            Aprovando...
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="w-4 h-4" />
-                            Aprovar & Next
-                          </>
-                        )}
-                      </Button>
-                    </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
 
               {/* Action Bar para Content */}
               {activeTab === 'content' && selectedContentItem && (() => {
