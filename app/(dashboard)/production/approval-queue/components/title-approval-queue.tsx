@@ -8,6 +8,7 @@ import {
   FileText,
   Clock,
   AlertCircle,
+  AlertTriangle,
   Brain,
   Target,
   Filter,
@@ -18,7 +19,9 @@ import {
   Package,
   Video,
   User,
-  RotateCcw
+  RotateCcw,
+  RefreshCw,
+  Loader2
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -32,7 +35,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { createClient } from '@supabase/supabase-js'
-import { approveTitle, approveThumbnail, rejectThumbnail, approveContent, rejectContent } from '../actions'
+import { approveTitle, rejectTitle, retryTitleRegenerationWebhook, approveThumbnail, rejectThumbnail, approveContent, rejectContent } from '../actions'
 import { toast } from 'sonner'
 
 // ============================================================================
@@ -66,6 +69,7 @@ interface PendingTitle {
   placeholder?: string | null
   title_approval_data: TitleApprovalData
   title_approval_status: string | null
+  status: string // 'create_title' | 'regenerate_title'
   created_at: string
   benchmark_id: number | null
   benchmark_videos?: {
@@ -338,6 +342,12 @@ export function TitleApprovalQueue({
   // Items removidos localmente (optimistic update)
   const [removedTitleIds, setRemovedTitleIds] = useState<Set<number>>(new Set())
 
+  // IDs de vídeos com erro no webhook de regeneração
+  const [webhookFailedIds, setWebhookFailedIds] = useState<Set<number>>(new Set())
+
+  // Loading state para retry de webhook
+  const [isRetryingWebhook, setIsRetryingWebhook] = useState(false)
+
   // Histórico de aprovações de títulos
   const [titleHistory, setTitleHistory] = useState<ApprovalHistoryTitle[]>(initialTitleHistory)
 
@@ -406,23 +416,45 @@ export function TitleApprovalQueue({
         {
           event: '*',
           schema: 'public',
-          table: 'production_videos',
-          filter: 'title_approval_status=eq.pending'
+          table: 'production_videos'
+          // Removido filtro para capturar todas as mudanças relevantes
         },
         (payload) => {
           console.log('⚡ [Realtime] Update received:', payload)
 
+          const newData = payload.new as any
+          const oldData = payload.old as any
+
           if (payload.eventType === 'INSERT') {
             // Novo título pendente
-            setPendingTitles((prev) => [...prev, payload.new as PendingTitle])
+            if (newData.title_approval_status === 'pending' && newData.status === 'create_title') {
+              setPendingTitles((prev) => [...prev, newData as PendingTitle])
+            }
           } else if (payload.eventType === 'UPDATE') {
-            // Título foi aprovado ou rejeitado
-            if (payload.new.title_approval_status !== 'pending') {
-              setPendingTitles((prev) => prev.filter((t) => t.id !== payload.new.id))
+            // Título voltou de regenerating para pending (regeneração concluída)
+            if (
+              oldData?.title_approval_status === 'regenerating' &&
+              newData.title_approval_status === 'pending' &&
+              newData.status === 'create_title'
+            ) {
+              setPendingTitles((prev) =>
+                prev.map((t) => (t.id === newData.id ? (newData as PendingTitle) : t))
+              )
+              toast.success(`Novos títulos gerados para o vídeo #${newData.id}!`)
+            }
+            // Título foi aprovado definitivamente - remover da lista
+            else if (newData.title_approval_status === 'approved') {
+              setPendingTitles((prev) => prev.filter((t) => t.id !== newData.id))
+            }
+            // Título entrou em regeneração (atualização via outro cliente)
+            else if (newData.status === 'regenerate_title' && newData.title_approval_status === 'regenerating') {
+              setPendingTitles((prev) =>
+                prev.map((t) => (t.id === newData.id ? (newData as PendingTitle) : t))
+              )
             }
           } else if (payload.eventType === 'DELETE') {
             // Título foi deletado
-            setPendingTitles((prev) => prev.filter((t) => t.id !== payload.old.id))
+            setPendingTitles((prev) => prev.filter((t) => t.id !== oldData.id))
           }
         }
       )
@@ -647,7 +679,7 @@ export function TitleApprovalQueue({
   }
 
   /**
-   * Rejeitar título atual e avançar para próximo
+   * Rejeitar título atual e disparar regeneração
    */
   const handleRejectTitle = async () => {
     if (!selectedTitle) {
@@ -655,22 +687,81 @@ export function TitleApprovalQueue({
       return
     }
 
-    // TODO: Implementar rejeição no backend
-    // Por enquanto, apenas remove da lista localmente
-    toast.info('Funcionalidade de rejeição será implementada em breve')
+    setIsApproving(true)
 
-    setRemovedTitleIds((prev) => new Set(prev).add(selectedTitle.id))
+    try {
+      const result = await rejectTitle(selectedTitle.id)
 
-    // Auto-avançar
-    const currentIndex = visiblePendingTitles.findIndex((t) => t.id === selectedItemId)
-    const nextTitle = visiblePendingTitles[currentIndex + 1] || visiblePendingTitles[currentIndex - 1]
+      if (result.success) {
+        // Atualizar estado local para mostrar loading imediatamente
+        setPendingTitles(prev => prev.map(t =>
+          t.id === selectedTitle.id
+            ? { ...t, status: 'regenerate_title', title_approval_status: 'regenerating' }
+            : t
+        ))
 
-    if (nextTitle) {
-      setSelectedItemId(nextTitle.id)
-      setSelectedTitleIndex(undefined)
-    } else {
-      setSelectedItemId(null)
-      setSelectedTitleIndex(undefined)
+        // Se o webhook falhou, marcar para mostrar botão de retry
+        if (result.webhookFailed) {
+          setWebhookFailedIds(prev => new Set(prev).add(selectedTitle.id))
+          toast.error('Título marcado para regeneração, mas o webhook falhou. Use o botão para tentar novamente.')
+        } else {
+          // Limpar erro se existia
+          setWebhookFailedIds(prev => {
+            const next = new Set(prev)
+            next.delete(selectedTitle.id)
+            return next
+          })
+          toast.info('Título rejeitado. Regenerando...')
+        }
+
+        // Mover para próximo item que não esteja regenerando
+        const currentIndex = visiblePendingTitles.findIndex((t) => t.id === selectedItemId)
+        const nextTitle = visiblePendingTitles.find((t, i) =>
+          i > currentIndex && t.status !== 'regenerate_title'
+        ) || visiblePendingTitles.find((t, i) =>
+          i < currentIndex && t.status !== 'regenerate_title'
+        )
+
+        if (nextTitle) {
+          setSelectedItemId(nextTitle.id)
+          setSelectedTitleIndex(undefined)
+        }
+      } else {
+        toast.error(result.error || 'Erro ao rejeitar título')
+      }
+    } catch (error) {
+      console.error('Error rejecting title:', error)
+      toast.error('Erro ao rejeitar título')
+    } finally {
+      setIsApproving(false)
+    }
+  }
+
+  /**
+   * Retry do webhook de regeneração de título
+   */
+  const handleRetryWebhook = async (videoId: number) => {
+    setIsRetryingWebhook(true)
+
+    try {
+      const result = await retryTitleRegenerationWebhook(videoId)
+
+      if (result.success && !result.webhookFailed) {
+        toast.success('Webhook chamado com sucesso! Regenerando título...')
+        // Remover da lista de erros
+        setWebhookFailedIds(prev => {
+          const next = new Set(prev)
+          next.delete(videoId)
+          return next
+        })
+      } else {
+        toast.error(result.error || 'Erro ao chamar webhook')
+      }
+    } catch (error) {
+      console.error('Error retrying webhook:', error)
+      toast.error('Erro ao tentar novamente')
+    } finally {
+      setIsRetryingWebhook(false)
     }
   }
 
@@ -1028,43 +1119,91 @@ export function TitleApprovalQueue({
                         </p>
                       </div>
                     ) : (
-                      filteredTitles.map((item) => (
-                        <button
-                          key={item.id}
-                          onClick={() => handleSelectItem(item.id)}
-                          className={`w-full text-left p-3 rounded-lg mb-2 transition-all ${
-                            selectedItemId === item.id
-                              ? 'bg-accent border-2 border-primary'
-                              : 'bg-muted/30 hover:bg-muted/50 border-2 border-transparent'
-                          }`}
-                        >
-                          {/* Row 1: Canal + ID + Time (3 badges) */}
-                          <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            {item.placeholder && (
-                              <Badge className="bg-primary/10 text-primary border-primary/30 text-xs">
-                                {item.placeholder}
-                              </Badge>
+                      filteredTitles.map((item) => {
+                        const isRegenerating = item.status === 'regenerate_title'
+                        const hasWebhookError = webhookFailedIds.has(item.id)
+
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => !isRegenerating && handleSelectItem(item.id)}
+                            disabled={isRegenerating && !hasWebhookError}
+                            className={`w-full text-left p-3 rounded-lg mb-2 transition-all relative ${
+                              hasWebhookError
+                                ? 'bg-red-500/5 border-2 border-dashed border-red-500/40'
+                                : isRegenerating
+                                  ? 'opacity-70 cursor-not-allowed bg-yellow-500/5 border-2 border-dashed border-yellow-500/40'
+                                  : selectedItemId === item.id
+                                    ? 'bg-accent border-2 border-primary'
+                                    : 'bg-muted/30 hover:bg-muted/50 border-2 border-transparent'
+                            }`}
+                          >
+                            {/* Overlay de Erro de Webhook */}
+                            {hasWebhookError && (
+                              <div className="flex items-center justify-between gap-2 mb-2 px-2 py-1.5 bg-red-500/20 rounded">
+                                <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+                                  <AlertTriangle className="w-3.5 h-3.5" />
+                                  <span className="text-xs font-medium">Webhook falhou</span>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleRetryWebhook(item.id)
+                                  }}
+                                  disabled={isRetryingWebhook}
+                                  className="h-6 px-2 text-xs gap-1 border-red-500/30 text-red-700 dark:text-red-400 hover:bg-red-500/10"
+                                >
+                                  {isRetryingWebhook ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <RefreshCw className="w-3 h-3" />
+                                  )}
+                                  Retry
+                                </Button>
+                              </div>
                             )}
-                            <Badge variant="outline" className="text-xs">
-                              ID: {item.id}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs gap-1">
-                              <Clock className="w-3 h-3" />
-                              {formatTimeAgo(item.created_at)}
-                            </Badge>
-                          </div>
 
-                          {/* Row 3: Reference Title */}
-                          <p className="text-xs text-muted-foreground mb-1 line-clamp-2">
-                            {item.benchmark_videos?.title || 'No reference title'}
-                          </p>
+                            {/* Overlay de Regeneração (sem erro) */}
+                            {isRegenerating && !hasWebhookError && (
+                              <div className="flex items-center gap-2 mb-2 px-2 py-1.5 bg-yellow-500/20 rounded text-yellow-700 dark:text-yellow-400">
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <span className="text-xs font-medium">Regenerando título...</span>
+                              </div>
+                            )}
 
-                          {/* Row 4: Suggested Title */}
-                          <p className="text-xs font-medium line-clamp-2">
-                            {item.title_approval_data.title}
-                          </p>
-                        </button>
-                      ))
+                            {/* Conteúdo do card - com blur se regenerating */}
+                            <div className={isRegenerating ? 'blur-[1px] opacity-60' : ''}>
+                              {/* Row 1: Canal + ID + Time (3 badges) */}
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                {item.placeholder && (
+                                  <Badge className="bg-primary/10 text-primary border-primary/30 text-xs">
+                                    {item.placeholder}
+                                  </Badge>
+                                )}
+                                <Badge variant="outline" className="text-xs">
+                                  ID: {item.id}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {formatTimeAgo(item.created_at)}
+                                </Badge>
+                              </div>
+
+                              {/* Row 3: Reference Title */}
+                              <p className="text-xs text-muted-foreground mb-1 line-clamp-2">
+                                {item.benchmark_videos?.title || 'No reference title'}
+                              </p>
+
+                              {/* Row 4: Suggested Title */}
+                              <p className="text-xs font-medium line-clamp-2">
+                                {item.title_approval_data.title}
+                              </p>
+                            </div>
+                          </button>
+                        )
+                      })
                     )}
                   </div>
                 )}
@@ -1208,6 +1347,76 @@ export function TitleApprovalQueue({
                 {/* =============================================== */}
                 {activeTab === 'titles' && selectedTitle && (
                   <div className="max-w-4xl mx-auto space-y-4">
+                    {/* Estado de Regeneração ou Erro de Webhook */}
+                    {selectedTitle.status === 'regenerate_title' ? (
+                      webhookFailedIds.has(selectedTitle.id) ? (
+                        // Estado de ERRO - Webhook falhou
+                        <div className="flex flex-col items-center justify-center py-16">
+                          <div className="relative mb-6">
+                            <AlertTriangle className="w-16 h-16 text-red-500" />
+                          </div>
+                          <h3 className="text-xl font-semibold mb-2 text-red-600 dark:text-red-400">
+                            Erro ao Chamar Webhook
+                          </h3>
+                          <p className="text-muted-foreground text-center max-w-md mb-6">
+                            O título foi marcado para regeneração, mas o webhook não conseguiu ser chamado.
+                            Clique no botão abaixo para tentar novamente.
+                          </p>
+                          <Button
+                            onClick={() => handleRetryWebhook(selectedTitle.id)}
+                            disabled={isRetryingWebhook}
+                            className="gap-2 mb-4"
+                          >
+                            {isRetryingWebhook ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Tentando...
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="w-4 h-4" />
+                                Tentar Novamente
+                              </>
+                            )}
+                          </Button>
+                          <div className="flex gap-2">
+                            <Badge variant="outline" className="gap-2">
+                              <Clock className="w-3 h-3" />
+                              Video ID: {selectedTitle.id}
+                            </Badge>
+                            {selectedTitle.placeholder && (
+                              <Badge className="bg-primary/10 text-primary border-primary/30">
+                                {selectedTitle.placeholder}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        // Estado de LOADING - Regenerando normalmente
+                        <div className="flex flex-col items-center justify-center py-16">
+                          <div className="relative mb-6">
+                            <Sparkles className="w-16 h-16 text-yellow-500" />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <Loader2 className="w-20 h-20 text-yellow-500/30 animate-spin" />
+                            </div>
+                          </div>
+                          <h3 className="text-xl font-semibold mb-2">Regenerando Título</h3>
+                          <p className="text-muted-foreground text-center max-w-md mb-4">
+                            O título está sendo regenerado pela IA. Isso pode levar alguns segundos...
+                          </p>
+                          <Badge variant="outline" className="gap-2">
+                            <Clock className="w-3 h-3" />
+                            Video ID: {selectedTitle.id}
+                          </Badge>
+                          {selectedTitle.placeholder && (
+                            <Badge className="mt-2 bg-primary/10 text-primary border-primary/30">
+                              {selectedTitle.placeholder}
+                            </Badge>
+                          )}
+                        </div>
+                      )
+                    ) : (
+                    <>
                     {/* Reference Section */}
                     <div className="bg-muted/50 border border-border p-4 rounded-lg">
                       <p className="text-xs uppercase tracking-wide font-medium text-muted-foreground mb-2">
@@ -1347,6 +1556,8 @@ export function TitleApprovalQueue({
                         </label>
                       ))}
                     </div>
+                    </>
+                    )}
                   </div>
                 )}
 
@@ -1565,7 +1776,12 @@ export function TitleApprovalQueue({
                 <div className="border-t border-border bg-card p-4 flex-shrink-0">
                   <div className="max-w-4xl mx-auto flex items-center justify-between">
                     <div className="text-sm text-muted-foreground">
-                      {selectedTitleIndex !== undefined ? (
+                      {selectedTitle.status === 'regenerate_title' ? (
+                        <span className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Regenerando título...
+                        </span>
+                      ) : selectedTitleIndex !== undefined ? (
                         <span>Option {selectedTitleIndex + 1} selected</span>
                       ) : (
                         <span>Select a title to continue</span>
@@ -1575,7 +1791,7 @@ export function TitleApprovalQueue({
                       <Button
                         variant="outline"
                         onClick={handleRejectTitle}
-                        disabled={isApproving}
+                        disabled={isApproving || selectedTitle.status === 'regenerate_title'}
                         className="gap-2"
                       >
                         <XCircle className="w-4 h-4" />
@@ -1583,7 +1799,7 @@ export function TitleApprovalQueue({
                       </Button>
                       <Button
                         onClick={handleApproveTitle}
-                        disabled={selectedTitleIndex === undefined || isApproving}
+                        disabled={selectedTitleIndex === undefined || isApproving || selectedTitle.status === 'regenerate_title'}
                         className="gap-2"
                       >
                         {isApproving ? (

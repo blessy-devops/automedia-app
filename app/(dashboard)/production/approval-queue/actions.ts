@@ -38,11 +38,243 @@ interface ApproveTitleResult {
   success: boolean
   error?: string
   videoId?: number
+  webhookFailed?: boolean // Indica se o webhook falhou (para mostrar botão de retry)
 }
 
 // ============================================================================
 // SERVER ACTIONS
 // ============================================================================
+
+/**
+ * Rejeita o título atual e dispara regeneração via webhook.
+ *
+ * Fluxo:
+ * 1. Valida se o vídeo está em 'create_title' e 'pending'
+ * 2. Atualiza status para 'regenerate_title'
+ * 3. Atualiza title_approval_status para 'regenerating'
+ * 4. Chama webhook 'create-tittle' para N8N regenerar
+ *
+ * @param videoId - ID do vídeo na tabela production_videos
+ * @returns Resultado da operação com success/error
+ */
+export async function rejectTitle(
+  videoId: number
+): Promise<ApproveTitleResult> {
+  try {
+    const supabase = createGobbiClient()
+
+    if (!supabase) {
+      return { success: false, error: 'Banco de dados do Gobbi não configurado' }
+    }
+
+    // 1. Buscar vídeo atual para validações
+    const { data: video, error: fetchError } = await supabase
+      .from('production_videos')
+      .select('id, status, title_approval_status')
+      .eq('id', videoId)
+      .single()
+
+    if (fetchError || !video) {
+      console.error('Error fetching video:', fetchError)
+      return { success: false, error: 'Vídeo não encontrado' }
+    }
+
+    // 2. Validações de estado
+    if (video.status !== 'create_title') {
+      return {
+        success: false,
+        error: `Vídeo não está na etapa de criação de título. Status atual: ${video.status}`
+      }
+    }
+
+    if (video.title_approval_status !== 'pending') {
+      return {
+        success: false,
+        error: 'Título não está pendente de aprovação'
+      }
+    }
+
+    // 3. Atualizar vídeo: marcar para regeneração
+    const now = new Date().toISOString()
+
+    const { error: updateError } = await supabase
+      .from('production_videos')
+      .update({
+        status: 'regenerate_title',
+        title_approval_status: 'regenerating',
+        updated_at: now
+        // NÃO limpa title_approval_data - mantém para mostrar loading
+      })
+      .eq('id', videoId)
+
+    if (updateError) {
+      console.error('Error updating video:', updateError)
+      return { success: false, error: 'Erro ao atualizar vídeo no banco de dados' }
+    }
+
+    // 4. Revalidar página
+    revalidatePath('/production/approval-queue')
+
+    console.log(`❌ Title rejected for video ${videoId} - Status changed to 'regenerate_title'`)
+
+    // 5. Chamar webhook create-tittle para regenerar
+    let webhookFailed = false
+
+    try {
+      const { data: webhook, error: webhookFetchError } = await supabase
+        .from('production_webhooks')
+        .select('webhook_url, api_key')
+        .eq('name', 'create-tittle')
+        .eq('is_active', true)
+        .single()
+
+      if (webhookFetchError) {
+        console.warn(`⚠️ [rejectTitle] Webhook create-tittle not found or inactive:`, webhookFetchError.message)
+        webhookFailed = true
+      } else if (webhook) {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        }
+
+        if (webhook.api_key) {
+          headers['X-API-Key'] = webhook.api_key
+        }
+
+        const payload = {
+          production_video_id: videoId,
+          triggered_at: new Date().toISOString(),
+          is_regeneration: true,
+        }
+
+        console.log(`📤 [rejectTitle] Calling webhook create-tittle for video ${videoId} (regeneration)...`)
+
+        const webhookResponse = await fetch(webhook.webhook_url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        })
+
+        if (webhookResponse.ok) {
+          console.log(`✅ [rejectTitle] Webhook create-tittle called successfully (${webhookResponse.status})`)
+        } else {
+          const errorText = await webhookResponse.text()
+          console.error(`❌ [rejectTitle] Webhook create-tittle failed (${webhookResponse.status}):`, errorText)
+          webhookFailed = true
+        }
+      } else {
+        webhookFailed = true
+      }
+    } catch (webhookError) {
+      console.error(`❌ [rejectTitle] Webhook error:`, webhookError)
+      webhookFailed = true
+    }
+
+    return { success: true, videoId, webhookFailed }
+
+  } catch (error) {
+    console.error('Unexpected error in rejectTitle:', error)
+    return {
+      success: false,
+      error: 'Erro interno ao rejeitar título'
+    }
+  }
+}
+
+/**
+ * Retry do webhook de regeneração de título.
+ * Usado quando o webhook falhou na primeira tentativa.
+ *
+ * @param videoId - ID do vídeo na tabela production_videos
+ * @returns Resultado da operação com success/error
+ */
+export async function retryTitleRegenerationWebhook(
+  videoId: number
+): Promise<ApproveTitleResult> {
+  try {
+    const supabase = createGobbiClient()
+
+    if (!supabase) {
+      return { success: false, error: 'Banco de dados do Gobbi não configurado' }
+    }
+
+    // 1. Verificar se o vídeo está em regenerate_title
+    const { data: video, error: fetchError } = await supabase
+      .from('production_videos')
+      .select('id, status, title_approval_status')
+      .eq('id', videoId)
+      .single()
+
+    if (fetchError || !video) {
+      return { success: false, error: 'Vídeo não encontrado' }
+    }
+
+    if (video.status !== 'regenerate_title') {
+      return {
+        success: false,
+        error: `Vídeo não está em regeneração. Status atual: ${video.status}`
+      }
+    }
+
+    // 2. Chamar webhook create-tittle
+    const { data: webhook, error: webhookFetchError } = await supabase
+      .from('production_webhooks')
+      .select('webhook_url, api_key')
+      .eq('name', 'create-tittle')
+      .eq('is_active', true)
+      .single()
+
+    if (webhookFetchError || !webhook) {
+      return {
+        success: false,
+        error: 'Webhook create-tittle não encontrado ou inativo',
+        webhookFailed: true
+      }
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+
+    if (webhook.api_key) {
+      headers['X-API-Key'] = webhook.api_key
+    }
+
+    const payload = {
+      production_video_id: videoId,
+      triggered_at: new Date().toISOString(),
+      is_regeneration: true,
+    }
+
+    console.log(`📤 [retryTitleRegenerationWebhook] Retrying webhook for video ${videoId}...`)
+
+    const webhookResponse = await fetch(webhook.webhook_url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    })
+
+    if (webhookResponse.ok) {
+      console.log(`✅ [retryTitleRegenerationWebhook] Webhook called successfully (${webhookResponse.status})`)
+      return { success: true, videoId, webhookFailed: false }
+    } else {
+      const errorText = await webhookResponse.text()
+      console.error(`❌ [retryTitleRegenerationWebhook] Webhook failed (${webhookResponse.status}):`, errorText)
+      return {
+        success: false,
+        error: `Webhook falhou: ${webhookResponse.status}`,
+        webhookFailed: true
+      }
+    }
+
+  } catch (error) {
+    console.error('Unexpected error in retryTitleRegenerationWebhook:', error)
+    return {
+      success: false,
+      error: 'Erro ao chamar webhook',
+      webhookFailed: true
+    }
+  }
+}
 
 /**
  * Aprova um título selecionado e avança o vídeo para a próxima etapa do workflow.
@@ -204,6 +436,7 @@ export async function getPendingTitleApprovals(): Promise<PendingApproval[]> {
     console.log('🔍 [getPendingTitleApprovals] Fetching pending titles from Gobbi database...')
 
     // Primeiro: tentar query completa COM JOIN
+    // Inclui tanto títulos pendentes (pending) quanto em regeneração (regenerating)
     let { data, error } = await supabase
       .from('production_videos')
       .select(`
@@ -220,8 +453,8 @@ export async function getPendingTitleApprovals(): Promise<PendingApproval[]> {
           thumbnail_url
         )
       `)
-      .eq('title_approval_status', 'pending')
-      .eq('status', 'create_title')
+      .in('title_approval_status', ['pending', 'regenerating'])
+      .in('status', ['create_title', 'regenerate_title'])
       .order('created_at', { ascending: true })
       .limit(50)
 
@@ -240,8 +473,8 @@ export async function getPendingTitleApprovals(): Promise<PendingApproval[]> {
           benchmark_id,
           status
         `)
-        .eq('title_approval_status', 'pending')
-        .eq('status', 'create_title')
+        .in('title_approval_status', ['pending', 'regenerating'])
+        .in('status', ['create_title', 'regenerate_title'])
         .order('created_at', { ascending: true })
         .limit(50)
 

@@ -1,400 +1,485 @@
-# 🚀 Production Pipeline - Guia de Deploy
+# Production Pipeline - Guia Completo
 
-**Data:** 2025-11-16
-**Status:** Pronto para Deploy
-**Objetivo:** Implementar fila de produção com processamento sequencial
-
----
-
-## 📋 O Que Foi Implementado
-
-### ✅ Mudanças no Código
-
-1. **Status Inicial Corrigido** (`actions.ts:235`)
-   - **Antes:** `status: 'create_title'`
-   - **Agora:** `status: 'queued'`
-   - Vídeos agora entram na fila ao invés de ir direto para produção
-
-2. **Edge Function Criada** (`production-pipeline-starter`)
-   - Verifica se já tem vídeo processando (catraca)
-   - Pega próximo vídeo em `queued`
-   - Inicia processamento: `is_processing = true` + `status = create_title`
+**Data:** 2025-11-30
+**Status:** Em Produção
+**Versão:** 2.0.0
 
 ---
 
-## 🔄 Fluxo Completo
+## Visão Geral
+
+O Production Pipeline é o sistema de fila de produção de vídeos. Ele controla:
+1. **Catraca** - Limite de vídeos simultâneos em produção
+2. **Webhooks** - Integração com N8N para automação
+3. **Status** - Ciclo de vida completo do vídeo
+
+---
+
+## Arquitetura
+
+### Componentes Principais
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│ 1. USER DISTRIBUI VÍDEO (UI)                                   │
-│    /production/distribution                                     │
-│    → Seleciona canais                                          │
-│    → Clica "Distribute"                                        │
-└─────────────────┬──────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│ 1. UI: /production/distribution                                         │
+│    → User seleciona canais e distribui vídeo                           │
+│    → Server Action: distributeVideoToChannels()                         │
+│    → Cria production_video com status = 'queued'                        │
+└─────────────────┬──────────────────────────────────────────────────────┘
                   │
                   ▼
-┌────────────────────────────────────────────────────────────────┐
-│ 2. SERVER ACTION: distributeVideoToChannels()                  │
-│    → Cria production_videos com status = 'queued'              │
-│    → Marca benchmark_video como 'used'                         │
-│    → Video SAI da tela /production/distribution                │
-└─────────────────┬──────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│ 2. CATRACA: production-pipeline-starter (Cron a cada 2min)             │
+│    → Verifica slots disponíveis (MAX_CONCURRENT_VIDEOS = 3)            │
+│    → Pega próximo vídeo em 'queued'                                    │
+│    → Marca: is_processing = true, status = 'create_title'              │
+│    → Chama webhook: create-tittle                                       │
+└─────────────────┬──────────────────────────────────────────────────────┘
                   │
                   ▼
-┌────────────────────────────────────────────────────────────────┐
-│ 3. PRODUCTION VIDEOS PAGE                                      │
-│    /production-videos                                           │
-│    → Vídeo aparece com status "Queued"                         │
-└─────────────────┬──────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│ 3. N8N: Gera títulos para o vídeo                                      │
+│    → Recebe: { production_video_id, triggered_at }                     │
+│    → Gera 3 opções de título                                           │
+│    → Atualiza: status = 'pending_approval'                             │
+└─────────────────┬──────────────────────────────────────────────────────┘
                   │
                   ▼
-┌────────────────────────────────────────────────────────────────┐
-│ 4. CRON #2: production-pipeline-starter (a cada 2min)          │
-│    → Verifica: já tem vídeo processando?                       │
-│    → Se NÃO: pega primeiro 'queued'                           │
-│    → Marca: is_processing = true                               │
-│    → Muda: status = 'create_title' (1ª etapa)                 │
-└─────────────────┬──────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│ 4. UI: /production/approval-queue                                       │
+│    → User visualiza títulos gerados                                     │
+│    → Escolhe: Approve (seleciona título) ou Put on Hold                │
+└─────────────────┬──────────────────────────────────────────────────────┘
                   │
                   ▼
-┌────────────────────────────────────────────────────────────────┐
-│ 5. PRODUCTION PIPELINE (15 stages)                             │
-│    → create_title → create_hook → ... → completed              │
-│    (Isso já está implementado no N8N por enquanto)             │
-└────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│ 5. SERVER ACTION: approveTitle()                                        │
+│    → Salva título escolhido                                             │
+│    → Atualiza: status = 'approved'                                      │
+│    → Chama webhook: create-content                                      │
+└─────────────────┬──────────────────────────────────────────────────────┘
+                  │
+                  ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ 6. N8N: Pipeline de Produção (13+ etapas)                              │
+│    → create_script → create_audio → ... → create_thumbnail             │
+│    → Ao final: status = 'scheduled' ou 'published'                     │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🚀 Passos de Deploy
+## Catraca (production-pipeline-starter)
 
-### PASSO 1: Verificar Cron Job #1 (5 min)
+### O Que É
 
-O Cron Job #1 (`production-queue-control`) já deveria estar rodando. Vamos verificar:
+A "catraca" é o controle de concorrência que limita quantos vídeos podem estar em produção simultânea. Funciona como uma catraca de metrô - só deixa passar quando tem espaço.
 
-1. Acesse o **SQL Editor** do Gobbi:
-   ```
-   https://supabase.com/dashboard/project/eafkhsmgrzywrhviisdl/sql/new
-   ```
+### Arquivo
 
-2. Cole e execute as queries do arquivo:
-   ```
-   verify-cron-jobs.sql
-   ```
+`supabase/functions/production-pipeline-starter/index.ts`
 
-3. **Verifique especificamente a seção #2** (production-queue-control)
+### Configuração
 
-**Resultados Esperados:**
-- ✅ Job existe e está ativo (`active = true`)
-- ✅ Schedule é `*/2 * * * *` (a cada 2min)
-- ✅ Últimas execuções têm `status = 'succeeded'`
+```typescript
+// Número máximo de vídeos em produção simultânea (default: 3)
+const MAX_CONCURRENT_VIDEOS = parseInt(Deno.env.get('MAX_CONCURRENT_VIDEOS') || '3', 10)
+```
 
-**Se o job NÃO existir:**
-- Ele foi criado antes mas pode ter sido deletado
-- Recriar seguindo o guia em `CHECKPOINT-2025-11-16.md`
-
----
-
-### PASSO 2: Deploy da Edge Function (5 min)
-
-No terminal local:
-
+Para alterar o limite:
 ```bash
-# Certifique-se de estar no diretório correto
-cd /Users/daviluis/Documents/automedia-platform/automedia
-
-# Deploy da Edge Function
-supabase functions deploy production-pipeline-starter \
-  --project-ref eafkhsmgrzywrhviisdl \
-  --no-verify-jwt
-
-# Verificar deploy
-supabase functions list --project-ref eafkhsmgrzywrhviisdl
+# Via secrets do Supabase
+npx supabase secrets set MAX_CONCURRENT_VIDEOS=5 --project-ref PROJECT_REF
 ```
 
-**Resultado esperado:**
+### Lógica de Bloqueio
+
+A catraca **NÃO** conta como "em processamento" vídeos com status:
+- `canceled` - Vídeo cancelado
+- `completed` - Vídeo finalizado (legacy)
+- `scheduled` - Vídeo agendado para publicação
+- `published` - Vídeo já publicado
+
+Isso significa que vídeos `scheduled` e `published` **não bloqueiam** novos vídeos de entrar em produção.
+
+```typescript
+// Query que verifica vídeos em processamento
+const { data: processingVideos } = await supabase
+  .from('production_videos')
+  .select('id, placeholder, status, is_processing')
+  .eq('is_processing', true)
+  .neq('status', 'canceled')
+  .neq('status', 'completed')
+  .neq('status', 'scheduled')
+  .neq('status', 'published')
+  .limit(MAX_CONCURRENT_VIDEOS)
 ```
-production-pipeline-starter (deployed)
+
+### Fluxo de Execução
+
+1. **Verifica slots** - Quantos vídeos estão em produção ativa?
+2. **Se cheio** - Retorna `{ status: 'blocked' }` e não faz nada
+3. **Se tem slot** - Busca próximo vídeo em `queued` (FIFO por `created_at`)
+4. **Inicia produção** - Marca `is_processing = true`, `status = 'create_title'`
+5. **Chama webhook** - Dispara `create-tittle` para N8N iniciar geração de títulos
+
+### Resposta da Edge Function
+
+```json
+// Sem vídeos na fila
+{ "status": "idle", "message": "No videos in queue" }
+
+// Fila cheia
+{
+  "status": "blocked",
+  "message": "Maximum concurrent videos reached (3/3)",
+  "current_count": 3,
+  "max_concurrent": 3,
+  "processing_videos": [
+    { "id": 189, "placeholder": "P-189", "status": "create_audio" },
+    { "id": 190, "placeholder": "P-190", "status": "create_script" },
+    { "id": 191, "placeholder": "P-191", "status": "pending_approval" }
+  ]
+}
+
+// Vídeo iniciado
+{
+  "status": "started",
+  "video_id": 192,
+  "video_placeholder": "P-192",
+  "benchmark_id": 26500,
+  "new_status": "create_title",
+  "webhook": { "called": true, "status": 200, "error": null }
+}
 ```
 
 ---
 
-### PASSO 3: Testar Edge Function Manualmente (5 min)
+## Webhooks
 
-Antes de configurar o cron, teste se a função funciona:
-
-```bash
-# Obter ANON_KEY do dashboard do Gobbi
-# https://supabase.com/dashboard/project/eafkhsmgrzywrhviisdl/settings/api
-
-# Testar função (trocar ANON_KEY_AQUI)
-curl -X POST \
-  'https://eafkhsmgrzywrhviisdl.supabase.co/functions/v1/production-pipeline-starter' \
-  -H 'Authorization: Bearer ANON_KEY_AQUI' \
-  -H 'Content-Type: application/json'
-```
-
-**Respostas esperadas:**
-
-Se não tem vídeos em queued:
-```json
-{"status":"idle","message":"No videos in queue"}
-```
-
-Se tem vídeo processando:
-```json
-{"status":"blocked","message":"A video is already being processed",...}
-```
-
-Se iniciou vídeo:
-```json
-{"status":"started","video_id":123,"new_status":"create_title",...}
-```
-
----
-
-### PASSO 4: Configurar Cron Job #2 (10 min)
-
-1. Acesse o **SQL Editor** do Gobbi
-
-2. **Obtenha a ANON_KEY:**
-   ```
-   https://supabase.com/dashboard/project/eafkhsmgrzywrhviisdl/settings/api
-   ```
-   Copie o valor de "anon public"
-
-3. Cole e execute (substituindo `ANON_KEY_AQUI`):
+### Tabela: production_webhooks
 
 ```sql
+CREATE TABLE public.production_webhooks (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL UNIQUE,
+  webhook_url TEXT NOT NULL,
+  api_key TEXT,
+  webhook_type VARCHAR(50),
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+### Webhooks Configurados
+
+| name | webhook_type | Disparado quando | Payload |
+|------|-------------|------------------|---------|
+| `create-tittle` | creation | Vídeo entra em produção (queued → create_title) | `{ production_video_id, triggered_at }` |
+| `create-content` | creation | Título é aprovado (pending_approval → approved) | `{ production_video_id, triggered_at }` |
+
+### Autenticação
+
+Os webhooks usam **Header Auth** com `X-API-Key`:
+
+```typescript
+const headers: Record<string, string> = {
+  'Content-Type': 'application/json',
+}
+
+if (webhook.api_key) {
+  headers['X-API-Key'] = webhook.api_key
+}
+```
+
+### Configuração no N8N
+
+1. No node Webhook, selecione **Authentication: Header Auth**
+2. Crie uma credential com:
+   - **Header Name:** `X-API-Key`
+   - **Header Value:** (a mesma key do banco)
+3. Salve e ative o workflow
+
+### Gerar API Key
+
+```sql
+-- Gerar e salvar uma API key
+UPDATE production_webhooks
+SET api_key = 'sk_prod_' || encode(gen_random_bytes(24), 'hex')
+WHERE name = 'create-tittle'
+RETURNING name, api_key;
+```
+
+---
+
+## Status do Vídeo
+
+### Ciclo de Vida Completo
+
+```
+queued
+  │
+  ▼ (catraca libera slot)
+create_title ──────────────────────────┐
+  │                                    │
+  ▼ (N8N gera títulos)                 │
+pending_approval                       │
+  │                                    │
+  ├──► on_hold (user pausou)           │
+  │                                    │
+  ▼ (user aprova título)               │
+approved                               │
+  │                                    │
+  ▼ (N8N continua pipeline)            │
+create_hook                            │
+  │                                    │ (qualquer etapa pode falhar)
+  ▼                                    │
+create_script                          │
+  │                                    │
+  ▼                                    │
+create_audio                           ├──► failed
+  │                                    │
+  ▼                                    │
+create_segments                        │
+  │                                    │
+  ▼                                    │
+create_images                          │
+  │                                    │
+  ▼                                    │
+create_render                          │
+  │                                    │
+  ▼                                    │
+create_thumbnail                       │
+  │                                    │
+  ▼                                    │
+create_youtube_metadata ───────────────┘
+  │
+  ▼
+scheduled (agendado para publicação)
+  │
+  ▼ (data de publicação chegou)
+published (vídeo publicado no YouTube)
+```
+
+### Status Especiais
+
+| Status | Cor | Descrição |
+|--------|-----|-----------|
+| `queued` | Yellow | Aguardando slot na fila |
+| `pending_approval` | Amber | Aguardando aprovação de título |
+| `on_hold` | Blue | Pausado pelo usuário |
+| `scheduled` | Purple | Agendado para publicação |
+| `published` | Green | Publicado no YouTube |
+| `failed` | Red | Erro em alguma etapa |
+| `canceled` | Gray | Cancelado pelo usuário |
+
+### Flags Importantes
+
+- `is_processing = true` → Vídeo está em produção ativa (conta para catraca)
+- `is_processing = false` → Vídeo finalizado, pausado ou cancelado
+
+---
+
+## Aprovação de Títulos
+
+### Arquivo
+
+`app/(dashboard)/production/approval-queue/actions.ts`
+
+### Função: approveTitle()
+
+```typescript
+export async function approveTitle(
+  videoId: number,
+  selectedTitleIndex: number
+): Promise<{ success: boolean; error?: string }>
+```
+
+### Fluxo
+
+1. Busca o vídeo e suas opções de título
+2. Valida que o vídeo está em `pending_approval`
+3. Salva o título escolhido no campo `title`
+4. Atualiza status para `approved`
+5. **Chama webhook `create-content`** para continuar o pipeline
+
+### Webhook create-content
+
+Disparado após aprovação do título:
+
+```typescript
+// Buscar webhook
+const { data: webhook } = await supabase
+  .from('production_webhooks')
+  .select('webhook_url, api_key')
+  .eq('name', 'create-content')
+  .eq('is_active', true)
+  .single()
+
+// Payload enviado ao N8N
+const payload = {
+  production_video_id: videoId,
+  triggered_at: new Date().toISOString(),
+}
+```
+
+---
+
+## Deploy
+
+### 1. Deploy da Edge Function
+
+```bash
+cd /Users/daviluis/Documents/automedia-platform/automedia
+
+npx supabase functions deploy production-pipeline-starter \
+  --project-ref PROJECT_REF
+
+# Verificar deploy
+npx supabase functions list --project-ref PROJECT_REF
+```
+
+### 2. Configurar Cron Job
+
+```sql
+-- No SQL Editor do Supabase
 SELECT cron.schedule(
   'production-pipeline-starter',
   '*/2 * * * *',  -- a cada 2 minutos
   $$
-  SELECT
-    net.http_post(
-      url := 'https://eafkhsmgrzywrhviisdl.supabase.co/functions/v1/production-pipeline-starter',
-      headers := '{"Content-Type": "application/json", "Authorization": "Bearer ANON_KEY_AQUI"}'::jsonb,
-      body := '{}'::jsonb
-    ) as request_id;
+  SELECT net.http_post(
+    url := 'https://PROJECT_REF.supabase.co/functions/v1/production-pipeline-starter',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer ANON_KEY"}'::jsonb,
+    body := '{}'::jsonb
+  ) as request_id;
   $$
 );
 ```
 
-4. **Verificar criação:**
+### 3. Verificar Cron
 
 ```sql
-SELECT * FROM cron.job WHERE jobname = 'production-pipeline-starter';
-```
+-- Listar jobs
+SELECT jobname, schedule, active FROM cron.job;
 
-Deve retornar 1 linha com `active = true`.
-
----
-
-### PASSO 5: Monitorar Execuções (10 min)
-
-#### Verificar Logs da Edge Function
-
-```bash
-# Terminal local - logs em tempo real
-supabase functions logs production-pipeline-starter \
-  --project-ref eafkhsmgrzywrhviisdl \
-  --follow
-```
-
-Aguarde até 2 minutos. Você deve ver:
-```
-[Pipeline Starter] Starting production queue check...
-[Pipeline Starter] No videos processing - queue is clear
-[Pipeline Starter] No videos in queue
-```
-
-#### Verificar Execuções do Cron (SQL)
-
-```sql
--- Últimas 5 execuções
-SELECT
-  runid,
-  status,
-  start_time,
-  end_time
+-- Ver execuções recentes
+SELECT runid, status, start_time, end_time
 FROM cron.job_run_details
 WHERE jobid = (SELECT jobid FROM cron.job WHERE jobname = 'production-pipeline-starter')
 ORDER BY start_time DESC
-LIMIT 5;
+LIMIT 10;
 ```
 
-**Resultado esperado:**
-- `status = 'succeeded'`
-- Execuções a cada 2 minutos
-
----
-
-### PASSO 6: Teste End-to-End (15 min)
-
-Agora vamos testar o fluxo completo:
-
-#### 6.1. Criar Vídeo de Teste
-
-1. Acesse: `http://localhost:7001/production/distribution`
-
-2. Se não tiver vídeos, crie um manualmente no banco:
-
-```sql
--- Verificar vídeos disponíveis
-SELECT id, title, status
-FROM benchmark_videos
-WHERE status = 'available'
-LIMIT 5;
-
--- Marcar um como add_to_production
-UPDATE benchmark_videos
-SET status = 'add_to_production'
-WHERE id = 26388;  -- usar ID real
-```
-
-3. Aguarde até 2min (Cron #1 vai mover para pending_distribution)
-
-4. Verifique que apareceu em `/production/distribution`
-
-#### 6.2. Distribuir Vídeo
-
-1. Na UI, selecione canais (mesmo que não tenha match, use "Remove from Queue" se necessário, ou crie canais matching)
-
-2. Clique "Distribute"
-
-3. **Verificar no banco:**
-
-```sql
--- Vídeo deve estar em 'queued'
-SELECT id, placeholder, status, is_processing
-FROM production_videos
-WHERE benchmark_id = 26388;
--- Esperado: status = 'queued', is_processing = false
-
--- Benchmark video deve estar 'used'
-SELECT id, status
-FROM benchmark_videos
-WHERE id = 26388;
--- Esperado: status = 'used'
-```
-
-#### 6.3. Aguardar Pipeline Starter
-
-Aguarde até 2 minutos. Monitore os logs:
+### 4. Monitorar Logs
 
 ```bash
-supabase functions logs production-pipeline-starter \
-  --project-ref eafkhsmgrzywrhviisdl \
+npx supabase functions logs production-pipeline-starter \
+  --project-ref PROJECT_REF \
   --follow
 ```
 
-Deve ver:
-```
-[Pipeline Starter] Found next video: {...}
-[Pipeline Starter] Video started processing: 123
-```
-
-#### 6.4. Verificar Mudança de Status
-
-```sql
--- Vídeo deve estar em 'create_title'
-SELECT id, placeholder, status, is_processing
-FROM production_videos
-WHERE benchmark_id = 26388;
--- Esperado: status = 'create_title', is_processing = true
-```
-
-#### 6.5. Verificar na UI
-
-1. Acesse: `http://localhost:7001/production-videos`
-2. Vídeo deve aparecer com badge "Create Title" (ou equivalente)
-3. Status deve mostrar que está em processamento
-
 ---
 
-## ✅ Checklist Final
+## Troubleshooting
 
-- [ ] Cron Job #1 (production-queue-control) está ativo
-- [ ] Cron Job #1 executando a cada 2min sem erros
-- [ ] Edge Function production-pipeline-starter deployed
-- [ ] Teste manual da Edge Function funcionando
-- [ ] Cron Job #2 (production-pipeline-starter) criado
-- [ ] Cron Job #2 executando a cada 2min sem erros
-- [ ] Teste end-to-end: vídeo vai de distribution → queued → create_title
-- [ ] UI de distribution remove vídeo após distribuir (status = used)
-- [ ] UI de production mostra vídeo com status correto
-
----
-
-## 🐛 Troubleshooting
-
-### Vídeo não sai de 'queued'
+### Vídeo travado em 'queued'
 
 **Possíveis causas:**
-1. Cron Job #2 não está rodando
-   - Verificar: `SELECT * FROM cron.job WHERE jobname = 'production-pipeline-starter'`
-2. Já tem vídeo processando (catraca bloqueada)
-   - Verificar: `SELECT * FROM production_videos WHERE is_processing = true`
-3. Edge Function com erro
-   - Ver logs: `supabase functions logs production-pipeline-starter`
+1. Cron não está rodando
+2. Fila cheia (3 vídeos em produção)
+3. Edge function com erro
 
 **Solução:**
 ```sql
--- Se vídeo está travado (is_processing = true há muito tempo)
+-- Verificar vídeos em produção
+SELECT id, placeholder, status, is_processing
+FROM production_videos
+WHERE is_processing = true
+  AND status NOT IN ('canceled', 'completed', 'scheduled', 'published');
+
+-- Se travado, resetar
 UPDATE production_videos
 SET is_processing = false
-WHERE id = 123 AND is_processing = true;
+WHERE id = XXX;
 ```
 
-### Vídeo não aparece em /production/distribution
+### Vídeo cancelado ainda aparece como "Processing"
 
-**Possíveis causas:**
-1. Cron Job #1 não está rodando
-2. Status não é 'pending_distribution'
+**Causa:** `is_processing` ficou `true` mesmo após cancelamento
+
+**Solução:**
+```sql
+UPDATE production_videos
+SET is_processing = false
+WHERE status = 'canceled' AND is_processing = true;
+```
+
+### Webhook não está sendo chamado
 
 **Verificar:**
+1. Webhook existe e está ativo?
 ```sql
-SELECT id, status FROM benchmark_videos WHERE id = 26388;
+SELECT name, webhook_url, api_key, is_active
+FROM production_webhooks
+WHERE name IN ('create-tittle', 'create-content');
 ```
 
-### Cron Jobs não executando
+2. URL está correta?
+3. API Key bate com o N8N?
 
-**Verificar extensão pg_cron:**
+### Catraca bloqueando mesmo com slots disponíveis
+
+**Verificar status dos vídeos:**
 ```sql
-SELECT * FROM pg_extension WHERE extname = 'pg_cron';
+SELECT id, placeholder, status, is_processing
+FROM production_videos
+WHERE is_processing = true
+ORDER BY created_at DESC;
 ```
 
-Se não existir:
+Se há vídeos `scheduled` ou `published` com `is_processing = true`, corrija:
 ```sql
-CREATE EXTENSION IF NOT EXISTS pg_cron;
+UPDATE production_videos
+SET is_processing = false
+WHERE status IN ('scheduled', 'published') AND is_processing = true;
 ```
 
 ---
 
-## 📊 Métricas de Sucesso
+## Testes
 
-Após 1 hora rodando:
+### Testar Catraca Manualmente
 
-- ✅ Pelo menos 30 execuções de cada cron (1 a cada 2min)
-- ✅ Nenhum erro crítico nos logs
-- ✅ Vídeos movendo automaticamente: distribution → queued → create_title
-- ✅ Sistema não processando 2 vídeos ao mesmo tempo (catraca funcionando)
-- ✅ UI de distribution funcionando perfeitamente
+```bash
+curl -X POST \
+  'https://PROJECT_REF.supabase.co/functions/v1/production-pipeline-starter' \
+  -H 'Authorization: Bearer ANON_KEY' \
+  -H 'Content-Type: application/json'
+```
+
+### Testar Webhook Diretamente
+
+```bash
+# Testar create-tittle
+curl -X POST 'WEBHOOK_URL' \
+  -H 'Content-Type: application/json' \
+  -H 'X-API-Key: API_KEY' \
+  -d '{"production_video_id": 999, "triggered_at": "2025-11-30T12:00:00Z"}'
+```
 
 ---
 
-## 🎯 Próximos Passos (Futuro)
+## Checklist de Produção
 
-Depois que o sistema estiver estável:
-
-1. **Substituir N8N Pipeline** - Migrar as 15 etapas para Edge Functions
-2. **Dashboard de Monitoramento** - Métricas em tempo real
-3. **Notificações** - Slack/email quando vídeo completa ou falha
-4. **Auto-retry** - Reprocessar vídeos que falharam
-5. **Priorização** - Flag para vídeos prioritários pularem fila
+- [ ] Edge Function deployed
+- [ ] Cron Job configurado (2min)
+- [ ] MAX_CONCURRENT_VIDEOS definido (default: 3)
+- [ ] Webhook `create-tittle` ativo com API key
+- [ ] Webhook `create-content` ativo com API key
+- [ ] N8N configurado com Header Auth
+- [ ] Monitoramento de logs ativo
 
 ---
 
-**Última atualização:** 2025-11-16
-**Versão:** 1.0.0
-**Status:** ✅ Pronto para Deploy
+**Última atualização:** 2025-11-30
+**Autor:** Claude Code + Davi Luis

@@ -106,10 +106,14 @@ Detalhes do Vídeo (/production-videos/168)
 
 **Cores de Status:**
 - `published` → Verde (#22c55e)
+- `scheduled` → Roxo (#a855f7)
 - `create_*` → Azul (#3b82f6)
-- `pending_approval` → Amarelo (#eab308)
+- `pending_approval` → Âmbar (#f59e0b)
+- `approved` → Âmbar (#f59e0b)
 - `failed` → Vermelho (#ef4444)
-- `on_hold` → Cinza (#6b7280)
+- `on_hold` → Azul (#3b82f6)
+- `canceled` → Cinza (#6b7280) com texto strikethrough
+- `queued` → Amarelo (#eab308)
 
 ---
 
@@ -943,11 +947,14 @@ Filtros: [Todos] [Imagens (40)] [Textos (5)] [Áudios (2)]
 
 **Status Colors:**
 ```css
---status-published: #22c55e;      /* Verde */
---status-in-progress: #3b82f6;    /* Azul */
---status-pending: #eab308;        /* Amarelo */
---status-failed: #ef4444;         /* Vermelho */
---status-on-hold: #6b7280;        /* Cinza */
+--status-published: #22c55e;      /* Verde - Vídeo publicado */
+--status-scheduled: #a855f7;      /* Roxo - Agendado para publicação */
+--status-in-progress: #3b82f6;    /* Azul - Em produção (create_*) */
+--status-pending: #f59e0b;        /* Âmbar - Aguardando aprovação */
+--status-queued: #eab308;         /* Amarelo - Na fila de produção */
+--status-failed: #ef4444;         /* Vermelho - Erro no processamento */
+--status-on-hold: #3b82f6;        /* Azul - Pausado pelo usuário */
+--status-canceled: #6b7280;       /* Cinza - Cancelado */
 ```
 
 **Emotional States:**
@@ -1210,7 +1217,17 @@ RESPONSIVIDADE:
 ---
 
 **Documento criado para:** AutoMedia Platform
-**Data:** 2025-11-14
-**Versão:** 1.0
-**Autor:** Claude Code
+**Data:** 2025-11-30
+**Versão:** 1.1
+**Autor:** Claude Code + Davi Luis
+
+---
+
+## Changelog
+
+### v1.1 (2025-11-30)
+- Adicionado status `scheduled` (roxo) para vídeos agendados
+- Adicionado status `canceled` (cinza, strikethrough) para vídeos cancelados
+- Atualizada paleta de cores de status
+- Corrigidas cores de `on_hold` e `pending_approval`
 
