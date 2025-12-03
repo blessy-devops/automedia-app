@@ -67,8 +67,9 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
   // View state (table or gallery)
   const [view, setView] = useState<"table" | "gallery">("table")
 
-  // Hide produced videos toggle (default: true - hide them)
-  const [hideProduced, setHideProduced] = useState(true)
+  // Produced videos filter: 'available' (default), 'all', or 'produced'
+  type ProducedFilter = 'all' | 'available' | 'produced'
+  const [producedFilter, setProducedFilter] = useState<ProducedFilter>('available')
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
@@ -95,10 +96,13 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
   const filtered = useMemo(() => {
     let result = data
 
-    // Filter out produced videos if toggle is on
-    if (hideProduced) {
+    // Filter by produced status
+    if (producedFilter === 'available') {
       result = result.filter(video => !video.isProduced)
+    } else if (producedFilter === 'produced') {
+      result = result.filter(video => video.isProduced)
     }
+    // 'all' shows everything
 
     // Filter by search
     if (search) {
@@ -110,7 +114,7 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
     }
 
     return result
-  }, [data, search, hideProduced])
+  }, [data, search, producedFilter])
 
   // Count of produced videos (for display)
   const producedCount = useMemo(() => {
@@ -286,42 +290,41 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
             Manage Folders
           </button>
 
-          {/* Hide/Show Produced Videos Toggle */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => {
-                    setHideProduced(!hideProduced)
-                    setPage(1)
-                  }}
-                  className={`border rounded-md px-3 py-2.5 text-sm flex items-center gap-2 transition-colors shadow-sm ${
-                    hideProduced
-                      ? "border-border bg-card text-foreground hover:bg-accent"
-                      : "border-destructive/50 bg-destructive/10 text-destructive hover:bg-destructive/20"
-                  }`}
-                >
-                  {hideProduced ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                  {producedCount > 0 && (
-                    <Badge variant={hideProduced ? "secondary" : "destructive"} className="text-xs px-1.5 py-0">
-                      {producedCount}
-                    </Badge>
-                  )}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>
-                  {hideProduced
-                    ? `Show ${producedCount} produced videos`
-                    : `Hide ${producedCount} produced videos`}
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          {/* Produced Videos Filter */}
+          <Select
+            value={producedFilter}
+            onValueChange={(value: 'all' | 'available' | 'produced') => {
+              setProducedFilter(value)
+              setPage(1)
+            }}
+          >
+            <SelectTrigger className="border border-border bg-card rounded-md px-3 py-2.5 text-sm text-foreground hover:bg-accent transition-colors shadow-sm w-[180px] h-auto">
+              {producedFilter === 'available' && <EyeOff className="w-4 h-4 mr-2 text-muted-foreground" />}
+              {producedFilter === 'all' && <Eye className="w-4 h-4 mr-2 text-muted-foreground" />}
+              {producedFilter === 'produced' && <CheckCircle2 className="w-4 h-4 mr-2 text-destructive" />}
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="available">
+                <div className="flex items-center gap-2">
+                  <EyeOff className="w-4 h-4" />
+                  <span>Available ({data.length - producedCount})</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="all">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-4 h-4" />
+                  <span>All Videos ({data.length})</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="produced">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-destructive" />
+                  <span>Produced ({producedCount})</span>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex items-center gap-2">
