@@ -17,7 +17,10 @@ import {
   List,
   Grid3x3,
   ArrowUpDown,
-  Trash2
+  Trash2,
+  EyeOff,
+  Eye,
+  CheckCircle2
 } from "lucide-react"
 import { PerformanceBadge } from "./performance-badge"
 import { AddToFolderButton } from "./add-to-folder-button"
@@ -29,6 +32,12 @@ import { VideoFiltersPopover } from "./video-filters-popover"
 import { DeleteVideoDialog } from "./delete-video-dialog"
 import { BulkDeleteVideosDialog } from "./bulk-delete-videos-dialog"
 import { Button } from "@/components/ui/button"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import type { Video } from "./columns"
 
 // Lazy load GalleryView
@@ -58,6 +67,9 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
   // View state (table or gallery)
   const [view, setView] = useState<"table" | "gallery">("table")
 
+  // Hide produced videos toggle (default: true - hide them)
+  const [hideProduced, setHideProduced] = useState(true)
+
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
@@ -79,15 +91,31 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
     router.push(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
-  // Filter by search
+  // Filter by search and produced status
   const filtered = useMemo(() => {
-    if (!search) return data
-    const searchLower = search.toLowerCase()
-    return data.filter(video =>
-      video.title?.toLowerCase().includes(searchLower) ||
-      video.channelName?.toLowerCase().includes(searchLower)
-    )
-  }, [data, search])
+    let result = data
+
+    // Filter out produced videos if toggle is on
+    if (hideProduced) {
+      result = result.filter(video => !video.isProduced)
+    }
+
+    // Filter by search
+    if (search) {
+      const searchLower = search.toLowerCase()
+      result = result.filter(video =>
+        video.title?.toLowerCase().includes(searchLower) ||
+        video.channelName?.toLowerCase().includes(searchLower)
+      )
+    }
+
+    return result
+  }, [data, search, hideProduced])
+
+  // Count of produced videos (for display)
+  const producedCount = useMemo(() => {
+    return data.filter(video => video.isProduced).length
+  }, [data])
 
   // Sort
   const sorted = useMemo(() => {
@@ -128,16 +156,25 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
 
   const totalPages = Math.ceil(sorted.length / pageSize)
 
-  // Selection handlers
+  // Selection handlers (only selectable videos - not produced)
+  const selectableVideos = useMemo(() => {
+    return sorted.filter(v => !v.isProduced)
+  }, [sorted])
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedIds(new Set(sorted.map(v => v.id)))
+      // Only select non-produced videos
+      setSelectedIds(new Set(selectableVideos.map(v => v.id)))
     } else {
       setSelectedIds(new Set())
     }
   }
 
   const handleSelectOne = (id: number, checked: boolean) => {
+    const video = sorted.find(v => v.id === id)
+    // Don't allow selecting produced videos
+    if (video?.isProduced) return
+
     const newSelected = new Set(selectedIds)
     if (checked) {
       newSelected.add(id)
@@ -147,8 +184,8 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
     setSelectedIds(newSelected)
   }
 
-  const allSelected = sorted.length > 0 && selectedIds.size === sorted.length
-  const someSelected = selectedIds.size > 0 && selectedIds.size < sorted.length
+  const allSelected = selectableVideos.length > 0 && selectedIds.size === selectableVideos.length
+  const someSelected = selectedIds.size > 0 && selectedIds.size < selectableVideos.length
 
   const handleClearSelection = () => {
     setSelectedIds(new Set())
@@ -248,6 +285,43 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
             <Settings className="w-4 h-4" />
             Manage Folders
           </button>
+
+          {/* Hide/Show Produced Videos Toggle */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => {
+                    setHideProduced(!hideProduced)
+                    setPage(1)
+                  }}
+                  className={`border rounded-md px-3 py-2.5 text-sm flex items-center gap-2 transition-colors shadow-sm ${
+                    hideProduced
+                      ? "border-border bg-card text-foreground hover:bg-accent"
+                      : "border-destructive/50 bg-destructive/10 text-destructive hover:bg-destructive/20"
+                  }`}
+                >
+                  {hideProduced ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                  {producedCount > 0 && (
+                    <Badge variant={hideProduced ? "secondary" : "destructive"} className="text-xs px-1.5 py-0">
+                      {producedCount}
+                    </Badge>
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>
+                  {hideProduced
+                    ? `Show ${producedCount} produced videos`
+                    : `Hide ${producedCount} produced videos`}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
 
         <div className="flex items-center gap-2">
@@ -441,33 +515,59 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
                 paginated.map((video, index) => (
                   <tr
                     key={video.id}
-                    className={`border-b border-border hover:bg-accent transition-colors cursor-pointer ${
-                      index % 2 === 0 ? '' : 'bg-muted/30'
+                    className={`border-b border-border transition-colors cursor-pointer ${
+                      video.isProduced
+                        ? 'bg-destructive/5 hover:bg-destructive/10 opacity-60'
+                        : index % 2 === 0
+                          ? 'hover:bg-accent'
+                          : 'bg-muted/30 hover:bg-accent'
                     }`}
                   >
                     <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(video.id)}
-                        onChange={(e) => handleSelectOne(video.id, e.target.checked)}
-                        className="w-4 h-4 rounded border-border"
-                      />
-                    </td>
-                    <td className="px-4 py-4">
-                      {video.thumbnailUrl && (
-                        <Image
-                          src={video.thumbnailUrl}
-                          alt=""
-                          width={80}
-                          height={45}
-                          className="w-20 h-11 object-cover rounded"
+                      {video.isProduced ? (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="w-4 h-4 flex items-center justify-center">
+                                <CheckCircle2 className="w-4 h-4 text-destructive" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="right">
+                              <p>Already used in production</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(video.id)}
+                          onChange={(e) => handleSelectOne(video.id, e.target.checked)}
+                          className="w-4 h-4 rounded border-border"
                         />
                       )}
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="relative">
+                        {video.thumbnailUrl && (
+                          <Image
+                            src={video.thumbnailUrl}
+                            alt=""
+                            width={80}
+                            height={45}
+                            className={`w-20 h-11 object-cover rounded ${video.isProduced ? 'grayscale' : ''}`}
+                          />
+                        )}
+                        {video.isProduced && (
+                          <Badge variant="destructive" className="absolute -top-1 -right-1 text-[10px] px-1 py-0">
+                            Used
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-4 text-sm text-foreground max-w-xl">
                       <Link
                         href={`/benchmark/videos/${video.id}`}
-                        className="hover:underline line-clamp-2"
+                        className={`hover:underline line-clamp-2 ${video.isProduced ? 'text-muted-foreground' : ''}`}
                       >
                         {video.title || "Untitled"}
                       </Link>

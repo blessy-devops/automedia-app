@@ -691,16 +691,14 @@ export async function bulkDeleteVideos(
  * Calls the send-to-gobbi Edge Function which handles:
  * - Fetching compatible video fields
  * - Batching
- * - Webhook URL lookup
+ * - Webhook URL lookup (uses 'receive-benchmark-videos' webhook by name)
  * - Error handling
  * - Logging
  *
  * @param videoIds - Array of video database IDs to send
- * @param webhookId - ID of the webhook to use (currently unused - Edge Function looks up by name)
  */
 export async function sendVideosToProduction(
-  videoIds: number[],
-  webhookId: number
+  videoIds: number[]
 ): Promise<ActionResult<{ sent: number; webhook_name: string }>> {
   try {
     if (!videoIds || videoIds.length === 0) {

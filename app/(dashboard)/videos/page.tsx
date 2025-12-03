@@ -53,6 +53,7 @@ export default async function VideosPageNew({
     { data: folderItemsData },
     { data: allChannelsData },
     { data: metricsData },
+    { data: producedVideosData },
     foldersResult
   ] = await Promise.all([
     // Query 1: Videos with filters/sorting
@@ -69,9 +70,19 @@ export default async function VideosPageNew({
     supabase
       .from('benchmark_videos')
       .select('views, performance_vs_median_historical'),
-    // Query 5: Folder tree
+    // Query 5: Get benchmark_ids that have been used in production
+    supabase
+      .from('production_videos')
+      .select('benchmark_id')
+      .not('benchmark_id', 'is', null),
+    // Query 6: Folder tree
     getFolderTree()
   ])
+
+  // Create a Set of produced benchmark IDs for O(1) lookup
+  const producedBenchmarkIds = new Set(
+    (producedVideosData || []).map((pv: { benchmark_id: number | null }) => pv.benchmark_id)
+  )
 
   if (error) {
     console.error('Error fetching videos:', error)
@@ -116,6 +127,7 @@ export default async function VideosPageNew({
       videoAgeDays: video.upload_date
         ? Math.floor((Date.now() - new Date(video.upload_date).getTime()) / (1000 * 60 * 60 * 24))
         : null,
+      isProduced: producedBenchmarkIds.has(video.id),
     }
   })
 

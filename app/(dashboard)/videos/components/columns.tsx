@@ -25,4 +25,6 @@ export type Video = {
   isOutlier: boolean | null
   // Video age in days
   videoAgeDays: number | null
+  // Whether this video has been used in production
+  isProduced: boolean
 }
