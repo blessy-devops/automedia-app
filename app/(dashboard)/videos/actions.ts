@@ -738,6 +738,21 @@ export async function sendVideosToProduction(
       }
     }
 
+    // Mark videos as sent to production in local database
+    const { error: updateError } = await supabase
+      .from('benchmark_videos')
+      .update({ is_sent_to_production: true })
+      .in('id', videoIds)
+
+    if (updateError) {
+      console.error('[sendVideosToProduction] Failed to mark videos as sent:', updateError)
+      // Don't fail the whole operation - videos were sent successfully
+      // Just log the error for debugging
+    }
+
+    // Revalidate the videos page to reflect the changes
+    revalidatePath('/videos')
+
     return {
       success: true,
       data: {
