@@ -35,10 +35,11 @@ export default async function VideosPageNew({
   const filters = parseVideoFilters(params)
   const folderId = params.folderId ? Number(params.folderId) : undefined
 
-  // Build base query
+  // Build base query - use range() to fetch all videos (Supabase default limit is 1000)
   let query = supabase
     .from('benchmark_videos')
     .select('*')
+    .range(0, 9999)
 
   // Apply filters using helper
   query = applyVideoFiltersToQuery(query, filters)
@@ -65,10 +66,11 @@ export default async function VideosPageNew({
       .select('channel_id, channel_name')
       .not('channel_name', 'is', null)
       .order('channel_name'),
-    // Query 4: All videos for metrics
+    // Query 4: All videos for metrics (use range to get all, not just 1000)
     supabase
       .from('benchmark_videos')
-      .select('views, performance_vs_median_historical'),
+      .select('views, performance_vs_median_historical')
+      .range(0, 9999),
     // Query 5: Folder tree
     getFolderTree()
   ])
