@@ -8,8 +8,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { ArrowUpDown, ChevronLeft, ChevronRight, Search } from "lucide-react"
+import { ArrowUpDown, ChevronLeft, ChevronRight, Search, RefreshCw, Trash2 } from "lucide-react"
 import { ChannelDataTableToolbar, ViewMode } from "./channel-data-table-toolbar"
+import { triggerManualUpdate } from "@/app/(dashboard)/benchmark/radar/actions"
+import { toast } from "sonner"
 
 // Lazy load ChannelGalleryView
 const ChannelGalleryView = lazy(() => import("./channel-gallery-view").then(mod => ({ default: mod.ChannelGalleryView })))
@@ -55,6 +57,32 @@ export function SimpleChannelsTable({ data }: SimpleChannelsTableProps) {
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc")
   const [page, setPage] = useState(1)
   const pageSize = 20
+  const [updatingChannelId, setUpdatingChannelId] = useState<string | null>(null)
+
+  const handleUpdateMetrics = async (channel: Channel) => {
+    setUpdatingChannelId(channel.channelId)
+    const displayName = channel.channelName || channel.channelId
+
+    try {
+      toast.loading(`Updating metrics for ${displayName}...`, { id: `update-${channel.channelId}` })
+
+      const result = await triggerManualUpdate(channel.channelId)
+
+      if (result.success) {
+        if (result.warning) {
+          toast.warning(`${displayName}: ${result.warning}`, { id: `update-${channel.channelId}` })
+        } else {
+          toast.success(`Metrics updated for ${displayName}`, { id: `update-${channel.channelId}` })
+        }
+      } else {
+        toast.error(`Failed to update ${displayName}: ${result.error}`, { id: `update-${channel.channelId}` })
+      }
+    } catch (error) {
+      toast.error(`Error updating ${displayName}`, { id: `update-${channel.channelId}` })
+    } finally {
+      setUpdatingChannelId(null)
+    }
+  }
 
   // Filter by search
   const filtered = useMemo(() => {
@@ -166,6 +194,7 @@ export function SimpleChannelsTable({ data }: SimpleChannelsTableProps) {
                   <SortButton field="createdAt">Benchmark Date</SortButton>
                 </TableHead>
                 <TableHead className="w-[200px]">Niche</TableHead>
+                <TableHead className="w-[80px] text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -225,11 +254,23 @@ export function SimpleChannelsTable({ data }: SimpleChannelsTableProps) {
                         </Badge>
                       )}
                     </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center">
+                        <button
+                          onClick={() => handleUpdateMetrics(channel)}
+                          disabled={updatingChannelId === channel.channelId}
+                          className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 p-1"
+                          title="Update Metrics"
+                        >
+                          <RefreshCw className={`w-4 h-4 ${updatingChannelId === channel.channelId ? 'animate-spin' : ''}`} />
+                        </button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center">
+                  <TableCell colSpan={9} className="h-24 text-center">
                     No channels found.
                   </TableCell>
                 </TableRow>

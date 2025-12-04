@@ -160,14 +160,14 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
 
   const totalPages = Math.ceil(sorted.length / pageSize)
 
-  // Selection handlers (only selectable videos - not produced)
+  // Selection handlers (all videos are selectable, including produced)
   const selectableVideos = useMemo(() => {
-    return sorted.filter(v => !v.isProduced)
+    return sorted
   }, [sorted])
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      // Only select non-produced videos
+      // Select all videos (including produced)
       setSelectedIds(new Set(selectableVideos.map(v => v.id)))
     } else {
       setSelectedIds(new Set())
@@ -175,10 +175,6 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
   }
 
   const handleSelectOne = (id: number, checked: boolean) => {
-    const video = sorted.find(v => v.id === id)
-    // Don't allow selecting produced videos
-    if (video?.isProduced) return
-
     const newSelected = new Set(selectedIds)
     if (checked) {
       newSelected.add(id)
@@ -524,27 +520,12 @@ export function SimpleVideosTableNew({ data, folders = [], currentFolderId }: Si
                     }`}
                   >
                     <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                      {video.isProduced ? (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="w-4 h-4 flex items-center justify-center">
-                                <CheckCircle2 className="w-4 h-4 text-destructive" />
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent side="right">
-                              <p>Already used in production</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      ) : (
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(video.id)}
-                          onChange={(e) => handleSelectOne(video.id, e.target.checked)}
-                          className="w-4 h-4 rounded border-border"
-                        />
-                      )}
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(video.id)}
+                        onChange={(e) => handleSelectOne(video.id, e.target.checked)}
+                        className="w-4 h-4 rounded border-border"
+                      />
                     </td>
                     <td className="px-4 py-4">
                       <div className="relative">

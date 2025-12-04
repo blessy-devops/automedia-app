@@ -6,6 +6,7 @@ import { formatLargeNumber, cn } from "@/lib/utils"
 import Image from "next/image"
 import { Users, Eye, Video, TrendingUp, Globe, Sparkles, AlertCircle } from "lucide-react"
 import { AddToRadarButton } from "@/app/(dashboard)/benchmark/radar/components/add-to-radar-button"
+import { UpdateMetricsButton } from "@/app/(dashboard)/benchmark/components/update-metrics-button"
 
 // Types based on Supabase schema
 interface BenchmarkChannel {
@@ -105,12 +106,18 @@ export function ChannelDetailHeader({
               </div>
             </div>
 
-            {/* Add to Radar Button */}
-            <AddToRadarButton
-              channelId={channel.channelId}
-              channelName={channel.channelName || undefined}
-              isInRadar={channel.inRadar}
-            />
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2">
+              <UpdateMetricsButton
+                channelId={channel.channelId}
+                channelName={channel.channelName || undefined}
+              />
+              <AddToRadarButton
+                channelId={channel.channelId}
+                channelName={channel.channelName || undefined}
+                isInRadar={channel.inRadar}
+              />
+            </div>
           </div>
         </div>
       </div>

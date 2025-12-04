@@ -3,12 +3,14 @@
 import { useState, useMemo } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { ArrowUpDown, BarChart3, Edit, Trash2, X } from "lucide-react"
+import { ArrowUpDown, BarChart3, RefreshCw, Trash2, X } from "lucide-react"
 import { formatLargeNumber, formatDate } from "@/lib/utils"
 import { DeleteChannelDialog } from "./delete-channel-dialog"
 import { BulkDeleteChannelsDialog } from "./bulk-delete-channels-dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
+import { triggerManualUpdate } from "@/app/(dashboard)/benchmark/radar/actions"
+import { toast } from "sonner"
 
 export type Channel = {
   id: number
@@ -108,9 +110,31 @@ export function ChannelsTable({ channels }: ChannelsTableProps) {
     router.push(`/benchmark/channels/${channelId}`)
   }
 
-  const handleEdit = (channelId: number) => {
-    // TODO: Open edit modal or navigate to edit page
-    console.log("Edit channel:", channelId)
+  const [updatingChannelId, setUpdatingChannelId] = useState<string | null>(null)
+
+  const handleUpdateMetrics = async (channel: Channel) => {
+    setUpdatingChannelId(channel.channelId)
+    const displayName = channel.channelName || channel.channelId
+
+    try {
+      toast.loading(`Updating metrics for ${displayName}...`, { id: `update-${channel.channelId}` })
+
+      const result = await triggerManualUpdate(channel.channelId)
+
+      if (result.success) {
+        if (result.warning) {
+          toast.warning(`${displayName}: ${result.warning}`, { id: `update-${channel.channelId}` })
+        } else {
+          toast.success(`Metrics updated for ${displayName}`, { id: `update-${channel.channelId}` })
+        }
+      } else {
+        toast.error(`Failed to update ${displayName}: ${result.error}`, { id: `update-${channel.channelId}` })
+      }
+    } catch (error) {
+      toast.error(`Error updating ${displayName}`, { id: `update-${channel.channelId}` })
+    } finally {
+      setUpdatingChannelId(null)
+    }
   }
 
   // Selection handlers
@@ -316,11 +340,12 @@ export function ChannelsTable({ channels }: ChannelsTableProps) {
                       <BarChart3 className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleEdit(channel.id)}
-                      className="text-muted-foreground hover:text-foreground transition-colors"
-                      title="Edit"
+                      onClick={() => handleUpdateMetrics(channel)}
+                      disabled={updatingChannelId === channel.channelId}
+                      className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                      title="Update Metrics"
                     >
-                      <Edit className="w-4 h-4" />
+                      <RefreshCw className={`w-4 h-4 ${updatingChannelId === channel.channelId ? 'animate-spin' : ''}`} />
                     </button>
                     <button
                       onClick={() =>

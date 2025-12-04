@@ -26,7 +26,9 @@ import { SortableTableHeader } from "@/components/ui/sortable-table-header"
 import { PaginationNumbered } from "@/components/ui/pagination-numbered"
 import { EmptyState } from "@/components/empty-state"
 import { EnhancedToolbar, ViewMode } from "./enhanced-toolbar"
-import { MoreVertical, TrendingUp, Pencil, Trash2, FolderSearch } from "lucide-react"
+import { MoreVertical, TrendingUp, RefreshCw, Trash2, FolderSearch } from "lucide-react"
+import { triggerManualUpdate } from "@/app/(dashboard)/benchmark/radar/actions"
+import { toast } from "sonner"
 
 // Lazy load ChannelGalleryView
 const ChannelGalleryView = lazy(() =>
@@ -82,8 +84,34 @@ export function EnhancedChannelsTable({ data }: EnhancedChannelsTableProps) {
   const [nicheFilter, setNicheFilter] = useState("")
   const [subnicheFilter, setSubnicheFilter] = useState("")
   const [benchmarkDate, setBenchmarkDate] = useState("all")
+  const [updatingChannelId, setUpdatingChannelId] = useState<string | null>(null)
 
   const pageSize = 10
+
+  const handleUpdateMetrics = async (channel: Channel) => {
+    setUpdatingChannelId(channel.channelId)
+    const displayName = channel.channelName || channel.channelId
+
+    try {
+      toast.loading(`Updating metrics for ${displayName}...`, { id: `update-${channel.channelId}` })
+
+      const result = await triggerManualUpdate(channel.channelId)
+
+      if (result.success) {
+        if (result.warning) {
+          toast.warning(`${displayName}: ${result.warning}`, { id: `update-${channel.channelId}` })
+        } else {
+          toast.success(`Metrics updated for ${displayName}`, { id: `update-${channel.channelId}` })
+        }
+      } else {
+        toast.error(`Failed to update ${displayName}: ${result.error}`, { id: `update-${channel.channelId}` })
+      }
+    } catch (error) {
+      toast.error(`Error updating ${displayName}`, { id: `update-${channel.channelId}` })
+    } finally {
+      setUpdatingChannelId(null)
+    }
+  }
 
   // Extract unique niches and subniches
   const { availableNiches, availableSubniches } = useMemo(() => {
@@ -391,10 +419,11 @@ export function EnhancedChannelsTable({ data }: EnhancedChannelsTableProps) {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
-                                  onClick={() => router.push(`/channels/${channel.id}`)}
+                                  onClick={() => handleUpdateMetrics(channel)}
+                                  disabled={updatingChannelId === channel.channelId}
                                 >
-                                  <Pencil className="mr-2 h-4 w-4" />
-                                  Edit
+                                  <RefreshCw className={`mr-2 h-4 w-4 ${updatingChannelId === channel.channelId ? 'animate-spin' : ''}`} />
+                                  {updatingChannelId === channel.channelId ? 'Updating...' : 'Update Metrics'}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem className="text-destructive">
                                   <Trash2 className="mr-2 h-4 w-4" />
