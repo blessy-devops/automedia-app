@@ -78,21 +78,20 @@ Deno.serve(async (req) => {
       .eq('id', taskId)
 
     // ========================================================================
-    // STEP 2: Find videos needing calculation (optimization) using Supabase Client
+    // STEP 2: Fetch ALL videos for the channel (always recalculate metrics)
     // ========================================================================
-    console.log('[Step 5: Outlier Calc] Finding videos needing calculation...')
+    console.log('[Step 5: Outlier Calc] Fetching all videos for channel...')
 
     const { data: videosToProcess, error: videosError } = await supabase
       .from('benchmark_videos')
       .select('youtube_video_id, views, upload_date')
       .eq('channel_id', channelId)
-      .is('performance_vs_avg_historical', null)
 
     if (videosError) {
       throw new Error(`Failed to fetch videos: ${videosError.message}`)
     }
 
-    console.log(`[Step 5: Outlier Calc] Found ${videosToProcess?.length || 0} videos needing calculation`)
+    console.log(`[Step 5: Outlier Calc] Found ${videosToProcess?.length || 0} videos to process`)
 
     if (!videosToProcess || videosToProcess.length === 0) {
       console.log('[Step 5: Outlier Calc] No videos to process, marking as completed')
@@ -133,10 +132,10 @@ Deno.serve(async (req) => {
     console.log('[Step 5: Outlier Calc] Collecting base data...')
 
     const [baselineStatsResult, channelDataResult, allVideosViewsResult] = await Promise.all([
-      // Baseline stats (with availability flag)
+      // Baseline stats (with availability flag and median)
       supabase
         .from('benchmark_channels_baseline_stats')
-        .select('total_views_14d, is_available')
+        .select('total_views_14d, is_available, mediana_diaria_views_14d')
         .eq('channel_id', channelId)
         .single(),
 
