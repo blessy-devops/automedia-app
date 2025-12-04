@@ -62,14 +62,14 @@ async function main() {
 
   // Gerar SQL
   const sql = `-- ============================================================================
--- Migration: Mark videos sent to production (synced from Gobbi)
+-- Migration: Mark videos as 'used' (synced from Gobbi production_videos)
 -- Generated: ${new Date().toISOString()}
 -- Total videos: ${youtubeVideoIds.length}
 -- ============================================================================
 
--- Update benchmark_videos to mark as sent to production
+-- Update benchmark_videos to mark status as 'used'
 UPDATE benchmark_videos
-SET is_sent_to_production = TRUE
+SET status = 'used'
 WHERE youtube_video_id IN (
 ${youtubeVideoIds.map(id => `  '${id}'`).join(',\n')}
 );
@@ -77,7 +77,7 @@ ${youtubeVideoIds.map(id => `  '${id}'`).join(',\n')}
 -- Verify count
 SELECT COUNT(*) as updated_count
 FROM benchmark_videos
-WHERE is_sent_to_production = TRUE;
+WHERE status = 'used';
 `
 
   console.log('📄 SQL gerado:\n')

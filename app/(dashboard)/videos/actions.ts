@@ -738,14 +738,14 @@ export async function sendVideosToProduction(
       }
     }
 
-    // Mark videos as sent to production in local database
+    // Mark videos as 'used' in local database
     const { error: updateError } = await supabase
       .from('benchmark_videos')
-      .update({ is_sent_to_production: true })
+      .update({ status: 'used' })
       .in('id', videoIds)
 
     if (updateError) {
-      console.error('[sendVideosToProduction] Failed to mark videos as sent:', updateError)
+      console.error('[sendVideosToProduction] Failed to mark videos as used:', updateError)
       // Don't fail the whole operation - videos were sent successfully
       // Just log the error for debugging
     }

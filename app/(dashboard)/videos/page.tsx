@@ -116,7 +116,7 @@ export default async function VideosPageNew({
       videoAgeDays: video.upload_date
         ? Math.floor((Date.now() - new Date(video.upload_date).getTime()) / (1000 * 60 * 60 * 24))
         : null,
-      isProduced: video.is_sent_to_production === true,
+      isProduced: video.status === 'used',
     }
   })
 
