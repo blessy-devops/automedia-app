@@ -1,19 +1,26 @@
 'use client';
 
-import React, { useState } from 'react';
-import { MOCK_EVENTS } from '../constants';
+import React, { useState, useEffect } from 'react';
 import { CalendarEvent } from '../types';
 import EventCard from './event-card';
 import EventDetailsDrawer from './event-details-drawer';
+import { Loader2 } from 'lucide-react';
 
 interface CalendarBoardProps {
     currentDate: Date;
+    events: CalendarEvent[];
+    isLoading?: boolean;
 }
 
-const CalendarBoard: React.FC<CalendarBoardProps> = ({ currentDate }) => {
+const CalendarBoard: React.FC<CalendarBoardProps> = ({ currentDate, events: initialEvents, isLoading }) => {
   // Use state for events to allow Drag & Drop updates
-  const [events, setEvents] = useState<CalendarEvent[]>(MOCK_EVENTS);
+  const [events, setEvents] = useState<CalendarEvent[]>(initialEvents);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+
+  // Sync events when prop changes
+  useEffect(() => {
+    setEvents(initialEvents);
+  }, [initialEvents]);
 
   // Drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -139,7 +146,17 @@ const CalendarBoard: React.FC<CalendarBoardProps> = ({ currentDate }) => {
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
-    <div className="p-4 md:p-6 h-full flex flex-col max-h-screen">
+    <div className="p-4 md:p-6 h-full flex flex-col max-h-screen relative">
+
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-background/50 backdrop-blur-[1px] z-10 flex items-center justify-center">
+          <div className="flex items-center gap-3 bg-card px-4 py-3 rounded-xl shadow-lg border border-border">
+            <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
+            <span className="text-sm font-medium text-foreground">Loading from Supabase...</span>
+          </div>
+        </div>
+      )}
 
       {/* Weekday Headers */}
       <div className="grid grid-cols-7 gap-2 mb-2 shrink-0">
