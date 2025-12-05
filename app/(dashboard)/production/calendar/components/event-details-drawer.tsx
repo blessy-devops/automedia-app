@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { X, Clock, CheckCircle2, Youtube, FileText, ArrowUpRight, BarChart, ChevronDown, ChevronUp, ExternalLink, Calendar } from 'lucide-react';
 import { CalendarEvent } from '../types';
 
@@ -30,9 +31,9 @@ const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose
     ? event.description
     : event.description?.substring(0, descriptionPreviewLength) + '...';
 
-  // Build YouTube URL for benchmark video
-  const benchmarkYoutubeUrl = event.benchmarkVideo?.youtubeVideoId
-    ? `https://www.youtube.com/watch?v=${event.benchmarkVideo.youtubeVideoId}`
+  // Build internal benchmark page URL (uses Gobbi database via ?source=gobbi)
+  const benchmarkPageUrl = event.benchmarkVideo?.id
+    ? `/benchmark/videos/${event.benchmarkVideo.id}?source=gobbi`
     : null;
 
   return (
@@ -119,16 +120,14 @@ const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose
                     <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">Benchmark Reference</h3>
                 </div>
                 {event.benchmarkVideo ? (
-                    <a
-                      href={benchmarkYoutubeUrl || '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <Link
+                      href={benchmarkPageUrl || '#'}
                       className="flex gap-4 p-3 rounded-xl border border-border bg-card shadow-sm hover:border-orange-500/50 transition-colors group cursor-pointer"
                     >
                          <div className="w-24 h-16 bg-muted rounded-lg overflow-hidden shrink-0 relative">
                              <img src={event.benchmarkVideo.thumbnail} alt={event.benchmarkVideo.title} className="w-full h-full object-cover" />
                              <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                                 <Youtube size={20} className="text-white" />
+                                 <BarChart size={20} className="text-white" />
                              </div>
                          </div>
                          <div className="flex-1 min-w-0 flex flex-col justify-center">
@@ -137,10 +136,10 @@ const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose
                                  {event.benchmarkVideo.title}
                              </h4>
                              <p className="text-xs text-orange-500 font-medium mt-1 flex items-center gap-1 group-hover:underline">
-                                 View on YouTube <ArrowUpRight size={10} />
+                                 View Benchmark <ArrowUpRight size={10} />
                              </p>
                          </div>
-                    </a>
+                    </Link>
                 ) : (
                     <div className="p-4 rounded-xl border border-dashed border-border bg-muted text-center text-muted-foreground text-sm">
                         No benchmark video linked.

@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { gobbiClient } from '@/lib/gobbi-client'
 import Link from 'next/link'
 import { VideoDetailHeader } from './components/video-detail-header'
 import { PerformanceMetricsCard } from './components/performance-metrics-card'
@@ -26,15 +27,23 @@ import {
  * - AI categorization results
  * - Basic statistics
  * - Channel information with link
+ *
+ * Supports ?source=gobbi to fetch from Gobbi database (for production videos)
  */
 export default async function VideoDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ source?: string }>
 }) {
-  const supabase = await createClient()
   const { id } = await params
+  const { source } = await searchParams
   const videoId = parseInt(id, 10)
+
+  // Choose database based on source param
+  const useGobbi = source === 'gobbi'
+  const supabase = useGobbi ? gobbiClient : await createClient()
 
   if (isNaN(videoId)) {
     notFound()
@@ -79,6 +88,7 @@ export default async function VideoDetailPage({
   }
 
   // Fetch channel information and baseline stats separately
+  // Use the same client that fetched the video (gobbi or automedia)
   const [channelResult, baselineStatsResult] = await Promise.all([
     supabase
       .from('benchmark_channels')
