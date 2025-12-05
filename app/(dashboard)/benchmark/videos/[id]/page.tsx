@@ -49,35 +49,59 @@ export default async function VideoDetailPage({
     notFound()
   }
 
-  // Fetch video data
+  // Gobbi has different columns than Automedia
+  // Common columns that exist in both databases
+  const gobbiColumns = `
+    id,
+    youtube_video_id,
+    channel_id,
+    title,
+    description,
+    views,
+    upload_date,
+    video_length,
+    thumbnail_url,
+    categorization,
+    performance_vs_avg_historical,
+    performance_vs_median_historical,
+    performance_vs_recent_14d,
+    keywords,
+    related_video_ids,
+    enrichment_data
+  `
+
+  // Automedia has additional columns
+  const automediaColumns = `
+    id,
+    youtube_video_id,
+    channel_id,
+    title,
+    description,
+    views,
+    likes,
+    comments,
+    upload_date,
+    video_length,
+    thumbnail_url,
+    tags,
+    categorization,
+    performance_vs_avg_historical,
+    performance_vs_median_historical,
+    performance_vs_recent_14d,
+    performance_vs_recent_30d,
+    performance_vs_recent_90d,
+    is_outlier,
+    outlier_threshold,
+    keywords,
+    related_video_ids,
+    enrichment_data,
+    last_enriched_at
+  `
+
+  // Fetch video data with appropriate columns for each database
   const { data: result, error } = await supabase
     .from('benchmark_videos')
-    .select(`
-      id,
-      youtube_video_id,
-      channel_id,
-      title,
-      description,
-      views,
-      likes,
-      comments,
-      upload_date,
-      video_length,
-      thumbnail_url,
-      tags,
-      categorization,
-      performance_vs_avg_historical,
-      performance_vs_median_historical,
-      performance_vs_recent_14d,
-      performance_vs_recent_30d,
-      performance_vs_recent_90d,
-      is_outlier,
-      outlier_threshold,
-      keywords,
-      related_video_ids,
-      enrichment_data,
-      last_enriched_at
-    `)
+    .select(useGobbi ? gobbiColumns : automediaColumns)
     .eq('id', videoId)
     .limit(1)
     .single()
@@ -112,6 +136,7 @@ export default async function VideoDetailPage({
   const videoAgeDays = Math.floor((now.getTime() - uploadDate.getTime()) / (1000 * 60 * 60 * 24))
 
   // Transform data to camelCase format
+  // Some fields only exist in Automedia, so we use optional chaining
   const video = {
     id: result.id,
     youtubeVideoId: result.youtube_video_id,
@@ -119,24 +144,24 @@ export default async function VideoDetailPage({
     title: result.title,
     description: result.description,
     views: result.views,
-    likes: result.likes,
-    comments: result.comments,
+    likes: result.likes ?? null, // Gobbi doesn't have this
+    comments: result.comments ?? null, // Gobbi doesn't have this
     uploadDate: result.upload_date,
     videoLength: result.video_length,
     thumbnailUrl: result.thumbnail_url,
-    tags: result.tags,
+    tags: result.tags ?? null, // Gobbi doesn't have this
     categorization: result.categorization,
     performanceVsAvgHistorical: result.performance_vs_avg_historical,
     performanceVsMedianHistorical: result.performance_vs_median_historical,
     performanceVsRecent14d: result.performance_vs_recent_14d,
-    performanceVsRecent30d: result.performance_vs_recent_30d,
-    performanceVsRecent90d: result.performance_vs_recent_90d,
-    isOutlier: result.is_outlier,
-    outlierThreshold: result.outlier_threshold,
+    performanceVsRecent30d: result.performance_vs_recent_30d ?? null, // Gobbi doesn't have this
+    performanceVsRecent90d: result.performance_vs_recent_90d ?? null, // Gobbi doesn't have this
+    isOutlier: result.is_outlier ?? null, // Gobbi doesn't have this
+    outlierThreshold: result.outlier_threshold ?? null, // Gobbi doesn't have this
     keywords: result.keywords,
     relatedVideoIds: result.related_video_ids,
     enrichmentData: result.enrichment_data,
-    lastEnrichedAt: result.last_enriched_at,
+    lastEnrichedAt: result.last_enriched_at ?? null, // Gobbi doesn't have this
     channelName: channelData?.channel_name || null,
     channelDatabaseId: channelData?.id || null,
     videoAgeDays,
