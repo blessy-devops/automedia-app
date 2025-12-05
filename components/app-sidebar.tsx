@@ -125,7 +125,6 @@ const collapsibleSections: CollapsibleSection[] = [
         title: "Calendar",
         href: "/production/calendar",
         icon: Calendar,
-        isPlaceholder: true,
       },
       {
         title: "Workflows",
