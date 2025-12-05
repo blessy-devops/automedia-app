@@ -24,4 +24,5 @@ export interface CalendarEvent {
   scheduledTime?: string; // e.g. "14:00"
   description?: string;
   benchmarkVideo?: BenchmarkVideo;
+  youtubeUrl?: string; // URL to view on YouTube (final_link)
 }

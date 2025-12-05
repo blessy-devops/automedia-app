@@ -82,10 +82,12 @@ export async function getCalendarEvents(year: number, month: number): Promise<Ca
     .select(`
       id,
       title,
+      description,
       status,
       planned_upload_date,
       placeholder,
       thumbnail_url,
+      final_link,
       benchmark_id,
       benchmark_videos!production_videos_benchmark_id_fkey (
         id,
@@ -140,7 +142,9 @@ export async function getCalendarEvents(year: number, month: number): Promise<Ca
       status: mapStatus(video.status),
       thumbnail: video.thumbnail_url || benchmarkData?.thumbnail_url || undefined,
       scheduledTime: extractTime(video.planned_upload_date),
+      description: video.description || undefined,
       benchmarkVideo,
+      youtubeUrl: video.final_link || undefined,
     }
   })
 }

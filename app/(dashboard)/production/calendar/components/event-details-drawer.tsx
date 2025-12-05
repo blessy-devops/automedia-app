@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Clock, CheckCircle2, Youtube, Sparkles, Loader2, FileText, ArrowUpRight, BarChart } from 'lucide-react';
+import Link from 'next/link';
+import { X, Clock, CheckCircle2, Youtube, FileText, ArrowUpRight, BarChart, ChevronDown, ChevronUp, ExternalLink, Calendar } from 'lucide-react';
 import { CalendarEvent } from '../types';
 
 interface EventDetailsDrawerProps {
@@ -11,19 +12,24 @@ interface EventDetailsDrawerProps {
 }
 
 const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose, event }) => {
-  const [loadingAI, setLoadingAI] = useState(false);
-  const [generatedDesc, setGeneratedDesc] = useState<string | null>(null);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   if (!event) return null;
 
-  const handleEnhance = async () => {
-    setLoadingAI(true);
-    // TODO: Integrate with AI service later
-    setTimeout(() => {
-      setGeneratedDesc("This is a placeholder AI-generated description. Connect to your AI service to generate real descriptions.");
-      setLoadingAI(false);
-    }, 1500);
-  }
+  // Format date with time
+  const formattedDateTime = event.date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  }) + (event.scheduledTime ? ` at ${event.scheduledTime}` : '');
+
+  // Check if description is long enough to need collapsing
+  const descriptionPreviewLength = 150;
+  const hasLongDescription = event.description && event.description.length > descriptionPreviewLength;
+  const displayDescription = isDescriptionExpanded || !hasLongDescription
+    ? event.description
+    : event.description?.substring(0, descriptionPreviewLength) + '...';
 
   return (
     <div className={`fixed inset-0 z-50 flex justify-end transition-all duration-300 ${isOpen ? 'visible' : 'invisible'}`}>
@@ -40,7 +46,7 @@ const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose
       `}>
 
         {/* Header Actions */}
-        <div className="absolute top-4 right-4 z-10 flex gap-2">
+        <div className="absolute top-6 right-4 z-10 flex gap-2">
             <button
                 onClick={onClose}
                 className="bg-background/90 hover:bg-background text-foreground p-2 rounded-full shadow-sm hover:shadow-md transition-all border border-border"
@@ -49,25 +55,27 @@ const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose
             </button>
         </div>
 
-        {/* Hero Image */}
-        <div className="h-48 md:h-56 bg-muted relative shrink-0">
-             {event.thumbnail ? (
-                 <img src={event.thumbnail} alt={event.title} className="w-full h-full object-cover" />
-             ) : (
-                 <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground font-medium">
-                     No Thumbnail
-                 </div>
-             )}
-             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-6 pt-16">
-                 <div className="flex items-center gap-3">
-                     <div className={`p-1.5 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-white`}>
-                        {event.status === 'Posted' ? <CheckCircle2 size={16} /> : <Clock size={16} />}
-                     </div>
-                     <span className="text-white font-semibold tracking-wide text-sm drop-shadow-sm uppercase">
-                         {event.status}
-                     </span>
-                 </div>
-             </div>
+        {/* Hero Image with top padding */}
+        <div className="pt-3 shrink-0">
+          <div className="h-48 md:h-56 bg-muted relative mx-3 rounded-t-xl overflow-hidden">
+               {event.thumbnail ? (
+                   <img src={event.thumbnail} alt={event.title} className="w-full h-full object-cover" />
+               ) : (
+                   <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground font-medium">
+                       No Thumbnail
+                   </div>
+               )}
+               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-6 pt-16">
+                   <div className="flex items-center gap-3">
+                       <div className={`p-1.5 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 text-white`}>
+                          {event.status === 'Posted' ? <CheckCircle2 size={16} /> : <Clock size={16} />}
+                       </div>
+                       <span className="text-white font-semibold tracking-wide text-sm drop-shadow-sm uppercase">
+                           {event.status}
+                       </span>
+                   </div>
+               </div>
+          </div>
         </div>
 
         {/* Scrollable Content */}
@@ -88,9 +96,12 @@ const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose
                         </div>
                     </div>
                     <div className="text-right">
-                         <p className="text-xs text-muted-foreground font-bold uppercase">Date</p>
+                         <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
+                           <Calendar size={12} />
+                           <p className="text-xs font-bold uppercase">Scheduled</p>
+                         </div>
                          <p className="text-sm font-mono font-medium text-foreground">
-                            {event.date.toLocaleDateString()}
+                            {formattedDateTime}
                          </p>
                     </div>
                 </div>
@@ -103,7 +114,10 @@ const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose
                     <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">Benchmark Reference</h3>
                 </div>
                 {event.benchmarkVideo ? (
-                    <div className="flex gap-4 p-3 rounded-xl border border-border bg-card shadow-sm hover:border-orange-500/50 transition-colors group cursor-pointer">
+                    <Link
+                      href={`/benchmark/videos/${event.benchmarkVideo.id}`}
+                      className="flex gap-4 p-3 rounded-xl border border-border bg-card shadow-sm hover:border-orange-500/50 transition-colors group cursor-pointer"
+                    >
                          <div className="w-24 h-16 bg-muted rounded-lg overflow-hidden shrink-0 relative">
                              <img src={event.benchmarkVideo.thumbnail} alt={event.benchmarkVideo.title} className="w-full h-full object-cover" />
                              <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -119,7 +133,7 @@ const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose
                                  View Benchmark <ArrowUpRight size={10} />
                              </p>
                          </div>
-                    </div>
+                    </Link>
                 ) : (
                     <div className="p-4 rounded-xl border border-dashed border-border bg-muted text-center text-muted-foreground text-sm">
                         No benchmark video linked.
@@ -127,54 +141,72 @@ const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose
                 )}
             </div>
 
-            {/* Description & AI */}
+            {/* Description - Collapsible */}
             <div>
-                <div className="flex items-center justify-between mb-3">
-                     <div className="flex items-center gap-2">
-                        <FileText size={18} className="text-muted-foreground" />
-                        <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">Description</h3>
-                    </div>
-                    {(!event.description && !generatedDesc) && (
-                        <button
-                            onClick={handleEnhance}
-                            disabled={loadingAI}
-                            className="text-xs bg-orange-500/10 text-orange-500 hover:bg-orange-500/20 px-2 py-1 rounded-md font-medium transition-colors flex items-center gap-1"
-                        >
-                            {loadingAI ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                            Generate with AI
-                        </button>
-                    )}
+                <div className="flex items-center gap-2 mb-3">
+                    <FileText size={18} className="text-muted-foreground" />
+                    <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">Description</h3>
                 </div>
 
-                <div className="p-4 bg-muted rounded-xl border border-border text-sm leading-relaxed text-foreground whitespace-pre-wrap">
-                    {generatedDesc || event.description || (
-                        <span className="text-muted-foreground italic">No description provided yet.</span>
+                <div className="p-4 bg-muted rounded-xl border border-border">
+                    {event.description ? (
+                      <>
+                        <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+                          {displayDescription}
+                        </p>
+                        {hasLongDescription && (
+                          <button
+                            onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                            className="mt-3 text-xs font-medium text-orange-500 hover:text-orange-600 flex items-center gap-1 transition-colors"
+                          >
+                            {isDescriptionExpanded ? (
+                              <>
+                                <ChevronUp size={14} />
+                                Show less
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown size={14} />
+                                Show more
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                        <span className="text-muted-foreground italic text-sm">No description provided.</span>
                     )}
                 </div>
             </div>
 
-            {/* Additional Metadata Grid */}
-            <div className="grid grid-cols-2 gap-4">
-                 <div className="p-3 rounded-lg border border-border bg-muted">
-                     <p className="text-[10px] text-muted-foreground font-bold uppercase mb-1">Video ID</p>
-                     <p className="text-sm font-mono font-medium text-foreground">{event.id}</p>
-                 </div>
-                 <div className="p-3 rounded-lg border border-border bg-muted">
-                     <p className="text-[10px] text-muted-foreground font-bold uppercase mb-1">Time</p>
-                     <p className="text-sm font-mono font-medium text-foreground">{event.scheduledTime}</p>
-                 </div>
+            {/* Video ID Card */}
+            <div className="p-3 rounded-lg border border-border bg-muted">
+                <p className="text-[10px] text-muted-foreground font-bold uppercase mb-1">Video ID</p>
+                <p className="text-sm font-mono font-medium text-foreground">{event.id}</p>
             </div>
 
         </div>
 
         {/* Footer Actions */}
         <div className="p-4 border-t border-border bg-muted flex gap-3">
-             <button className="flex-1 py-2.5 rounded-lg bg-background border border-border text-foreground font-semibold text-sm hover:bg-accent transition-colors shadow-sm">
-                 Edit Details
-             </button>
-             <button className="flex-1 py-2.5 rounded-lg bg-foreground text-background font-semibold text-sm hover:bg-foreground/90 transition-colors shadow-md">
-                 Open in Studio
-             </button>
+             {event.status === 'Posted' && event.youtubeUrl ? (
+               // Posted video - show View on YouTube button
+               <a
+                 href={event.youtubeUrl}
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 className="flex-1 py-2.5 rounded-lg bg-red-600 text-white font-semibold text-sm hover:bg-red-700 transition-colors shadow-md flex items-center justify-center gap-2"
+               >
+                 <Youtube size={18} />
+                 View on YouTube
+                 <ExternalLink size={14} />
+               </a>
+             ) : (
+               // Scheduled video - show Edit Details button
+               <button className="flex-1 py-2.5 rounded-lg bg-background border border-border text-foreground font-semibold text-sm hover:bg-accent transition-colors shadow-sm">
+                   Edit Details
+               </button>
+             )}
         </div>
 
       </div>
