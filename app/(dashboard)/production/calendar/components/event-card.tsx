@@ -30,7 +30,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, isDragging, onClick, onDra
       className={`
         group flex items-center gap-2 p-1.5 rounded-md border cursor-grab active:cursor-grabbing transition-all shadow-sm
         ${event.channel.colorTheme}
-        ${isDragging ? 'opacity-40 grayscale scale-[0.98] border-dashed ring-2 ring-gray-200' : 'opacity-100 hover:shadow-md'}
+        ${isDragging ? 'opacity-40 grayscale scale-[0.98] border-dashed ring-2 ring-border' : 'opacity-100 hover:shadow-md'}
       `}
       title={`${event.title} - ${event.channel.name}`}
     >

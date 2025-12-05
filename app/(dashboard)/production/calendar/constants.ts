@@ -5,25 +5,25 @@ export const CHANNELS: Record<string, Channel> = {
     id: 'c1',
     name: 'Automedia Official',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&backgroundColor=b6e3f4',
-    colorTheme: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+    colorTheme: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800 dark:hover:bg-blue-900'
   },
   gaming: {
     id: 'c2',
     name: 'Retro Gaming Hub',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jack&backgroundColor=ffdfbf',
-    colorTheme: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
+    colorTheme: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800 dark:hover:bg-purple-900'
   },
   tech: {
     id: 'c3',
     name: 'Tech Breakdown',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka&backgroundColor=c0aede',
-    colorTheme: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+    colorTheme: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 dark:hover:bg-emerald-900'
   },
   vlog: {
     id: 'c4',
     name: 'Daily Life',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah&backgroundColor=ffdfbf',
-    colorTheme: 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100'
+    colorTheme: 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800 dark:hover:bg-orange-900'
   },
 };
 

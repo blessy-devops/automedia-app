@@ -144,7 +144,7 @@ const CalendarBoard: React.FC<CalendarBoardProps> = ({ currentDate }) => {
       {/* Weekday Headers */}
       <div className="grid grid-cols-7 gap-2 mb-2 shrink-0">
           {weekDays.map(day => (
-              <div key={day} className="text-right pr-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
+              <div key={day} className="text-right pr-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">
                   {day}
               </div>
           ))}
@@ -154,7 +154,7 @@ const CalendarBoard: React.FC<CalendarBoardProps> = ({ currentDate }) => {
       <div className="grid grid-cols-7 grid-rows-5 gap-2 flex-1 min-h-0">
         {totalSlots.map((day, index) => {
             if (day === null) {
-                return <div key={`blank-${index}`} className="bg-gray-50/50 rounded-lg" />;
+                return <div key={`blank-${index}`} className="bg-muted/50 rounded-lg" />;
             }
 
             const dayEvents = getEventsForDay(day);
@@ -166,19 +166,19 @@ const CalendarBoard: React.FC<CalendarBoardProps> = ({ currentDate }) => {
                     onDragOver={(e) => handleDragOverDay(e, day, dayEvents.length)}
                     onDrop={(e) => handleDrop(e, day)}
                     className={`relative rounded-xl p-2 transition-all border group flex flex-col overflow-hidden
-                        ${isToday ? 'bg-orange-50/30 border-orange-200' : 'bg-white border-gray-200 hover:border-orange-300 shadow-sm'}
+                        ${isToday ? 'bg-orange-500/10 border-orange-500/30 dark:bg-orange-500/20 dark:border-orange-500/40' : 'bg-card border-border hover:border-orange-300 shadow-sm'}
                     `}
                 >
                     {/* Header: Date & Count Badge */}
                     <div className="flex justify-between items-start mb-1 shrink-0">
                          <span className={`text-sm font-semibold w-6 h-6 flex items-center justify-center rounded-full
-                            ${isToday ? 'bg-orange-500 text-white' : 'text-gray-500'}
+                            ${isToday ? 'bg-orange-500 text-white' : 'text-muted-foreground'}
                         `}>
                             {day}
                         </span>
 
                         {dayEvents.length > 0 && (
-                             <span className="bg-gray-100 text-gray-500 text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
+                             <span className="bg-muted text-muted-foreground text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
                                 {dayEvents.length}
                             </span>
                         )}
@@ -194,7 +194,7 @@ const CalendarBoard: React.FC<CalendarBoardProps> = ({ currentDate }) => {
                                 <React.Fragment key={event.id}>
                                     {/* Placeholder when dragging ABOVE this item */}
                                     {showPlaceholder && (
-                                        <div className="h-8 bg-gray-50 border-2 border-dashed border-gray-300 rounded-md mb-1 w-full shrink-0 animate-in fade-in duration-200" />
+                                        <div className="h-8 bg-muted border-2 border-dashed border-border rounded-md mb-1 w-full shrink-0 animate-in fade-in duration-200" />
                                     )}
 
                                     <EventCard
@@ -210,12 +210,12 @@ const CalendarBoard: React.FC<CalendarBoardProps> = ({ currentDate }) => {
 
                         {/* Placeholder at the END of the list */}
                         {dragOverInfo?.day === day && dragOverInfo.index === dayEvents.length && (
-                             <div className="h-8 bg-gray-50 border-2 border-dashed border-gray-300 rounded-md mb-1 w-full shrink-0 animate-in fade-in duration-200" />
+                             <div className="h-8 bg-muted border-2 border-dashed border-border rounded-md mb-1 w-full shrink-0 animate-in fade-in duration-200" />
                         )}
 
                         {dayEvents.length === 0 && !dragOverInfo && (
                              <div className="h-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                <span className="text-[10px] text-gray-300 font-medium">+ Schedule</span>
+                                <span className="text-[10px] text-muted-foreground/50 font-medium">+ Schedule</span>
                              </div>
                         )}
                     </div>

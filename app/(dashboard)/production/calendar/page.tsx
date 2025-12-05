@@ -33,26 +33,26 @@ export default function ProductionCalendarPage() {
   return (
     <div className="flex flex-col h-screen">
       {/* Local Toolbar */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white shrink-0">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-background shrink-0">
         {/* Title & Date Nav */}
         <div className="flex items-center gap-6">
-          <h1 className="text-xl font-bold text-gray-900">Content Calendar</h1>
-          <div className="h-6 w-px bg-gray-200" />
+          <h1 className="text-xl font-bold text-foreground">Content Calendar</h1>
+          <div className="h-6 w-px bg-border" />
 
           {/* Date Navigation */}
-          <div className="flex items-center gap-2 bg-gray-50 rounded-xl border border-gray-200 p-1">
+          <div className="flex items-center gap-2 bg-muted rounded-xl border border-border p-1">
             <button
               onClick={handlePrevMonth}
-              className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
+              className="p-1.5 hover:bg-accent rounded-lg text-muted-foreground transition-colors"
             >
               <ChevronLeft size={18} />
             </button>
-            <div className="px-2 min-w-[140px] text-center font-semibold text-gray-700 select-none">
+            <div className="px-2 min-w-[140px] text-center font-semibold text-foreground select-none">
               {formattedDate}
             </div>
             <button
               onClick={handleNextMonth}
-              className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
+              className="p-1.5 hover:bg-accent rounded-lg text-muted-foreground transition-colors"
             >
               <ChevronRight size={18} />
             </button>
@@ -60,7 +60,7 @@ export default function ProductionCalendarPage() {
 
           <button
             onClick={handleToday}
-            className="text-sm font-medium text-gray-500 hover:text-orange-500 transition-colors"
+            className="text-sm font-medium text-muted-foreground hover:text-orange-500 transition-colors"
           >
             Jump to Today
           </button>
@@ -70,20 +70,20 @@ export default function ProductionCalendarPage() {
         <div className="relative group">
           <Search
             size={18}
-            className="text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-orange-500"
+            className="text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 group-focus-within:text-orange-500"
           />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Find video..."
-            className="pl-9 pr-4 py-2 rounded-full bg-gray-100 border border-transparent focus:bg-white focus:border-orange-200 focus:ring-2 focus:ring-orange-100 outline-none text-sm w-48 transition-all"
+            className="pl-9 pr-4 py-2 rounded-full bg-muted border border-transparent focus:bg-background focus:border-orange-200 focus:ring-2 focus:ring-orange-100 outline-none text-sm w-48 transition-all text-foreground placeholder:text-muted-foreground"
           />
         </div>
       </div>
 
       {/* Main Board Area */}
-      <div className="flex-1 overflow-hidden bg-gray-50">
+      <div className="flex-1 overflow-hidden bg-muted/50">
         <CalendarBoard currentDate={currentDate} />
       </div>
     </div>
