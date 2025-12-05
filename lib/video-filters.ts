@@ -29,6 +29,10 @@ export interface VideoFilters {
   // Legacy preset date range (kept for backward compatibility)
   dateRange?: '7d' | '30d' | '90d' | 'all'
 
+  // Categorization filters (from JSONB column)
+  niche?: string
+  subniche?: string
+
   sortBy?: 'upload_date' | 'views' | 'outlier_score'
 }
 
@@ -72,6 +76,10 @@ export function parseVideoFilters(searchParams: { [key: string]: string | string
 
     // Legacy preset date range (kept for backward compatibility)
     dateRange: searchParams.dateRange as '7d' | '30d' | '90d' | 'all' | undefined,
+
+    // Categorization filters
+    niche: parseDate(searchParams.niche),
+    subniche: parseDate(searchParams.subniche),
 
     // Sorting
     sortBy: (searchParams.sortBy as 'upload_date' | 'views' | 'outlier_score') || 'upload_date',
@@ -138,6 +146,14 @@ export function applyVideoFiltersToQuery(query: any, filters: VideoFilters) {
     }
   }
 
+  // Apply categorization filters (JSONB)
+  if (filters.niche) {
+    query = query.eq('categorization->>niche', filters.niche)
+  }
+  if (filters.subniche) {
+    query = query.eq('categorization->>subniche', filters.subniche)
+  }
+
   // Apply sorting
   if (filters.sortBy === 'views') {
     query = query.order('views', { ascending: false })
@@ -177,6 +193,10 @@ export function countActiveFilters(filters: VideoFilters): number {
 
     // Legacy preset date range
     filters.dateRange && filters.dateRange !== 'all',
+
+    // Categorization filters
+    !!filters.niche,
+    !!filters.subniche,
   ].filter(Boolean)
 
   return activeFilters.length

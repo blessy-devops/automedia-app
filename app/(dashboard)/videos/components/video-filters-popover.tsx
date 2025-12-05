@@ -54,6 +54,10 @@ export function VideoFiltersPopover() {
   // Legacy preset date range
   const [dateRange, setDateRange] = useState(searchParams.get("dateRange") || "all")
 
+  // Categorization filters
+  const [niche, setNiche] = useState(searchParams.get("niche") || "")
+  const [subniche, setSubniche] = useState(searchParams.get("subniche") || "")
+
   // Sync local state with URL params when they change
   useEffect(() => {
     setMinViews(searchParams.get("minViews") || "")
@@ -67,6 +71,8 @@ export function VideoFiltersPopover() {
     setUploadDateFrom(searchParams.get("uploadDateFrom") || "")
     setUploadDateTo(searchParams.get("uploadDateTo") || "")
     setDateRange(searchParams.get("dateRange") || "all")
+    setNiche(searchParams.get("niche") || "")
+    setSubniche(searchParams.get("subniche") || "")
   }, [searchParams])
 
   // Update URL params helper
@@ -118,6 +124,12 @@ export function VideoFiltersPopover() {
     if (dateRange && dateRange !== "all") params.set("dateRange", dateRange)
     else params.delete("dateRange")
 
+    // Categorization filters
+    if (niche) params.set("niche", niche)
+    else params.delete("niche")
+    if (subniche) params.set("subniche", subniche)
+    else params.delete("subniche")
+
     router.push(`${pathname}?${params.toString()}`, { scroll: false })
     setFiltersOpen(false)
   }
@@ -135,6 +147,8 @@ export function VideoFiltersPopover() {
     setUploadDateFrom("")
     setUploadDateTo("")
     setDateRange("all")
+    setNiche("")
+    setSubniche("")
 
     const params = new URLSearchParams(searchParams.toString())
     params.delete("minViews")
@@ -148,6 +162,8 @@ export function VideoFiltersPopover() {
     params.delete("uploadDateFrom")
     params.delete("uploadDateTo")
     params.delete("dateRange")
+    params.delete("niche")
+    params.delete("subniche")
 
     router.push(`${pathname}?${params.toString()}`, { scroll: false })
   }
@@ -165,6 +181,8 @@ export function VideoFiltersPopover() {
     uploadDateFrom: uploadDateFrom || undefined,
     uploadDateTo: uploadDateTo || undefined,
     dateRange: dateRange as '7d' | '30d' | '90d' | 'all' | undefined,
+    niche: niche || undefined,
+    subniche: subniche || undefined,
   })
 
   return (
@@ -191,6 +209,60 @@ export function VideoFiltersPopover() {
               Filter videos by date ranges, views, age, and performance
             </p>
           </div>
+          <Separator />
+
+          {/* Categorization Filters */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Categorization</Label>
+            <div className="space-y-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="niche" className="text-xs text-muted-foreground">Niche</Label>
+                <Select value={niche} onValueChange={setNiche}>
+                  <SelectTrigger className="w-full h-9">
+                    <SelectValue placeholder="All niches" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All niches</SelectItem>
+                    <SelectItem value="entertainment">Entertainment</SelectItem>
+                    <SelectItem value="history">History</SelectItem>
+                    <SelectItem value="religion">Religion</SelectItem>
+                    <SelectItem value="motivation">Motivation</SelectItem>
+                    <SelectItem value="animals">Animals</SelectItem>
+                    <SelectItem value="business">Business</SelectItem>
+                    <SelectItem value="news">News</SelectItem>
+                    <SelectItem value="health">Health</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="subniche" className="text-xs text-muted-foreground">Subniche</Label>
+                <Select value={subniche} onValueChange={setSubniche}>
+                  <SelectTrigger className="w-full h-9">
+                    <SelectValue placeholder="All subniches" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All subniches</SelectItem>
+                    <SelectItem value="storytelling">Storytelling</SelectItem>
+                    <SelectItem value="biblical_studies">Biblical Studies</SelectItem>
+                    <SelectItem value="wars">Wars</SelectItem>
+                    <SelectItem value="tv_drama">TV Drama</SelectItem>
+                    <SelectItem value="modern_history">Modern History</SelectItem>
+                    <SelectItem value="wildlife">Wildlife</SelectItem>
+                    <SelectItem value="true_crime">True Crime</SelectItem>
+                    <SelectItem value="medical_conditions">Medical Conditions</SelectItem>
+                    <SelectItem value="aviation">Aviation</SelectItem>
+                    <SelectItem value="ancient_history">Ancient History</SelectItem>
+                    <SelectItem value="mysteries">Mysteries</SelectItem>
+                    <SelectItem value="business_finance">Business Finance</SelectItem>
+                    <SelectItem value="aquatic_animals">Aquatic Animals</SelectItem>
+                    <SelectItem value="medieval_history">Medieval History</SelectItem>
+                    <SelectItem value="biographies">Biographies</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
           <Separator />
 
           {/* Views Range */}
