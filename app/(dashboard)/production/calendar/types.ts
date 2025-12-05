@@ -12,6 +12,7 @@ export interface BenchmarkVideo {
   id: string;
   title: string;
   thumbnail: string;
+  youtubeVideoId?: string; // YouTube video ID for external link
 }
 
 export interface CalendarEvent {

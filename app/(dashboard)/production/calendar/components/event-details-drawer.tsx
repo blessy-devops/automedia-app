@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
 import { X, Clock, CheckCircle2, Youtube, FileText, ArrowUpRight, BarChart, ChevronDown, ChevronUp, ExternalLink, Calendar } from 'lucide-react';
 import { CalendarEvent } from '../types';
 
@@ -16,13 +15,13 @@ const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose
 
   if (!event) return null;
 
-  // Format date with time
-  const formattedDateTime = event.date.toLocaleDateString('en-US', {
+  // Format date
+  const formattedDate = event.date.toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
     year: 'numeric'
-  }) + (event.scheduledTime ? ` at ${event.scheduledTime}` : '');
+  });
 
   // Check if description is long enough to need collapsing
   const descriptionPreviewLength = 150;
@@ -30,6 +29,11 @@ const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose
   const displayDescription = isDescriptionExpanded || !hasLongDescription
     ? event.description
     : event.description?.substring(0, descriptionPreviewLength) + '...';
+
+  // Build YouTube URL for benchmark video
+  const benchmarkYoutubeUrl = event.benchmarkVideo?.youtubeVideoId
+    ? `https://www.youtube.com/watch?v=${event.benchmarkVideo.youtubeVideoId}`
+    : null;
 
   return (
     <div className={`fixed inset-0 z-50 flex justify-end transition-all duration-300 ${isOpen ? 'visible' : 'invisible'}`}>
@@ -79,32 +83,33 @@ const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
 
-            {/* Title & Channel */}
+            {/* Title */}
             <div>
-                <h2 className="text-2xl font-bold text-foreground leading-tight mb-4">
+                <h2 className="text-2xl font-bold text-foreground leading-tight">
                     {event.title}
                 </h2>
+            </div>
 
-                <div className="flex items-center justify-between p-3 bg-muted rounded-xl border border-border">
-                    <div className="flex items-center gap-3">
-                        <img src={event.channel.avatar} alt={event.channel.name} className="w-10 h-10 rounded-full border border-border" />
-                        <div>
-                            <p className="text-xs text-muted-foreground font-bold uppercase">Posting to</p>
-                            <p className="text-sm font-bold text-foreground">{event.channel.name}</p>
-                        </div>
-                    </div>
-                    <div className="text-right">
-                         <div className="flex items-center gap-1.5 text-muted-foreground mb-0.5">
-                           <Calendar size={12} />
-                           <p className="text-xs font-bold uppercase">Scheduled</p>
-                         </div>
-                         <p className="text-sm font-mono font-medium text-foreground">
-                            {formattedDateTime}
-                         </p>
-                    </div>
+            {/* Channel Card */}
+            <div className="flex items-center gap-3 p-3 bg-muted rounded-xl border border-border">
+                <img src={event.channel.avatar} alt={event.channel.name} className="w-10 h-10 rounded-full border border-border" />
+                <div>
+                    <p className="text-xs text-muted-foreground font-bold uppercase">Posting to</p>
+                    <p className="text-sm font-bold text-foreground">{event.channel.name}</p>
                 </div>
+            </div>
+
+            {/* Scheduled Date/Time Card */}
+            <div className="p-3 bg-muted rounded-xl border border-border">
+                <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                    <Calendar size={14} />
+                    <p className="text-xs font-bold uppercase">Scheduled Publication</p>
+                </div>
+                <p className="text-sm font-mono font-medium text-foreground">
+                    {formattedDate} {event.scheduledTime && `at ${event.scheduledTime}`}
+                </p>
             </div>
 
             {/* Benchmark Video Card */}
@@ -114,8 +119,10 @@ const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose
                     <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">Benchmark Reference</h3>
                 </div>
                 {event.benchmarkVideo ? (
-                    <Link
-                      href={`/benchmark/videos/${event.benchmarkVideo.id}`}
+                    <a
+                      href={benchmarkYoutubeUrl || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="flex gap-4 p-3 rounded-xl border border-border bg-card shadow-sm hover:border-orange-500/50 transition-colors group cursor-pointer"
                     >
                          <div className="w-24 h-16 bg-muted rounded-lg overflow-hidden shrink-0 relative">
@@ -130,10 +137,10 @@ const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose
                                  {event.benchmarkVideo.title}
                              </h4>
                              <p className="text-xs text-orange-500 font-medium mt-1 flex items-center gap-1 group-hover:underline">
-                                 View Benchmark <ArrowUpRight size={10} />
+                                 View on YouTube <ArrowUpRight size={10} />
                              </p>
                          </div>
-                    </Link>
+                    </a>
                 ) : (
                     <div className="p-4 rounded-xl border border-dashed border-border bg-muted text-center text-muted-foreground text-sm">
                         No benchmark video linked.
@@ -187,27 +194,21 @@ const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose
 
         </div>
 
-        {/* Footer Actions */}
-        <div className="p-4 border-t border-border bg-muted flex gap-3">
-             {event.status === 'Posted' && event.youtubeUrl ? (
-               // Posted video - show View on YouTube button
-               <a
-                 href={event.youtubeUrl}
-                 target="_blank"
-                 rel="noopener noreferrer"
-                 className="flex-1 py-2.5 rounded-lg bg-red-600 text-white font-semibold text-sm hover:bg-red-700 transition-colors shadow-md flex items-center justify-center gap-2"
-               >
-                 <Youtube size={18} />
-                 View on YouTube
-                 <ExternalLink size={14} />
-               </a>
-             ) : (
-               // Scheduled video - show Edit Details button
-               <button className="flex-1 py-2.5 rounded-lg bg-background border border-border text-foreground font-semibold text-sm hover:bg-accent transition-colors shadow-sm">
-                   Edit Details
-               </button>
-             )}
-        </div>
+        {/* Footer Actions - Only show View on YouTube for posted videos */}
+        {event.status === 'Posted' && event.youtubeUrl && (
+          <div className="p-4 border-t border-border bg-muted">
+            <a
+              href={event.youtubeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-2.5 rounded-lg bg-red-600 text-white font-semibold text-sm hover:bg-red-700 transition-colors shadow-md flex items-center justify-center gap-2"
+            >
+              <Youtube size={18} />
+              View on YouTube
+              <ExternalLink size={14} />
+            </a>
+          </div>
+        )}
 
       </div>
     </div>

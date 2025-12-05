@@ -131,6 +131,7 @@ export async function getCalendarEvents(year: number, month: number): Promise<Ca
         id: benchmarkData.id.toString(),
         title: benchmarkData.title,
         thumbnail: benchmarkData.thumbnail_url,
+        youtubeVideoId: benchmarkData.youtube_video_id,
       }
     }
 
