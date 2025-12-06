@@ -15,6 +15,7 @@ interface BenchmarkVideo {
   video_transcript: string | null
   youtube_video_id: string
   youtube_url: string
+  upload_date: string | null
   status: string
   created_at: string
   performance_vs_median_14d: number | null
@@ -49,6 +50,7 @@ interface VideoWithChannels extends BenchmarkVideo {
     category?: string
     format?: string
   }
+  upload_date: string | null
   eligibleChannels: StructureAccount[]
 }
 

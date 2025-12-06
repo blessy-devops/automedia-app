@@ -66,6 +66,7 @@ interface VideoWithChannels {
   video_transcript: string | null
   youtube_video_id: string
   youtube_url: string
+  upload_date: string | null
   performance_vs_median_14d: number | null
   performance_vs_avg_14d: number | null
   median_metric_source?: '14d' | 'historical'
@@ -597,6 +598,9 @@ export function DistributionList({
                   Source
                 </th>
                 <th className="px-4 py-3 text-left text-sm text-muted-foreground">
+                  Published
+                </th>
+                <th className="px-4 py-3 text-left text-sm text-muted-foreground">
                   Category
                 </th>
                 <th className="px-4 py-3 text-left text-sm text-muted-foreground">
@@ -675,7 +679,34 @@ export function DistributionList({
                       )}
                     </td>
 
-                    {/* Column 4: Category (Niche + Subniche) */}
+                    {/* Column 4: Published Date */}
+                    <td className="px-4 py-3">
+                      {video.upload_date ? (
+                        <div className="flex flex-col gap-0.5">
+                          <div className="text-sm text-foreground">
+                            {new Date(video.upload_date).toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {(() => {
+                              const days = Math.floor(
+                                (Date.now() - new Date(video.upload_date).getTime()) / (1000 * 60 * 60 * 24)
+                              )
+                              if (days === 0) return 'Today'
+                              if (days === 1) return '1 day ago'
+                              return `${days} days ago`
+                            })()}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
+                    </td>
+
+                    {/* Column 5: Category (Niche + Subniche) */}
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
                         <Badge variant="secondary" className="text-xs">
