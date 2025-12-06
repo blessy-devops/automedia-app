@@ -834,10 +834,10 @@ export async function rejectThumbnail(
       return { success: false, error: 'Banco de dados do Gobbi não configurado' }
     }
 
-    // 1. Buscar vídeo atual
+    // 1. Buscar vídeo atual (inclui thumbnail_approval_data para extrair nome do arquivo)
     const { data: video, error: fetchError } = await supabase
       .from('production_videos')
-      .select('id, status, thumbnail_approval_status')
+      .select('id, status, thumbnail_approval_status, thumbnail_approval_data')
       .eq('id', videoId)
       .single()
 
@@ -866,20 +866,32 @@ export async function rejectThumbnail(
     }
 
     // 3. Deletar arquivo de thumbnail do storage antes de regenerar
+    // Extrai o nome do arquivo da URL salva em thumbnail_approval_data
     const adminClient = createGobbiAdminClient()
     if (adminClient) {
-      const thumbnailPath = `${videoId}_thumbnail_final.jpg`
-      console.log(`🗑️ [rejectThumbnail] Deleting thumbnail from storage: thumbnails/${thumbnailPath}`)
+      const thumbnailUrl = video.thumbnail_approval_data?.thumbnail_url as string | undefined
 
-      const { error: deleteError } = await adminClient.storage
-        .from('thumbnails')
-        .remove([thumbnailPath])
+      if (thumbnailUrl) {
+        // Extrair nome do arquivo da URL completa do Supabase Storage
+        // Formato: https://xxx.supabase.co/storage/v1/object/public/thumbnails/FILENAME
+        const urlParts = thumbnailUrl.split('/')
+        const thumbnailPath = urlParts[urlParts.length - 1] // Pega o último segmento (nome do arquivo)
 
-      if (deleteError) {
-        console.warn(`⚠️ [rejectThumbnail] Failed to delete thumbnail from storage:`, deleteError.message)
-        // Não falha a operação, apenas loga o warning
+        console.log(`🗑️ [rejectThumbnail] Deleting thumbnail from storage: thumbnails/${thumbnailPath}`)
+        console.log(`🗑️ [rejectThumbnail] Original URL: ${thumbnailUrl}`)
+
+        const { error: deleteError } = await adminClient.storage
+          .from('thumbnails')
+          .remove([thumbnailPath])
+
+        if (deleteError) {
+          console.warn(`⚠️ [rejectThumbnail] Failed to delete thumbnail from storage:`, deleteError.message)
+          // Não falha a operação, apenas loga o warning
+        } else {
+          console.log(`✅ [rejectThumbnail] Thumbnail deleted from storage successfully`)
+        }
       } else {
-        console.log(`✅ [rejectThumbnail] Thumbnail deleted from storage successfully`)
+        console.log(`ℹ️ [rejectThumbnail] No thumbnail URL found in thumbnail_approval_data, skipping storage deletion`)
       }
     } else {
       console.warn(`⚠️ [rejectThumbnail] Admin client not available, skipping storage deletion`)
