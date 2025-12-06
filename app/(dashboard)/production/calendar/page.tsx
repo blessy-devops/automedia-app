@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useState, useEffect, useTransition, useMemo } from 'react';
 import CalendarBoard from './components/calendar-board';
+import ChannelFilterSidebar from './components/channel-filter-sidebar';
 import { ChevronLeft, ChevronRight, Search, Database, FlaskConical, Loader2 } from 'lucide-react';
-import { getCalendarEvents } from './actions';
+import { getCalendarEvents, getAvailableChannels } from './actions';
 import { MOCK_EVENTS } from './constants';
-import type { CalendarEvent } from './types';
+import type { CalendarEvent, Channel } from './types';
 
 export default function ProductionCalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -13,6 +14,22 @@ export default function ProductionCalendarPage() {
   const [useMockData, setUseMockData] = useState(true);
   const [realEvents, setRealEvents] = useState<CalendarEvent[]>([]);
   const [isPending, startTransition] = useTransition();
+
+  // Channel filter state
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [selectedChannelIds, setSelectedChannelIds] = useState<Set<string>>(new Set());
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // Fetch channels on mount
+  useEffect(() => {
+    const fetchChannels = async () => {
+      const availableChannels = await getAvailableChannels();
+      setChannels(availableChannels);
+      // Select all channels by default
+      setSelectedChannelIds(new Set(availableChannels.map(c => c.id)));
+    };
+    fetchChannels();
+  }, []);
 
   // Fetch real data when switching to real mode or changing month
   useEffect(() => {
@@ -26,6 +43,48 @@ export default function ProductionCalendarPage() {
       });
     }
   }, [useMockData, currentDate]);
+
+  // Filter events by selected channels
+  const filteredEvents = useMemo(() => {
+    const sourceEvents = useMockData ? MOCK_EVENTS : realEvents;
+    if (selectedChannelIds.size === 0) return [];
+    if (selectedChannelIds.size === channels.length) return sourceEvents;
+    return sourceEvents.filter(event => selectedChannelIds.has(event.channel.id));
+  }, [useMockData, realEvents, selectedChannelIds, channels.length]);
+
+  // Channel filter handlers
+  const handleToggleChannel = (channelId: string) => {
+    setSelectedChannelIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(channelId)) {
+        newSet.delete(channelId);
+      } else {
+        newSet.add(channelId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAllChannels = () => {
+    setSelectedChannelIds(new Set(channels.map(c => c.id)));
+  };
+
+  const handleSelectNoChannels = () => {
+    setSelectedChannelIds(new Set());
+  };
+
+  // Refresh events after reschedule
+  const handleEventUpdated = () => {
+    if (!useMockData) {
+      startTransition(async () => {
+        const events = await getCalendarEvents(
+          currentDate.getFullYear(),
+          currentDate.getMonth()
+        );
+        setRealEvents(events);
+      });
+    }
+  };
 
   const handlePrevMonth = () => {
     setCurrentDate(prev => {
@@ -134,12 +193,27 @@ export default function ProductionCalendarPage() {
         </div>
       </div>
 
-      {/* Main Board Area */}
-      <div className="flex-1 overflow-hidden bg-muted/50">
-        <CalendarBoard
-          currentDate={currentDate}
-          events={useMockData ? MOCK_EVENTS : realEvents}
-          isLoading={isPending && !useMockData}
+      {/* Main Board Area with Sidebar */}
+      <div className="flex-1 overflow-hidden bg-muted/50 flex">
+        {/* Calendar Grid */}
+        <div className="flex-1 overflow-hidden">
+          <CalendarBoard
+            currentDate={currentDate}
+            events={filteredEvents}
+            isLoading={isPending && !useMockData}
+            onEventUpdated={handleEventUpdated}
+          />
+        </div>
+
+        {/* Channel Filter Sidebar (Right) */}
+        <ChannelFilterSidebar
+          channels={channels}
+          selectedChannelIds={selectedChannelIds}
+          onToggleChannel={handleToggleChannel}
+          onSelectAll={handleSelectAllChannels}
+          onSelectNone={handleSelectNoChannels}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         />
       </div>
     </div>

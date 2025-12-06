@@ -60,6 +60,7 @@
     "postcss": "8.4.31",
     "react": "19.0.0",
     "react-aria-components": "^1.13.0",
+    "react-day-picker": "^9",
     "react-dom": "19.0.0",
     "react-hook-form": "^7.65.0",
     "react-markdown": "^10.1.0",
@@ -74,6 +75,8 @@
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.19",
+    "@types/pg": "^8.15.6",
+    "pg": "^8.16.3",
     "tailwindcss-animate": "^1.0.7",
     "tsx": "^4.20.6"
   }

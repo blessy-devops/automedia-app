@@ -6,6 +6,9 @@ export interface Channel {
   avatar: string; // URL to channel icon
   subscribers?: string;
   colorTheme: string; // Tailwind classes for styling
+  solidColor: string; // Solid color for legend dot (e.g. "bg-blue-500")
+  timezone?: string; // e.g. "America/Sao_Paulo" - from structure_accounts.timezone
+  placeholder?: string; // The placeholder key used in production_videos
 }
 
 export interface BenchmarkVideo {

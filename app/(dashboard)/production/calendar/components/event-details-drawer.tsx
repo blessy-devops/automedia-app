@@ -1,22 +1,53 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { X, Clock, CheckCircle2, Youtube, FileText, ArrowUpRight, BarChart, ChevronDown, ChevronUp, ExternalLink, Calendar } from 'lucide-react';
+import { X, Clock, CheckCircle2, Youtube, FileText, ArrowUpRight, BarChart, ChevronDown, ChevronUp, ExternalLink, Calendar, Edit2, Save, Loader2, AlertTriangle, Globe } from 'lucide-react';
 import { CalendarEvent } from '../types';
+import { updateVideoSchedule, checkScheduleConflict } from '../actions';
+import { DateTimePicker } from '@/components/ui/datetime-picker';
 
 interface EventDetailsDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   event: CalendarEvent | null;
+  onEventUpdated?: () => void; // Callback to refresh events after reschedule
 }
 
-const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose, event }) => {
+const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose, event, onEventUpdated }) => {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+
+  // Schedule editing state
+  const [isEditingSchedule, setIsEditingSchedule] = useState(false);
+  const [editDateTime, setEditDateTime] = useState<Date | undefined>(undefined);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [conflictWarning, setConflictWarning] = useState<string | null>(null);
+
+  // Initialize editDateTime from event
+  const initialDateTime = useMemo(() => {
+    if (!event) return undefined;
+    const date = new Date(event.date);
+    if (event.scheduledTime) {
+      const [hours, minutes] = event.scheduledTime.split(':').map(Number);
+      date.setHours(hours, minutes, 0, 0);
+    }
+    return date;
+  }, [event]);
+
+  // Reset edit state when event changes or drawer closes
+  useEffect(() => {
+    if (event && isOpen) {
+      setEditDateTime(initialDateTime);
+      setIsEditingSchedule(false);
+      setSaveError(null);
+      setConflictWarning(null);
+    }
+  }, [event, isOpen, initialDateTime]);
 
   if (!event) return null;
 
-  // Format date
+  // Format date for display
   const formattedDate = event.date.toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
@@ -35,6 +66,64 @@ const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose
   const benchmarkPageUrl = event.benchmarkVideo?.id
     ? `/benchmark/videos/${event.benchmarkVideo.id}?source=gobbi`
     : null;
+
+  // Handle schedule save
+  const handleSaveSchedule = async () => {
+    if (!event || !editDateTime) return;
+
+    setIsSaving(true);
+    setSaveError(null);
+    setConflictWarning(null);
+
+    try {
+      // Convert to ISO string
+      const newDateTime = editDateTime.toISOString();
+
+      // Check for conflicts (5-minute rule)
+      if (event.channel.placeholder) {
+        const conflictResult = await checkScheduleConflict(
+          event.channel.placeholder,
+          newDateTime,
+          event.id
+        );
+
+        if (conflictResult.hasConflict) {
+          const conflictTime = new Date(conflictResult.conflictingTime!).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          setConflictWarning(`Another video is scheduled within 5 minutes (at ${conflictTime}). Consider a different time.`);
+          // Don't block, just warn
+        }
+      }
+
+      // Save to database
+      const result = await updateVideoSchedule(event.id, newDateTime);
+
+      if (!result.success) {
+        setSaveError(result.error || 'Failed to save');
+        return;
+      }
+
+      // Success - close edit mode and refresh
+      setIsEditingSchedule(false);
+      onEventUpdated?.();
+
+    } catch {
+      setSaveError('Unexpected error occurred');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Cancel editing
+  const handleCancelEdit = () => {
+    // Reset to original value
+    setEditDateTime(initialDateTime);
+    setIsEditingSchedule(false);
+    setSaveError(null);
+    setConflictWarning(null);
+  };
 
   return (
     <div className={`fixed inset-0 z-50 flex justify-end transition-all duration-300 ${isOpen ? 'visible' : 'invisible'}`}>
@@ -102,15 +191,102 @@ const EventDetailsDrawer: React.FC<EventDetailsDrawerProps> = ({ isOpen, onClose
                 </div>
             </div>
 
-            {/* Scheduled Date/Time Card */}
+            {/* Scheduled Date/Time Card - Editable */}
             <div className="p-3 bg-muted rounded-xl border border-border">
-                <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
-                    <Calendar size={14} />
-                    <p className="text-xs font-bold uppercase">Scheduled Publication</p>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Calendar size={14} />
+                      <p className="text-xs font-bold uppercase">Scheduled Publication</p>
+                  </div>
+                  {!isEditingSchedule && event.status !== 'Posted' && (
+                    <button
+                      onClick={() => setIsEditingSchedule(true)}
+                      className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                      title="Edit schedule"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                  )}
                 </div>
-                <p className="text-sm font-mono font-medium text-foreground">
-                    {formattedDate} {event.scheduledTime && `at ${event.scheduledTime}`}
-                </p>
+
+                {isEditingSchedule ? (
+                  <div className="space-y-3">
+                    {/* DateTime Picker */}
+                    <div>
+                      <label className="text-[10px] text-muted-foreground font-medium uppercase block mb-2">Date & Time</label>
+                      <DateTimePicker
+                        value={editDateTime}
+                        onChange={setEditDateTime}
+                        timezone={event.channel.timezone}
+                        timePicker={{ hour: true, minute: true, second: false }}
+                        min={new Date()} // Can't schedule in the past
+                        modal={true}
+                      />
+                    </div>
+
+                    {/* Conflict Warning */}
+                    {conflictWarning && (
+                      <div className="flex items-start gap-2 p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-600 dark:text-yellow-400">
+                        <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                        <p className="text-xs">{conflictWarning}</p>
+                      </div>
+                    )}
+
+                    {/* Error Message */}
+                    {saveError && (
+                      <div className="flex items-start gap-2 p-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400">
+                        <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                        <p className="text-xs">{saveError}</p>
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={handleCancelEdit}
+                        disabled={isSaving}
+                        className="flex-1 px-3 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveSchedule}
+                        disabled={isSaving}
+                        className="flex-1 px-3 py-2 rounded-lg bg-orange-500 text-white text-sm font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {isSaving ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save size={14} />
+                            Save
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* TODO Note */}
+                    <p className="text-[10px] text-muted-foreground/60 italic">
+                      Note: YouTube API reschedule will be implemented in a future update.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-sm font-mono font-medium text-foreground">
+                        {formattedDate} {event.scheduledTime && `at ${event.scheduledTime}`}
+                    </p>
+                    {/* Timezone Display (read mode) */}
+                    {event.channel.timezone && (
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+                        <Globe size={12} />
+                        <span>{event.channel.timezone}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
             </div>
 
             {/* Benchmark Video Card */}

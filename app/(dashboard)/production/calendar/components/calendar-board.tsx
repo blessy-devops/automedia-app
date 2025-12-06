@@ -10,9 +10,10 @@ interface CalendarBoardProps {
     currentDate: Date;
     events: CalendarEvent[];
     isLoading?: boolean;
+    onEventUpdated?: () => void; // Callback when an event is rescheduled
 }
 
-const CalendarBoard: React.FC<CalendarBoardProps> = ({ currentDate, events: initialEvents, isLoading }) => {
+const CalendarBoard: React.FC<CalendarBoardProps> = ({ currentDate, events: initialEvents, isLoading, onEventUpdated }) => {
   // Use state for events to allow Drag & Drop updates
   const [events, setEvents] = useState<CalendarEvent[]>(initialEvents);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -245,6 +246,7 @@ const CalendarBoard: React.FC<CalendarBoardProps> = ({ currentDate, events: init
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         event={selectedEvent}
+        onEventUpdated={onEventUpdated}
       />
     </div>
   );
